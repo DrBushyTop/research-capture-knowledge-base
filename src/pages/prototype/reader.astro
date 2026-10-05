@@ -1,0 +1,64 @@
+---
+// Three synthetic reader variants on one throwaway route, switchable with ?variant=A|B|C.
+import VariantA from '../../components/VariantA.astro';
+import VariantB from '../../components/VariantB.astro';
+import VariantC from '../../components/VariantC.astro';
+import PrototypeSwitcher from '../../components/PrototypeSwitcher.astro';
+import '../../styles/reader.css';
+import '@fontsource/source-sans-3/400.css';
+import '@fontsource/source-sans-3/600.css';
+import '@fontsource/source-sans-3/700.css';
+import '@fontsource/source-serif-4/400.css';
+import '@fontsource/source-serif-4/600.css';
+---
+<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Research reader — throwaway prototype</title></head><body>
+  <a class="skip-link" href="#prototype-reader">Skip to reader</a>
+  <div class="prototype-disclosure"><span>Private research reader · interface prototype</span><strong>All sources and research statements are synthetic.</strong></div>
+  <div id="prototype-reader"><VariantA /><VariantB /><VariantC /></div>
+  <details class="prototype-state"><summary>Prototype state</summary><pre data-state></pre><p>Search uses these three examples in memory. Production uses a static full-text index. Authentication and editing are outside this prototype.</p></details>
+  <PrototypeSwitcher />
+  <script>
+    import { sources } from '../../data/sources';
+    const variants = ['A', 'B', 'C'];
+    const names = ['Margin notebook', 'Evidence desk', 'Accession ledger'];
+    const state = { variant: 'A', source: sources[0].id as string, query: '', topic: '', type: '', year: '' };
+    const match = (source: (typeof sources)[number]) => {
+      const haystack = [source.title, source.citation, source.topics.join(' '), source.summary, source.abstract, source.notes, ...source.findings, ...source.limitations].join(' ').toLowerCase();
+      return (!state.query || haystack.includes(state.query.toLowerCase())) && (!state.topic || (source.topics as readonly string[]).includes(state.topic)) && (!state.type || source.type === state.type) && (!state.year || source.year === state.year);
+    };
+    function render() {
+      const matches = sources.filter(match);
+      if (!matches.some(source => source.id === state.source)) state.source = matches[0]?.id || '';
+      document.querySelectorAll<HTMLElement>('[data-variant]').forEach(node => { node.hidden = node.dataset.variant !== state.variant; });
+      document.querySelectorAll<HTMLButtonElement>('[data-source-choice]').forEach(node => {
+        node.hidden = !matches.some(source => source.id === node.dataset.sourceChoice);
+        node.setAttribute('aria-pressed', String(node.dataset.sourceChoice === state.source));
+      });
+      document.querySelectorAll<HTMLElement>('[data-source-detail]').forEach(node => { node.hidden = node.dataset.sourceDetail !== state.source; });
+      document.querySelectorAll<HTMLElement>('[data-no-results]').forEach(node => { node.hidden = matches.length > 0; });
+      document.querySelectorAll<HTMLElement>('[data-result-count]').forEach(node => { node.textContent = `${matches.length} ${matches.length === 1 ? 'source' : 'sources'}`; });
+      document.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-filter]').forEach(node => { node.value = state[node.dataset.filter as 'query' | 'topic' | 'type' | 'year']; });
+      const label = document.querySelector('[data-variant-label]');
+      if (label) label.textContent = `${state.variant} · ${names[variants.indexOf(state.variant)]}`;
+      const selected = sources.find(source => source.id === state.source);
+      const debug = document.querySelector('[data-state]');
+      if (debug) debug.textContent = JSON.stringify({ ...state, matches: matches.map(source => source.id), extraction: selected?.extraction ?? null, review: selected?.review ?? null, publication: 'Private only' }, null, 2);
+      document.body.dataset.readerVariant = state.variant;
+    }
+    function setVariant(variant: string) {
+      state.variant = variants.includes(variant) ? variant : 'A';
+      const url = new URL(location.href); url.searchParams.set('variant', state.variant); history.replaceState(null, '', url); render();
+    }
+    function cycle(direction: number) { setVariant(variants[(variants.indexOf(state.variant) + direction + variants.length) % variants.length]); }
+    document.querySelectorAll<HTMLElement>('[data-switch]').forEach(node => node.addEventListener('click', () => cycle(Number(node.dataset.switch))));
+    document.addEventListener('keydown', event => {
+      const target = event.target as HTMLElement | null;
+      if (target?.matches('input, textarea, select, [contenteditable]')) return;
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); cycle(event.key === 'ArrowLeft' ? -1 : 1); }
+    });
+    document.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-filter]').forEach(node => node.addEventListener('input', () => { state[node.dataset.filter as 'query' | 'topic' | 'type' | 'year'] = node.value.trim(); render(); }));
+    document.querySelectorAll<HTMLButtonElement>('[data-source-choice]').forEach(node => node.addEventListener('click', () => { state.source = node.dataset.sourceChoice!; render(); if (matchMedia('(max-width: 720px)').matches) document.querySelector<HTMLElement>('[data-variant="' + state.variant + '"] main')?.scrollIntoView({ behavior: 'auto', block: 'start' }); }));
+    document.querySelectorAll('[data-go-library]').forEach(node => node.addEventListener('click', () => document.querySelector<HTMLElement>('[data-variant="' + state.variant + '"] .filters')?.scrollIntoView({ behavior: 'auto', block: 'start' })));
+    setVariant(new URL(location.href).searchParams.get('variant') || 'A');
+  </script>
+</body></html>

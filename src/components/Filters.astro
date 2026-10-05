@@ -1,0 +1,12 @@
+---
+const { suffix } = Astro.props;
+---
+<form class="filters" autocomplete="off" onsubmit="return false">
+  <div class="search-field">
+    <label for={`search-${suffix}`}>Search your research</label>
+    <input id={`search-${suffix}`} type="search" data-filter="query" placeholder="Title, topic, or a note…" />
+  </div>
+  <div class="select-field"><label for={`topic-${suffix}`}>Topic</label><select id={`topic-${suffix}`} data-filter="topic"><option value="">All topics</option><option>Environment</option><option>Rehabilitation</option><option>Research methods</option><option>Unclassified</option></select></div>
+  <div class="select-field"><label for={`type-${suffix}`}>Source type</label><select id={`type-${suffix}`} data-filter="type"><option value="">All types</option><option>Journal article</option><option>Webpage</option></select></div>
+  <div class="select-field"><label for={`year-${suffix}`}>Year</label><select id={`year-${suffix}`} data-filter="year"><option value="">All years</option><option>2025</option><option>2024</option><option>Unknown</option></select></div>
+</form>

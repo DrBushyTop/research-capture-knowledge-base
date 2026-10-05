@@ -1,0 +1,14 @@
+{
+  "name": "research-reader-prototype",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prototype:reader": "astro dev --host 127.0.0.1 --port 4328",
+    "build": "astro build"
+  },
+  "dependencies": {
+    "astro": "7.3.5",
+    "@fontsource/source-sans-3": "5.3.0",
+    "@fontsource/source-serif-4": "5.3.0"
+  }
+}

@@ -1,0 +1,19 @@
+---
+import { sources } from '../data/sources';
+import Filters from './Filters.astro';
+---
+<div class="variant evidence-desk" data-variant="B" hidden>
+  <header class="desk-heading"><h1>Research desk</h1><p>A source on one side. Your understanding on the other.</p></header>
+  <Filters suffix="b" />
+  <nav class="desk-source-strip" aria-label="Choose a source">{sources.map(source => <button class="desk-source-choice" data-source-choice={source.id}><span>{source.type} · {source.year}</span><strong>{source.title}</strong><em>{source.status}</em></button>)}</nav>
+  <p class="no-results" data-no-results hidden>No matching sources. Try a different search or clear the filters.</p>
+  <main><button class="back-to-library" data-go-library>Back to saved sources</button>
+    {sources.map(source => <article data-source-detail={source.id}>
+      <header class="desk-note-heading"><h1>{source.title}</h1><p>{source.citation}</p><span class:list={['status', {attention: source.status === 'Needs attention'}]}>{source.review}</span></header>
+      <div class="desk-columns">
+        <section class="desk-original"><h2>Source record</h2><p class="provenance">Saved metadata · {source.extraction}</p><p>{source.abstract}</p><dl class="facts"><div><dt>Source type</dt><dd>{source.type}</dd></div><div><dt>Published</dt><dd>{source.year}</dd></div><div><dt>Captured</dt><dd>{source.captured}</dd></div></dl><h3>Reading boundary</h3><p>{source.scope}</p><p class="desk-rights">{source.rights}</p></section>
+        <div class="desk-understanding"><section><h2>Machine interpretation</h2><p class="provenance">{source.findings.length ? 'Generated from available source material' : 'Waiting for source text'}</p><p>{source.summary}</p>{source.findings.length > 0 && <ul>{source.findings.map(f => <li>{f}</li>)}</ul>}</section><section class="desk-limits"><h2>What remains uncertain</h2><ul>{source.limitations.map(l => <li>{l}</li>)}</ul></section><section class="desk-human"><h2>Your notes</h2><p class="provenance">Human commentary · preserved on reprocessing</p><p>{source.notes || 'No personal notes yet.'}</p></section></div>
+      </div>
+    </article>)}
+  </main>
+</div>

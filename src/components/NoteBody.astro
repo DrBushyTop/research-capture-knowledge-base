@@ -1,0 +1,25 @@
+---
+import type { Source } from '../data/sources';
+const { source, prefix } = Astro.props as { source: Source; prefix: string };
+---
+<div class="note-body">
+  <section class="source-facts" aria-labelledby={`${prefix}-facts-${source.id}`}>
+    <h2 id={`${prefix}-facts-${source.id}`}>About the source</h2>
+    <p>{source.abstract}</p>
+    <dl class="facts"><div><dt>Source type</dt><dd>{source.type}</dd></div><div><dt>Published</dt><dd>{source.year}</dd></div><div><dt>Captured</dt><dd>{source.captured}</dd></div><div><dt>Available material</dt><dd>{source.scope}</dd></div></dl>
+  </section>
+  <section class="machine-section" aria-labelledby={`${prefix}-analysis-${source.id}`}>
+    <div class="section-title"><h2 id={`${prefix}-analysis-${source.id}`}>Machine analysis</h2><span class="section-origin">{source.findings.length ? 'Generated interpretation' : 'Unavailable'}</span></div>
+    <p>{source.summary}</p>
+    {source.findings.length > 0 && <><h3>What to take from this source</h3><ul>{source.findings.map(f => <li>{f}</li>)}</ul></>}
+  </section>
+  <section class="limitations-section" aria-labelledby={`${prefix}-limitations-${source.id}`}>
+    <h2 id={`${prefix}-limitations-${source.id}`}>Limitations &amp; open questions</h2>
+    <ul>{source.limitations.map(l => <li>{l}</li>)}</ul>
+  </section>
+  <section class="human-section" aria-labelledby={`${prefix}-notes-${source.id}`}>
+    <div class="section-title"><h2 id={`${prefix}-notes-${source.id}`}>Your notes</h2><span class="section-origin">Written by you</span></div>
+    <p class:list={{'empty-note': !source.notes}}>{source.notes || 'No personal notes yet.'}</p>
+    <p class="note-help">Personal notes are kept separately and survive reprocessing.</p>
+  </section>
+</div>

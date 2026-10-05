@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-05T15:33:43.716873+00:00",
+  "title": "Research reader prototype",
+  "extensions": {
+    "shadows": [
+      {
+        "name": "prototype-switcher",
+        "value": "0 8px 28px #13233836",
+        "purpose": "Keep development controls separate from the evaluated layout."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact",
+        "value": "980px"
+      },
+      {
+        "name": "phone",
+        "value": "720px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Source selection",
+      "kind": "nav",
+      "description": "A source in the notebook margin.",
+      "html": "<button class=\"ds-source\" aria-pressed=\"true\">Example source<span>Analysis ready</span></button>",
+      "css": ".ds-source { text-align:left; background:#dbe6f4; border:none; border-radius:7px; padding:.85rem .6rem; color:#202d3d; font:600 16px Source Sans 3,sans-serif; } .ds-source span { display:block; font-size:13px; font-weight:400; margin-top:.4rem; } .ds-source:hover { background:#e0e7ef; } .ds-source:focus-visible { outline:3px solid #2356a5; outline-offset:4px; }"
+    },
+    {
+      "name": "Review label",
+      "kind": "chip",
+      "refersTo": "status",
+      "description": "Written review state near the citation.",
+      "html": "<span class=\"ds-status\">Machine analysis \u00b7 not reviewed</span>",
+      "css": ".ds-status { color:#284e81; background:#eaf1fc; border-radius:4px; padding:.2rem .5rem; font:13px Source Sans 3,sans-serif; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "A library margin beside an open note",
+    "overview": "Private research notes remain readable while their source, generated analysis, and human commentary remain distinguishable.",
+    "keyCharacteristics": [
+      "Long reading column",
+      "Labeled provenance",
+      "Visible missing-text states"
+    ],
+    "rules": [],
+    "dos": [
+      "Keep origin labels visible."
+    ],
+    "donts": [
+      "Do not promote synthetic examples into production."
+    ]
+  }
+}

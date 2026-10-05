@@ -1,0 +1,15 @@
+---
+import { sources } from '../data/sources';
+import Filters from './Filters.astro';
+import NoteBody from './NoteBody.astro';
+---
+<div class="variant accession-ledger" data-variant="C" hidden>
+  <header class="ledger-heading"><h1>Library register</h1><p>Find a reference. See what is ready to read.</p><div class="ledger-key"><span>2 notes available</span><span class="attention">1 source needs attention</span></div></header>
+  <Filters suffix="c" />
+  <div class="ledger-workspace">
+    <section class="ledger-register" aria-label="Saved source register"><div class="register-head"><span>Source</span><span>State</span></div><nav>{sources.map(source => <button class="register-row" data-source-choice={source.id}><span><strong>{source.title}</strong><small>{source.type} · {source.year}<br/>{source.topics.join(', ')}</small></span><span class:list={['register-state', {attention: source.status === 'Needs attention'}]}>{source.status}<small>{source.extraction}</small></span></button>)}</nav><p class="no-results" data-no-results hidden>No matching sources. Try a different search or clear the filters.</p><p class="register-caption" data-result-count>3 sources</p></section>
+    <main class="ledger-detail"><button class="back-to-library" data-go-library>Back to saved sources</button>
+      {sources.map(source => <article data-source-detail={source.id}><header class="ledger-note-heading"><h1>{source.title}</h1><p>{source.citation}</p><span class="status">{source.review}</span></header><NoteBody source={source} prefix="c" /><footer class="source-footer">{source.rights}</footer></article>)}
+    </main>
+  </div>
+</div>

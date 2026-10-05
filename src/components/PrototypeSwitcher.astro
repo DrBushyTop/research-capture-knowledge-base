@@ -1,0 +1,4 @@
+---
+const show = import.meta.env.DEV;
+---
+{show && <div class="prototype-switcher" aria-label="Prototype variations"><button type="button" data-switch="-1" aria-label="Previous variant"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6" /></svg></button><div><span class="prototype-label">Throwaway prototype</span><strong data-variant-label>A · Margin notebook</strong></div><button type="button" data-switch="1" aria-label="Next variant"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 6 6 6-6 6" /></svg></button></div>}

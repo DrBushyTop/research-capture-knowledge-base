@@ -1,0 +1,21 @@
+---
+import { sources } from '../data/sources';
+import Filters from './Filters.astro';
+import NoteBody from './NoteBody.astro';
+---
+<div class="variant notebook" data-variant="A">
+  <aside class="notebook-library" aria-label="Your library">
+    <header class="library-heading"><h1>Research library</h1><p>Save now. Read when it matters.</p></header>
+    <Filters suffix="a" />
+    <div class="list-heading"><h2>Saved sources</h2><span data-result-count>3 sources</span></div>
+    <nav class="source-list">{sources.map(source => <button class="source-choice" data-source-choice={source.id}><span class="source-type">{source.type} · {source.year}</span><strong>{source.title}</strong><span class:list={['source-status', {attention: source.status === 'Needs attention'}]}>{source.status}</span></button>)}</nav>
+    <p class="no-results" data-no-results hidden>No matching sources. Try a different search or clear the filters.</p>
+  </aside>
+  <main class="notebook-reading" id="reader-a"><button class="back-to-library" data-go-library>Back to saved sources</button>
+    {sources.map(source => <article class="research-note" data-source-detail={source.id}>
+      <header class="note-header"><h1>{source.title}</h1><div class="topic-line">{source.topics.join(' / ')}</div><p class="citation">{source.citation}</p><div class="review-line"><span class:list={['status', {attention: source.status === 'Needs attention'}]}>{source.review}</span><span>{source.extraction}</span></div></header>
+      <NoteBody source={source} prefix="a" />
+      <footer class="source-footer">{source.rights}. Source facts and interpretation remain separate.</footer>
+    </article>)}
+  </main>
+</div>

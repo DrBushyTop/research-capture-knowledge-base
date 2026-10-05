@@ -31,6 +31,8 @@ Remove newly ticketed questions from Not yet specified. Close questions that pro
 
 Resolve at most one non-research ticket per wayfinder session. Research tickets may run in parallel. HITL tickets require the user's answers and remain open until that exchange happens.
 
+The user requires prototype creation to run in background subagents. Delegate each prototype to a subagent applying the prototype skill, link its artifact from the GitHub ticket, and collect the user's feedback before resolving the HITL decision. Continue independent work while the prototype is being built.
+
 Research findings live in `docs/research/`, link back to their GitHub question, and are linked as assets from resolution comments. The initial research happened before repository history existed; its reports were subsequently published with the brief and glossary during the GitHub migration. Future research sessions can use throwaway `research/<name>` branches.
 
 For multiline issue bodies and comments, use structured API JSON or `gh --body-file` with an actual file. Keep real newlines. When creating or working on a pull request, register its full URL with this thread's `link_pull_request` tool.

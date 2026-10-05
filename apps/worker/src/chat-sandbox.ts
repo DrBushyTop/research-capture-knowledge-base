@@ -4,7 +4,7 @@ import { SandboxGroupClient, endpointForRegion } from '@azure/containerapps-sand
 import { hash } from '../../../shared/corpus.js';
 import { chunkText, corpusEvidence, evidenceChunk, packEvidence, type ChatCorpus, type ChatJob, type Evidence } from '../../../shared/chat.js';
 import type { BlobStore } from './storage.js';
-import { createWorkspace, deleteWorkspace } from './sandbox-lifecycle.js';
+import { createWorkspace, deleteWorkspace, denyWorkspaceEgress, readWorkspaceFile, writeWorkspaceFile } from './sandbox-lifecycle.js';
 import { loadSearchIndex, rankEvidenceSources } from '../../../shared/search.js';
 const required = (key: string) => { const value = process.env[key]; if (!value) throw new Error(`Missing ${key}`); return value; };
 export function sandboxClient() {
@@ -32,9 +32,9 @@ export async function gatherEvidence(store: BlobStore, corpus: ChatCorpus, job: 
   try {
     await createWorkspace(client, signal, async created => { id = created; await record(created); });
     const sandbox = { id: id! };
-    await client.egress.setPolicy(sandbox.id, { defaultAction: 'Deny', trafficInspection: 'Full', hostRules: [], rules: [] }, { abortSignal: signal });
-    await client.files.write(sandbox.id, '/workspace/evidence.py', await readFile(new URL('../sandbox/evidence.py', import.meta.url)), { mode: '0444', createDirs: true, abortSignal: signal });
-    await client.files.write(sandbox.id, '/workspace/corpus.json', JSON.stringify({ revision: corpus.revision, sources }), { mode: '0444', abortSignal: signal });
+    await denyWorkspaceEgress(sandbox.id, signal);
+    await writeWorkspaceFile(sandbox.id, '/workspace/evidence.py', await readFile(new URL('../sandbox/evidence.py', import.meta.url)), signal);
+    await writeWorkspaceFile(sandbox.id, '/workspace/corpus.json', JSON.stringify({ revision: corpus.revision, sources }), signal);
     const inputs: { sourceId: string; path: string; hash: string; mime: string; visualPage?: number }[] = [];
     for (const { note } of sources) {
       if (!note.extraction.artifactHash) continue;
@@ -44,15 +44,15 @@ export async function gatherEvidence(store: BlobStore, corpus: ChatCorpus, job: 
       const bytes = await raw.downloadToBuffer(0, undefined, { abortSignal: signal });
       if (hash(bytes) !== note.extraction.artifactHash) throw new Error('Archived artifact hash mismatch');
       const filename = `${note.source.key}.source`;
-      await client.files.write(sandbox.id, `/workspace/data/${filename}`, bytes, { mode: '0444', createDirs: true, abortSignal: signal });
+      await writeWorkspaceFile(sandbox.id, `/workspace/data/${filename}`, bytes, signal);
       inputs.push({ sourceId: note.source.id, path: filename, hash: note.extraction.artifactHash, mime: properties.contentType || 'application/octet-stream',
         ...(job.request.visual?.sourceId === note.source.id ? { visualPage: job.request.visual.page } : {}) });
     }
     if (job.request.visual && !inputs.some(input => input.sourceId === job.request.visual!.sourceId)) throw new Error('No retained visual artifact for this source');
-    await client.files.write(sandbox.id, '/workspace/request.json', JSON.stringify({ sources: inputs }), { mode: '0444', abortSignal: signal });
+    await writeWorkspaceFile(sandbox.id, '/workspace/request.json', JSON.stringify({ sources: inputs }), signal);
     const execution = await client.sandboxes.exec(sandbox.id, { command: 'python3 /workspace/evidence.py' }, { abortSignal: signal });
     if (execution.exitCode !== 0) throw new Error('Sandbox source extraction failed');
-    const content = await client.files.read(sandbox.id, '/workspace/evidence.json', { abortSignal: signal });
+    const content = await readWorkspaceFile(sandbox.id, '/workspace/evidence.json', 2 * 1024 * 1024, signal);
     const extracted = JSON.parse(Buffer.from(content).toString('utf8')) as { sourceId: string; hash: string; pages: { locator: string; text: string }[] }[];
     const evidence = initial.filter(chunk => sources.some(source => source.note.source.id === chunk.sourceId));
     for (const artifact of extracted) {
@@ -62,14 +62,16 @@ export async function gatherEvidence(store: BlobStore, corpus: ChatCorpus, job: 
         evidence.push(...chunkText({ sourceId: note.source.id, generationId: note.generationId, title: note.source.title, kind: 'source', locator: page.locator }, page.text));
       }
     }
-    let packed = packEvidence(evidence, query);
+    const original = new Map<string, Evidence>();
+    for (const chunk of packEvidence(evidence.filter(chunk => chunk.kind === 'source'), query)) if (!original.has(chunk.sourceId)) original.set(chunk.sourceId, chunk);
+    let packed = packEvidence(evidence, query, [...original.values()]);
     if (job.request.visual && visualSource) {
-      const bytes = Buffer.from(await client.files.read(sandbox.id, '/workspace/visual.png', { abortSignal: signal }));
+      const bytes = await readWorkspaceFile(sandbox.id, '/workspace/visual.png', 5 * 1024 * 1024, signal);
       if (bytes.length > 5 * 1024 * 1024 || bytes.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') throw new Error('Invalid rendered image');
       const visual = evidenceChunk({ sourceId: visualSource.note.source.id, generationId: visualSource.note.generationId, title: visualSource.note.source.title,
         kind: 'visual', locator: `Selected source page ${job.request.visual.page}`, text: `Rendered image of the retained artifact, page ${job.request.visual.page}. Read only visible content; uncertain values must be stated as uncertain.` });
       image = { dataUrl: `data:image/png;base64,${bytes.toString('base64')}`, evidence: visual };
-      packed = packEvidence(evidence, query, [visual]);
+      packed = packEvidence(evidence, query, [visual, ...original.values()]);
     }
     return { evidence: packed, image };
   } finally {

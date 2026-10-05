@@ -52,3 +52,7 @@ Crossref DOI license metadata is recorded as external evidence, not permission t
 Functions has no always-ready instances. The hourly importer avoids five-minute GitHub builds; scheduled imports skip the code verification job, while source pushes run full checks. Private Actions minute allowances, storage operations, inference tokens and consumption execution are metered; observe actual usage before changing frequency. Diagnostic ingestion is capped at 0.1 GB/day with 30-day retention; a reached cap can limit diagnostics. Never log credentials, source text, raw responses or signed download URLs.
 
 Manual acceptance still includes signing into the invited reader account, checking an unintended signed-in account, desktop Connector capture and comfortable reading on the actual Android device. Automation validates cloud captures, generated content, search/filter behavior, public-build exclusion and anonymous direct-asset access; it must not claim those human interactions occurred.
+
+## Fuzzy search
+
+The collection uses a prebuilt MiniSearch inverted index in the browser, with prefix matching, typo tolerance and boosted title/topic fields. It makes no model or backend calls. Source type, topic and year filters apply to the fuzzy results. Public builds construct the index from approved notes only; check:public verifies routes and index membership together. Development indexing runs when npm run dev starts; restart it after changing corpus files.

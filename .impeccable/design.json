@@ -1,0 +1,319 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-05T16:37:20Z",
+  "title": "Design System: Research library",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "neutral",
+        "displayName": "Reading ink",
+        "tonalRamp": [
+          "oklch(15.00% 0.03436 254.00)",
+          "oklch(26.43% 0.03436 254.00)",
+          "oklch(37.86% 0.03436 254.00)",
+          "oklch(49.29% 0.03436 254.00)",
+          "oklch(60.71% 0.03436 254.00)",
+          "oklch(72.14% 0.03436 254.00)",
+          "oklch(83.57% 0.03436 254.00)",
+          "oklch(95.00% 0.03436 254.00)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted slate",
+        "tonalRamp": [
+          "oklch(15.00% 0.03490 251.55)",
+          "oklch(26.43% 0.03490 251.55)",
+          "oklch(37.86% 0.03490 251.55)",
+          "oklch(49.29% 0.03490 251.55)",
+          "oklch(60.71% 0.03490 251.55)",
+          "oklch(72.14% 0.03490 251.55)",
+          "oklch(83.57% 0.03490 251.55)",
+          "oklch(95.00% 0.03490 251.55)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Reading paper",
+        "tonalRamp": [
+          "oklch(15.00% 0.00000 0.00)",
+          "oklch(26.43% 0.00000 0.00)",
+          "oklch(37.86% 0.00000 0.00)",
+          "oklch(49.29% 0.00000 0.00)",
+          "oklch(60.71% 0.00000 0.00)",
+          "oklch(72.14% 0.00000 0.00)",
+          "oklch(83.57% 0.00000 0.00)",
+          "oklch(95.00% 0.00000 0.00)"
+        ]
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Cool margin",
+        "tonalRamp": [
+          "oklch(15.00% 0.00688 247.90)",
+          "oklch(26.43% 0.00688 247.90)",
+          "oklch(37.86% 0.00688 247.90)",
+          "oklch(49.29% 0.00688 247.90)",
+          "oklch(60.71% 0.00688 247.90)",
+          "oklch(72.14% 0.00688 247.90)",
+          "oklch(83.57% 0.00688 247.90)",
+          "oklch(95.00% 0.00688 247.90)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Page divider",
+        "tonalRamp": [
+          "oklch(15.00% 0.01507 251.17)",
+          "oklch(26.43% 0.01507 251.17)",
+          "oklch(37.86% 0.01507 251.17)",
+          "oklch(49.29% 0.01507 251.17)",
+          "oklch(60.71% 0.01507 251.17)",
+          "oklch(72.14% 0.01507 251.17)",
+          "oklch(83.57% 0.01507 251.17)",
+          "oklch(95.00% 0.01507 251.17)"
+        ]
+      },
+      "blue": {
+        "role": "primary",
+        "displayName": "Notebook blue",
+        "tonalRamp": [
+          "oklch(15.00% 0.13879 259.12)",
+          "oklch(26.43% 0.13879 259.12)",
+          "oklch(37.86% 0.13879 259.12)",
+          "oklch(49.29% 0.13879 259.12)",
+          "oklch(60.71% 0.13879 259.12)",
+          "oklch(72.14% 0.13879 259.12)",
+          "oklch(83.57% 0.13879 259.12)",
+          "oklch(95.00% 0.13879 259.12)"
+        ]
+      },
+      "blue-wash": {
+        "role": "primary",
+        "displayName": "Blue status wash",
+        "tonalRamp": [
+          "oklch(15.00% 0.01658 259.42)",
+          "oklch(26.43% 0.01658 259.42)",
+          "oklch(37.86% 0.01658 259.42)",
+          "oklch(49.29% 0.01658 259.42)",
+          "oklch(60.71% 0.01658 259.42)",
+          "oklch(72.14% 0.01658 259.42)",
+          "oklch(83.57% 0.01658 259.42)",
+          "oklch(95.00% 0.01658 259.42)"
+        ]
+      },
+      "status-ink": {
+        "role": "primary",
+        "displayName": "Blue status ink",
+        "tonalRamp": [
+          "oklch(15.00% 0.09580 256.43)",
+          "oklch(26.43% 0.09580 256.43)",
+          "oklch(37.86% 0.09580 256.43)",
+          "oklch(49.29% 0.09580 256.43)",
+          "oklch(60.71% 0.09580 256.43)",
+          "oklch(72.14% 0.09580 256.43)",
+          "oklch(83.57% 0.09580 256.43)",
+          "oklch(95.00% 0.09580 256.43)"
+        ]
+      },
+      "attention": {
+        "role": "secondary",
+        "displayName": "Evidence warning ink",
+        "tonalRamp": [
+          "oklch(15.00% 0.11103 54.06)",
+          "oklch(26.43% 0.11103 54.06)",
+          "oklch(37.86% 0.11103 54.06)",
+          "oklch(49.29% 0.11103 54.06)",
+          "oklch(60.71% 0.11103 54.06)",
+          "oklch(72.14% 0.11103 54.06)",
+          "oklch(83.57% 0.11103 54.06)",
+          "oklch(95.00% 0.11103 54.06)"
+        ]
+      },
+      "attention-wash": {
+        "role": "secondary",
+        "displayName": "Evidence warning wash",
+        "tonalRamp": [
+          "oklch(15.00% 0.02817 74.31)",
+          "oklch(26.43% 0.02817 74.31)",
+          "oklch(37.86% 0.02817 74.31)",
+          "oklch(49.29% 0.02817 74.31)",
+          "oklch(60.71% 0.02817 74.31)",
+          "oklch(72.14% 0.02817 74.31)",
+          "oklch(83.57% 0.02817 74.31)",
+          "oklch(95.00% 0.02817 74.31)"
+        ]
+      },
+      "field-line": {
+        "role": "neutral",
+        "displayName": "Field boundary",
+        "tonalRamp": [
+          "oklch(15.00% 0.02711 253.61)",
+          "oklch(26.43% 0.02711 253.61)",
+          "oklch(37.86% 0.02711 253.61)",
+          "oklch(49.29% 0.02711 253.61)",
+          "oklch(60.71% 0.02711 253.61)",
+          "oklch(72.14% 0.02711 253.61)",
+          "oklch(83.57% 0.02711 253.61)",
+          "oklch(95.00% 0.02711 253.61)"
+        ]
+      },
+      "limitations-surface": {
+        "role": "neutral",
+        "displayName": "Limitations inset",
+        "tonalRamp": [
+          "oklch(15.00% 0.00514 247.88)",
+          "oklch(26.43% 0.00514 247.88)",
+          "oklch(37.86% 0.00514 247.88)",
+          "oklch(49.29% 0.00514 247.88)",
+          "oklch(60.71% 0.00514 247.88)",
+          "oklch(72.14% 0.00514 247.88)",
+          "oklch(83.57% 0.00514 247.88)",
+          "oklch(95.00% 0.00514 247.88)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Research note title",
+        "purpose": "Serif title at the start of a research note. Mobile uses 2rem."
+      },
+      "headline": {
+        "displayName": "Evidence section heading",
+        "purpose": "Sans serif headings for the note's evidence sections."
+      },
+      "title": {
+        "displayName": "Saved source title",
+        "purpose": "Serif title in a source row. Mobile uses 1.35rem."
+      },
+      "body": {
+        "displayName": "Facts and interpretation",
+        "purpose": "Default sans serif text for source facts and machine interpretation."
+      },
+      "human-prose": {
+        "displayName": "Human commentary",
+        "purpose": "Serif prose for preserved personal notes."
+      },
+      "label": {
+        "displayName": "Visible field label",
+        "purpose": "Semibold sans serif labels above search and filters."
+      },
+      "status": {
+        "displayName": "Review state",
+        "purpose": "Compact text within informational review badges."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "link-color",
+        "value": "color 0.15s ease-out",
+        "purpose": "Source rows and note-section links, only when prefers-reduced-motion is no-preference."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "single-column",
+        "value": "720px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Library search",
+      "kind": "input",
+      "refersTo": "search-field",
+      "description": "A visible search label above a full-width native search field.",
+      "html": "<div class=\"ds-search\"><label for=\"ds-search-input\">Search your research</label><input id=\"ds-search-input\" type=\"search\" placeholder=\"A topic, finding, or title\"></div>",
+      "css": ".ds-search{font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;line-height:1.6;color:var(--ink,#202d3d)}.ds-search label{display:block;margin-top:.8rem;margin-bottom:.35rem;font-size:.85rem;font-weight:600}.ds-search input{font-family:inherit;color:inherit;min-width:0;width:100%;min-height:44px;border:1px solid #a8b5c5;border-radius:6px;background:var(--paper,#fff);padding:.55rem .65rem;font-size:.92rem;line-height:1.6;caret-color:var(--blue,#2356a5)}.ds-search input::placeholder{color:#627083}.ds-search input:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}"
+    },
+    {
+      "name": "Library filter",
+      "kind": "input",
+      "refersTo": "filter-select",
+      "description": "A labeled native select for topic, source type, or publication year.",
+      "html": "<div class=\"ds-filter\"><label for=\"ds-filter-type\">Source type</label><select id=\"ds-filter-type\"><option>All types</option><option>Journal article</option><option>Webpage</option></select></div>",
+      "css": ".ds-filter{font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;line-height:1.6;color:var(--ink,#202d3d)}.ds-filter label{display:block;margin-top:.8rem;margin-bottom:.35rem;font-size:.85rem;font-weight:600}.ds-filter select{font-family:inherit;color:inherit;min-width:0;width:100%;min-height:44px;border:1px solid #a8b5c5;border-radius:6px;background:var(--paper,#fff);padding:.55rem .65rem;font-size:.92rem;line-height:1.6}.ds-filter select:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}@media(max-width:720px){.ds-filter label{font-size:.75rem}.ds-filter select{font-size:.8rem;padding:.5rem .35rem}}"
+    },
+    {
+      "name": "Source row",
+      "kind": "custom",
+      "refersTo": "source-row",
+      "description": "A full-row source link with metadata, serif title, a short summary, and a review label.",
+      "html": "<div class=\"ds-source-row\"><a href=\"#research-note\"><span class=\"ds-source-kind\">Journal article · 2004</span><h3>Management of Fibromyalgia Syndrome</h3><p>A saved clinical review with its source facts and machine interpretation kept separate.</p><span class=\"ds-source-status\">Machine analysis · not reviewed</span></a></div>",
+      "css": ".ds-source-row{font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;line-height:1.6;border-bottom:1px solid var(--line,#d6dee7)}.ds-source-row a{display:block;padding:1.5rem 0;text-decoration:none;color:var(--ink,#202d3d)}.ds-source-kind{font-size:.8rem;color:var(--muted,#546476)}.ds-source-row h3{font-family:'Source Serif 4 Variable',Georgia,serif;font-size:1.5rem;font-weight:700;line-height:1.4;margin:.4rem 0 .7rem;overflow-wrap:anywhere}.ds-source-row p{margin:0;font-size:.93rem;color:var(--muted,#546476);max-width:70ch;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.ds-source-status{display:inline-flex;font-size:.78rem;padding:.2rem .5rem;color:#284e81;background:var(--blue-wash,#eaf1fc);border-radius:4px;margin-top:.9rem}.ds-source-row a:hover h3{color:var(--blue,#2356a5);text-decoration:underline;text-underline-offset:.2em}.ds-source-row a:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}@media(max-width:720px){.ds-source-row h3{font-size:1.35rem}}@media(prefers-reduced-motion:no-preference){.ds-source-row a{transition:color .15s ease-out}}"
+    },
+    {
+      "name": "Note navigation",
+      "kind": "nav",
+      "refersTo": "note-navigation",
+      "description": "Desktop section links in the notebook margin.",
+      "html": "<aside class=\"ds-note-margin\"><a class=\"ds-back-link\" href=\"#saved-sources\">Back to saved sources</a><p class=\"ds-margin-label\">In this note</p><nav aria-label=\"Note sections\"><a href=\"#source\">Source facts</a><a href=\"#analysis\">Machine interpretation</a><a href=\"#limitations\">Limitations</a><a href=\"#human\">Human notes</a></nav></aside>",
+      "css": ".ds-note-margin{font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;line-height:1.6;background:var(--ground,#edf1f5);color:var(--ink,#202d3d);padding:2.5rem 1.5rem}.ds-note-margin a{color:var(--blue,#2356a5);text-underline-offset:.2em}.ds-back-link{display:block;min-height:44px;font-size:.9rem}.ds-margin-label{font-weight:600;font-size:.8rem;margin:1.7rem 0 0}.ds-note-margin nav{display:flex;flex-direction:column;margin-top:.5rem}.ds-note-margin nav a{padding:.5rem 0;min-height:44px;font-size:.9rem;text-decoration:none}.ds-note-margin nav a:hover{text-decoration:underline}.ds-note-margin a:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}@media(max-width:720px){.ds-note-margin{padding:1rem 1.2rem}.ds-note-margin nav,.ds-margin-label{display:none}.ds-back-link{display:flex;align-items:center}}@media(prefers-reduced-motion:no-preference){.ds-note-margin nav a{transition:color .15s ease-out}}"
+    },
+    {
+      "name": "Default review status",
+      "kind": "chip",
+      "refersTo": "status-default",
+      "description": "An informational label for unreviewed machine interpretation.",
+      "html": "<span class=\"ds-status-default\">Machine interpretation · not reviewed</span>",
+      "css": ".ds-status-default{display:inline-flex;font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:.78rem;line-height:1.6;padding:.2rem .5rem;color:#284e81;background:var(--blue-wash,#eaf1fc);border-radius:4px}"
+    },
+    {
+      "name": "Limited evidence status",
+      "kind": "chip",
+      "refersTo": "status-attention",
+      "description": "An informational review label for limited or missing evidence.",
+      "html": "<span class=\"ds-status-attention\">Needs review · limited evidence</span>",
+      "css": ".ds-status-attention{display:inline-flex;font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:.78rem;line-height:1.6;padding:.2rem .5rem;color:var(--attention,#8b4810);background:var(--attention-wash,#fff1df);border-radius:4px}"
+    },
+    {
+      "name": "Limitations section",
+      "kind": "card",
+      "refersTo": "limitations-section",
+      "description": "A pale reading block for limitations and open questions.",
+      "html": "<section class=\"ds-limitations\"><h2>Limitations and open questions</h2><p>Limitations have not been assessed from usable source text.</p></section>",
+      "css": ".ds-limitations{font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;line-height:1.6;color:var(--ink,#202d3d);padding:1.2rem 1.4rem;background:#f2f5f8;border-radius:8px}.ds-limitations h2{margin:0 0 .9rem;font-size:1.22rem;font-weight:700;line-height:1.3}.ds-limitations p{margin:0}@media(max-width:720px){.ds-limitations{padding:1.2rem}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The research notebook",
+    "overview": "A cool gray library margin sits beside a white reading page. Source Sans 3 carries controls, source facts, and machine interpretation. Source Serif 4 gives saved titles and personal commentary a different reading rhythm.\n\nThe notebook separates evidence origins through headings, rules, and status text. It keeps the source citation and review state close to the title. The recorded system covers the shipped library and research note routes in `apps/reader`.",
+    "keyCharacteristics": [
+      "A library margin beside a white reading page.",
+      "Full-width source rows with serif titles and short sans serif summaries.",
+      "Separate sections for source facts, machine interpretation, limitations, and human notes.",
+      "Text labels beside color-coded review states."
+    ],
+    "rules": [
+      {
+        "name": "The Review Text Rule",
+        "body": "Every review state includes a text label. Color supplements the label.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Reading Voices Rule",
+        "body": "Use Source Sans 3 for facts, machine interpretation, and controls. Use Source Serif 4 for source titles and human commentary.",
+        "section": "typography"
+      },
+      {
+        "name": "The Reading Width Rule",
+        "body": "Keep research articles within the 72ch reading column, including long titles, citations, and source URLs.",
+        "section": "layout"
+      }
+    ],
+    "dos": [
+      "Do pair the cool library margin with a white reading page.",
+      "Do keep source facts, machine interpretation, limitations, and human notes in separate labeled sections.",
+      "Do retain a visible label for search and every filter.",
+      "Do keep source titles and personal commentary in the serif reading voice.",
+      "Do give keyboard focus the recorded blue outline and preserve 44px control and navigation targets.",
+      "Do keep long source titles and URLs within the reading column."
+    ],
+    "donts": [
+      "Don't communicate review state through color alone.",
+      "Don't use the limited-evidence warning treatment for the default machine interpretation state.",
+      "Don't apply shadows to the reader's flat rows and reading page."
+    ]
+  }
+}

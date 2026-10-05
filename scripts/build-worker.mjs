@@ -1,0 +1,9 @@
+import { build } from 'esbuild';
+import { mkdir, readFile, writeFile, copyFile } from 'node:fs/promises';
+const destination = '.function-package';
+await mkdir(destination + '/dist', { recursive: true });
+await build({ entryPoints: ['apps/worker/src/index.ts'], bundle: true, platform: 'node', target: 'node22', format: 'esm', packages: 'external', outfile: destination + '/dist/index.js', sourcemap: false });
+const pkg = JSON.parse(await readFile('package.json', 'utf8'));
+const dependencies = Object.fromEntries(Object.entries(pkg.dependencies).filter(([name]) => name.startsWith('@azure/') || ['@mozilla/readability', 'pdfjs-dist', 'jsdom', 'ipaddr.js', 'zod'].includes(name)));
+await writeFile(destination + '/package.json', JSON.stringify({ name: 'research-worker', private: true, type: 'module', main: 'dist/index.js', dependencies }, null, 2));
+await copyFile('apps/worker/host.json', destination + '/host.json');

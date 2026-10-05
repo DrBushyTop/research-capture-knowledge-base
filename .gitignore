@@ -1,0 +1,10 @@
+node_modules/
+.agents/
+.astro/
+dist/
+.function-package/
+.local/
+.env
+local.settings.json
+*.zip
+coverage/

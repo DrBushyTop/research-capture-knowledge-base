@@ -29,9 +29,9 @@ Create new issues before wiring their relationships. The REST API adds a child t
 
 Remove newly ticketed questions from Not yet specified. Close questions that prove out of scope and link them from Out of scope rather than Decisions so far.
 
-Resolve at most one non-research ticket per wayfinder session. Research tickets may run in parallel. HITL tickets require the user's answers and remain open until that exchange happens.
+On 2026-10-05 the user authorized implementation, working through the tickets, and delegated judgement. For this effort, continue across tickets and record decisions without stopping for the former one-decision-per-session or HITL confirmation defaults. Human-only acceptance checks still need honest, separate status.
 
-The user requires prototype creation to run in background subagents. Delegate each prototype to a subagent applying the prototype skill, link its artifact from the GitHub ticket, and collect the user's feedback before resolving the HITL decision. Continue independent work while the prototype is being built.
+The user requires prototype creation to run in background subagents. Delegate each prototype to a subagent applying the prototype skill, link its artifact from the GitHub ticket, and record the adopted direction under the delegated judgement. Continue independent work while the prototype is being built.
 
 Research findings live in `docs/research/`, link back to their GitHub question, and are linked as assets from resolution comments. The initial research happened before repository history existed; its reports were subsequently published with the brief and glossary during the GitHub migration. Future research sessions can use throwaway `research/<name>` branches.
 

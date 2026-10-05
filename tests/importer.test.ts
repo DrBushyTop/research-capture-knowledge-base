@@ -1,0 +1,27 @@
+import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, expect, it } from 'vitest';
+import { applyCandidate } from '../shared/importer.js';
+import { normalize, type Note } from '../shared/corpus.js';
+import { snapshot } from './fixtures.js';
+const dirs: string[] = [];
+afterEach(async () => { for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true }); });
+const source = normalize(snapshot)[0].source;
+const note: Note = { schemaVersion: 1, generationId: 'a'.repeat(64), source, extraction: { status: 'metadata-only', method: 'none', reason: 'No text available.', truncated: false, retrievedAt: '2026-10-05T10:00:00Z', artifactHash: null }, analysis: null, processing: { version: '1', model: null, processedAt: '2026-10-05T10:00:00Z' }, rightsEvidence: [] };
+it('preserves human notes and detects edits to generated content', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'research-import-')); dirs.push(root);
+  expect(await applyCandidate(root, note)).toBe('written');
+  const dir = path.join(root, source.id);
+  await writeFile(path.join(dir, 'notes.md'), 'Keep my observation.\n');
+  expect(await applyCandidate(root, { ...note, generationId: 'b'.repeat(64) })).toBe('written');
+  expect(await readFile(path.join(dir, 'notes.md'), 'utf8')).toBe('Keep my observation.\n');
+  await writeFile(path.join(dir, 'index.md'), 'Human edit to generated file.\n');
+  expect(await applyCandidate(root, { ...note, generationId: 'c'.repeat(64) })).toBe('conflict');
+  expect(await readFile(path.join(dir, 'index.md'), 'utf8')).toBe('Human edit to generated file.\n');
+});
+it('recognizes a committed receipt when acknowledging a prior write failed', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'research-import-')); dirs.push(root);
+  await applyCandidate(root, note);
+  expect(await applyCandidate(root, note)).toBe('already-written');
+});

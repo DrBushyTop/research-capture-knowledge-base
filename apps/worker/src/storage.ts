@@ -10,6 +10,7 @@ export class BlobStore implements PipelineStore {
   readonly container: ContainerClient;
   readonly raw: ContainerClient;
   readonly queue;
+  readonly chatQueue;
   private readonly leases = new AsyncLocalStorage<LeaseFrame>();
   constructor(account: string) {
     const credential = new DefaultAzureCredential();
@@ -17,6 +18,7 @@ export class BlobStore implements PipelineStore {
     this.container = blobs.getContainerClient('pipeline');
     this.raw = blobs.getContainerClient('raw');
     this.queue = new QueueServiceClient(`https://${account}.queue.core.windows.net`, credential).getQueueClient('processing');
+    this.chatQueue = new QueueServiceClient(`https://${account}.queue.core.windows.net`, credential).getQueueClient('chat');
   }
   get leaseSignal(): AbortSignal | undefined {
     const signals: AbortSignal[] = [];
@@ -87,6 +89,7 @@ export class BlobStore implements PipelineStore {
     }
   }
   async send(id: string) { await this.verifyLease(); await this.queue.sendMessage(Buffer.from(JSON.stringify({ jobId: id })).toString('base64'), { messageTimeToLive: -1, abortSignal: this.operationSignal() }); }
+  async sendChat(id: string) { await this.verifyLease(); await this.chatQueue.sendMessage(Buffer.from(JSON.stringify({ jobId: id })).toString('base64'), { messageTimeToLive: -1, abortSignal: this.operationSignal() }); }
   async retain(hash: string, data: Uint8Array, mime: string) {
     await this.verifyLease();
     try { await this.raw.getBlockBlobClient(hash).upload(data, data.length, { conditions: { ifNoneMatch: '*' }, abortSignal: this.operationSignal(), blobHTTPHeaders: { blobContentType: mime } }); }

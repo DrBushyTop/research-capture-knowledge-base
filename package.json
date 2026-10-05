@@ -19,6 +19,7 @@
     "check:public": "READER_MODE=public npm run build:reader && tsx scripts/verify-public-artifacts.ts"
   },
   "dependencies": {
+    "@azure/containerapps-sandbox": "^1.0.0-beta.1",
     "@azure/functions": "^4.16.5",
     "@azure/identity": "^4.13.3",
     "@azure/keyvault-secrets": "^4.11.2",

@@ -34,6 +34,7 @@ jobs:
     env:
       STORAGE_ACCOUNT: ${{ vars.STORAGE_ACCOUNT }}
       READER_MODE: private
+      SEARCH_SOURCE_TEXT: azure
       IMPORT_PUSH: 'true'
     steps:
       - uses: actions/checkout@v4
@@ -56,12 +57,15 @@ jobs:
           git config user.email 'research-capture-bot@users.noreply.github.com'
           npm run import
       - run: npm run build:reader
+      - name: Package the private chat proxy
+        run: npm ci --prefix apps/chat-proxy --omit=dev
       - name: Deploy the private reader from this commit
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
           action: upload
           app_location: apps/reader/dist
+          api_location: apps/chat-proxy
           skip_app_build: true
           skip_api_build: true
           production_branch: master
@@ -77,3 +81,5 @@ jobs:
           app-name: ${{ vars.FUNCTION_APP }}
           package: .function-package
           sku: flexconsumption
+      - name: Synchronize the deployed private chat corpus
+        run: npx tsx scripts/sync-chat-corpus.ts

@@ -2,6 +2,7 @@ import { noteSchema, type Analysis, type Note, type SourceSnapshot } from '../..
 import { MissingArtifact, type Extracted } from './extraction.js';
 import { TransientInference } from './enrichment.js';
 import type { Job, PipelineStore, SourceState } from './pipeline.js';
+import { sourceText } from '../../../shared/source-text.js';
 
 export interface Processor {
   version: string; model: string;
@@ -36,6 +37,7 @@ export async function processJob(store: PipelineStore, id: string, processor: Pr
       }
       let analysis: Analysis | null = null;
       if (extracted.text) {
+        await store.create(`source-text/${id}.json`, sourceText({ source: snapshot.source, generationId: id, extraction: extracted.evidence }, extracted.text));
         try { analysis = await processor.enrich(extracted.text, store.leaseSignal); }
         catch (error) {
           store.leaseSignal?.throwIfAborted();

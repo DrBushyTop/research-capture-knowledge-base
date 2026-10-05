@@ -1,0 +1,8 @@
+{
+  "name": "research-chat-proxy",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "engines": { "node": "22.x" },
+  "dependencies": { "@azure/functions": "4.16.5" }
+}

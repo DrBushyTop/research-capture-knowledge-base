@@ -1,0 +1,19 @@
+import { execFileSync } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { BlobStore } from '../apps/worker/src/storage.js';
+import { readCorpus } from '../shared/reader.js';
+import { chatCorpusSchema } from '../shared/chat.js';
+if (!process.env.STORAGE_ACCOUNT) throw new Error('STORAGE_ACCOUNT is required');
+const revision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+const entries = await readCorpus('content/research', 'private');
+const sources = [];
+for (const { note } of entries) sources.push({ note, humanMarkdown: await readFile(path.join('content/research', note.source.id, 'notes.md'), 'utf8') });
+const corpus = chatCorpusSchema.parse({ revision, sources });
+if (Buffer.byteLength(JSON.stringify(corpus)) > 20 * 1024 * 1024) throw new Error('Chat corpus exceeds snapshot limit');
+const store = new BlobStore(process.env.STORAGE_ACCOUNT);
+await store.withLease('chat-corpus', async () => {
+  await store.create(`chat/corpora/${revision}.json`, corpus);
+  await store.write('chat/current.json', { revision, updatedAt: new Date().toISOString() });
+});
+console.log(JSON.stringify({ revision, chatSources: sources.length }));

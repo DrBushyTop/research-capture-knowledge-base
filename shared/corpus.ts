@@ -34,9 +34,9 @@ export const licenseEvidenceSchema = z.strictObject({
 export const noteSchema = z.strictObject({
   schemaVersion: z.literal(1), generationId: z.string().regex(/^[a-f0-9]{64}$/), source: sourceSchema,
   extraction: z.strictObject({
-    status: z.enum(['text', 'metadata-only', 'needs-review']), method: z.enum(['pdf-text', 'html', 'none']),
+    status: z.enum(['text', 'metadata-only', 'needs-review']), method: z.enum(['pdf-text', 'html', 'text', 'none']),
     reason: z.string().max(1000).nullable(), truncated: z.boolean(), retrievedAt: z.string(),
-    artifactHash: z.string().regex(/^[a-f0-9]{64}$/).nullable()
+    artifactHash: z.string().regex(/^[a-f0-9]{64}$/).nullable(), artifactMime: z.string().max(100).optional()
   }),
   analysis: analysisSchema.nullable(),
   processing: z.strictObject({ version: z.string(), model: z.string().nullable(), processedAt: z.string() }),

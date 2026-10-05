@@ -12,6 +12,7 @@ it('stages a validated note once despite duplicate delivery', async () => {
   await processJob(store, job.id, { ...processor, enrich: async () => { throw new Error('duplicate paid inference'); } });
   const note = await store.read<Note>(`staged/${job.id}.json`);
   expect(note?.analysis?.summary).toBe('A narrative review reports uncertainty in the evidence.');
+  expect((await store.read<{ text: string }>(`source-text/${job.id}.json`))?.text).toBe('Available source evidence.');
   expect((await store.read<Job>(key))?.status).toBe('staged');
 });
 it('a failed model produces an honest review note without invented analysis', async () => {

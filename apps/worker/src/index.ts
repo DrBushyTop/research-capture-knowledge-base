@@ -8,6 +8,9 @@ import { discover, reconcile } from './pipeline.js';
 import { extract } from './extraction.js';
 import { enrich, licenseEvidence } from './enrichment.js';
 import { processJob } from './processing.js';
+import { ChatAccessError, chatStatus, processChatJob, readerIdentity, reconcileChat, submitChat } from './chat-service.js';
+import { gatherEvidence } from './chat-sandbox.js';
+import { answerQuestion } from './chat-model.js';
 const required = (name: string) => { const value = process.env[name]; if (!value) throw new Error(`Missing configuration: ${name}`); return value; };
 const store = () => new BlobStore(required('STORAGE_ACCOUNT'));
 let zoteroPromise: Promise<Zotero> | undefined;
@@ -31,6 +34,38 @@ app.timer('discoverCaptures', {
     context.log(JSON.stringify({ event: 'discovery-complete', libraryVersion: library?.version ?? checkpoint?.libraryVersion }));
   }
 });
+app.http('chatGateway', {
+  route: 'chat', methods: ['GET', 'POST'], authLevel: 'function',
+  handler: async request => {
+    try {
+      const owner = readerIdentity(request.headers.get('x-ms-client-principal'));
+      const state = store();
+      const result = request.method === 'GET' ? await chatStatus(state, owner, request.query.get('id') || '') : await (async () => {
+        const text = await request.text();
+        if (Buffer.byteLength(text) > 16_384) throw new ChatAccessError(413, 'Question is too large');
+        let input: unknown; try { input = JSON.parse(text); } catch { throw new ChatAccessError(400, 'Invalid question'); }
+        return submitChat(state, owner, input, id => state.sendChat(id));
+      })();
+      return { status: request.method === 'POST' ? 202 : 200, jsonBody: result, headers: { 'Cache-Control': 'private, no-store' } };
+    } catch (error) {
+      return { status: error instanceof ChatAccessError ? error.status : 503, jsonBody: { error: error instanceof ChatAccessError ? error.message : 'Chat is temporarily unavailable. Try again.' }, headers: { 'Cache-Control': 'private, no-store' } };
+    }
+  }
+});
+app.timer('recoverChats', { schedule: '30 */5 * * * *', handler: async (_timer, context) => {
+  const state = store(); await reconcileChat(state, id => state.sendChat(id));
+  context.log(JSON.stringify({ event: 'chat-reconciliation-complete' }));
+} });
+app.storageQueue('answerChat', { queueName: 'chat', connection: 'AzureWebJobsStorage', handler: async (message: unknown, context) => {
+  const payload = typeof message === 'string' ? JSON.parse(message) : message;
+  const id = (payload as { jobId: string }).jobId;
+  const state = store();
+  await processChatJob(state, id, async (corpus, job, record) => {
+    const { evidence, image } = await gatherEvidence(state, corpus, job, record);
+    return { answer: await answerQuestion(job.request, evidence, image?.dataUrl, state.leaseSignal), evidence };
+  });
+  context.log(JSON.stringify({ event: 'chat-processing-complete', jobId: /^[a-f0-9]{32}$/.test(id) ? id : 'invalid' }));
+} });
 app.storageQueue('processCapture', {
   queueName: 'processing', connection: 'AzureWebJobsStorage',
   handler: async (message: unknown, context) => {

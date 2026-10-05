@@ -3,6 +3,7 @@ param suffix string = '16681c6a'
 param vaultName string = 'kv-research-dev-16681c6a'
 param bootstrapPrincipalId string
 param processingVersion string = '2'
+param sandboxSnapshot string = '4daeeb76-0b95-4d8b-9c36-32ea7167fcde'
 param githubSubject string = 'repo:DrBushyTop@22717844/research-capture-knowledge-base@1405750793:ref:refs/heads/master'
 var tags = { application: 'research-capture-knowledge-base', environment: 'development' }
 var blobOwner = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
@@ -39,6 +40,38 @@ resource containers 'Microsoft.Storage/storageAccounts/blobServices/containers@2
 resource queues 'Microsoft.Storage/storageAccounts/queueServices@2023-05-01' = { parent: storage, name: 'default' }
 resource processingQueue 'Microsoft.Storage/storageAccounts/queueServices/queues@2023-05-01' = { parent: queues, name: 'processing' }
 resource poisonQueue 'Microsoft.Storage/storageAccounts/queueServices/queues@2023-05-01' = { parent: queues, name: 'processing-poison' }
+resource chatQueue 'Microsoft.Storage/storageAccounts/queueServices/queues@2023-05-01' = { parent: queues, name: 'chat' }
+resource chatPoisonQueue 'Microsoft.Storage/storageAccounts/queueServices/queues@2023-05-01' = { parent: queues, name: 'chat-poison' }
+resource chatRetention 'Microsoft.Storage/storageAccounts/managementPolicies@2023-05-01' = {
+  parent: storage
+  name: 'default'
+  properties: {
+    policy: { rules: [{
+      name: 'expire-chat-questions'
+      enabled: true
+      type: 'Lifecycle'
+      definition: {
+        filters: { blobTypes: ['blockBlob'], prefixMatch: ['pipeline/chat/jobs/', 'pipeline/chat/users/'] }
+        actions: { baseBlob: { delete: { daysAfterModificationGreaterThan: 1 } } }
+      }
+    }] }
+  }
+}
+resource sandboxes 'Microsoft.App/sandboxGroups@2026-02-01-preview' = {
+  name: 'sbg-research-chat-dev'
+  location: location
+  tags: tags
+  properties: { allowedLocations: [location], enableDetailedMetrics: false }
+}
+resource workerSandboxRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(sandboxes.id, workerIdentity.id, 'sandbox-data-owner')
+  scope: sandboxes
+  properties: {
+    principalId: workerIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'c24cf47c-5077-412d-a19c-45202126392c')
+  }
+}
 resource workerStorageRoles 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for role in [blobOwner, queueContributor, tableContributor]: {
   name: guid(storage.id, workerIdentity.id, role)
   scope: storage
@@ -144,6 +177,11 @@ resource settings 'Microsoft.Web/sites/config@2024-04-01' = {
     APPLICATIONINSIGHTS_CONNECTION_STRING: insights.properties.ConnectionString
     APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'ClientId=${workerIdentity.properties.clientId};Authorization=AAD'
     PROCESSING_VERSION: processingVersion
+    AZURE_SUBSCRIPTION_ID: subscription().subscriptionId
+    AZURE_RESOURCE_GROUP: resourceGroup().name
+    SANDBOX_REGION: location
+    SANDBOX_GROUP: sandboxes.name
+    SANDBOX_SNAPSHOT: sandboxSnapshot
   }
 }
 resource ciDeployRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {

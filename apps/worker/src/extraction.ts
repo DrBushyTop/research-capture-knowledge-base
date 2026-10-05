@@ -75,7 +75,7 @@ export async function extract(snapshot: SourceSnapshot, zotero: Zotero, retain: 
   const cached = await restore?.();
   const artifacts = snapshot.root.data.itemType === 'attachment' ? [snapshot.root, ...snapshot.children] : snapshot.children;
   const attachment = artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && c.data.contentType === 'application/pdf') ||
-    artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && c.data.contentType === 'text/html');
+    artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && /^(text\/|image\/|application\/json$)/.test(String(c.data.contentType)));
   if (cached) {
     bytes = cached.bytes; mime = cached.mime; evidence.retrievedAt = cached.retrievedAt;
   } else if (attachment) {
@@ -94,6 +94,7 @@ export async function extract(snapshot: SourceSnapshot, zotero: Zotero, retain: 
   const artifactHash = hash(bytes);
   await retain(artifactHash, bytes, mime);
   evidence.artifactHash = artifactHash;
+  evidence.artifactMime = mime.split(';')[0];
   let text = '';
   if (mime.includes('pdf') || Buffer.from(bytes.subarray(0, 5)).toString() === '%PDF-') {
     const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
@@ -114,7 +115,9 @@ export async function extract(snapshot: SourceSnapshot, zotero: Zotero, retain: 
     try { text = new Readability(dom.window.document).parse()?.textContent?.trim() || ''; }
     finally { dom.window.close(); }
     evidence.method = 'html'; evidence.truncated = text.length > 60_000;
-  } else return { text: '', evidence: { ...evidence, reason: 'Unsupported source format.' } };
+  } else if (mime.startsWith('text/') || mime === 'application/json') {
+    text = Buffer.from(bytes).toString('utf8'); evidence.method = 'text'; evidence.truncated = text.length > 60_000;
+  } else return { text: '', evidence: { ...evidence, status: 'needs-review', reason: mime.startsWith('image/') ? 'Image retained privately. Use a visual chat question to inspect it; text search needs OCR.' : 'Unsupported source format.' } };
   text = text.slice(0, 60_000).trim();
   if (text.length < 80) return { text: '', evidence: { ...evidence, status: 'needs-review', reason: 'No usable text layer. A scan may need OCR or manual review.' } };
   return { text, evidence: { ...evidence, status: 'text' } };

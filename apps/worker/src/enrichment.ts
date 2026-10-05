@@ -4,8 +4,8 @@ import { analysisSchema, httpUrl, type Analysis, type Note } from '../../../shar
 
 export class TransientInference extends Error {}
 
-function inferenceSchema() {
-  const schema = z.toJSONSchema(analysisSchema);
+export function inferenceSchema(input: z.ZodType = analysisSchema) {
+  const schema = z.toJSONSchema(input);
   const unsupported = new Set(['$schema', 'maxLength', 'minLength', 'maxItems', 'minItems', 'minimum', 'maximum']);
   const clean = (value: unknown): unknown => Array.isArray(value) ? value.map(clean) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).filter(([key]) => !unsupported.has(key)).map(([key, v]) => [key, clean(v)])) : value;
   return clean(schema);

@@ -16,5 +16,5 @@ for (const entry of await readCorpus('content/research', 'private')) {
 }
 const files = await readdir(root, { recursive: true });
 if (files.some(file => /\.(pdf|docx?|xlsx?|zip)$/i.test(file))) throw new Error('Raw artifact present in reader output');
-if (files.some(file => file === 'chat' || file.startsWith('chat/'))) throw new Error('Private chat route in public output');
+if (files.some(file => file === 'reader-chat.js' || file === 'chat' || file.startsWith('chat/'))) throw new Error('Private chat route or script in public output');
 console.log(JSON.stringify({ publicNotes: expected.size, fuzzyDocuments: search.documentCount, rawArtifacts: 0, privateChat: false }));

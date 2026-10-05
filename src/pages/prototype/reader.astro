@@ -57,8 +57,8 @@ import '@fontsource/source-serif-4/600.css';
       if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); cycle(event.key === 'ArrowLeft' ? -1 : 1); }
     });
     document.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-filter]').forEach(node => node.addEventListener('input', () => { state[node.dataset.filter as 'query' | 'topic' | 'type' | 'year'] = node.value.trim(); render(); }));
-    document.querySelectorAll<HTMLButtonElement>('[data-source-choice]').forEach(node => node.addEventListener('click', () => { state.source = node.dataset.sourceChoice!; render(); if (matchMedia('(max-width: 720px)').matches) document.querySelector<HTMLElement>('[data-variant="' + state.variant + '"] main')?.scrollIntoView({ behavior: 'auto', block: 'start' }); }));
-    document.querySelectorAll('[data-go-library]').forEach(node => node.addEventListener('click', () => document.querySelector<HTMLElement>('[data-variant="' + state.variant + '"] .filters')?.scrollIntoView({ behavior: 'auto', block: 'start' })));
+    document.querySelectorAll<HTMLButtonElement>('[data-source-choice]').forEach(node => node.addEventListener('click', () => { state.source = node.dataset.sourceChoice!; render(); if (matchMedia('(max-width: 720px)').matches) document.querySelector<HTMLElement>('[data-variant="' + state.variant + '"] main')?.scrollIntoView({ behavior: 'instant', block: 'start' }); }));
+    document.querySelectorAll('[data-go-library]').forEach(node => node.addEventListener('click', () => document.querySelector<HTMLElement>('[data-variant="' + state.variant + '"] .filters')?.scrollIntoView({ behavior: 'instant', block: 'start' })));
     setVariant(new URL(location.href).searchParams.get('variant') || 'A');
   </script>
 </body></html>

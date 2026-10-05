@@ -8,3 +8,5 @@ dist/
 local.settings.json
 *.zip
 coverage/
+
+.impeccable/review/

@@ -1,13 +1,14 @@
 import { canonical, hash, normalize, type LibrarySnapshot, type SourceSnapshot } from '../../../shared/corpus.js';
 
 export interface PipelineStore {
+  readonly leaseSignal?: AbortSignal;
   read<T>(key: string): Promise<T | undefined>;
   write(key: string, value: unknown): Promise<void>;
   create(key: string, value: unknown): Promise<void>;
   list(prefix: string): Promise<string[]>;
   withLease<T>(key: string, fn: () => Promise<T>): Promise<T>;
 }
-export interface Job { id: string; source: SourceSnapshot['source']; snapshotKey: string; status: 'pending' | 'staged' | 'imported' | 'failed'; attempts: number; observedAt: string; lastQueuedAt?: string; error?: string; retryAt?: string; }
+export interface Job { id: string; source: SourceSnapshot['source']; snapshotKey: string; status: 'pending' | 'staged' | 'imported' | 'failed'; attempts: number; dispatches?: number; observedAt: string; lastQueuedAt?: string; error?: string; retryAt?: string; }
 export interface SourceState { generationId: string; source: SourceSnapshot['source']; processingVersion?: string; }
 export async function discover(store: PipelineStore, library: LibrarySnapshot, version: string, collection?: string) {
   return store.withLease('poll', async () => {
@@ -41,11 +42,21 @@ export async function reconcile(store: PipelineStore, send: (id: string) => Prom
     const desired = await store.read<SourceState>(`sources/${job.source.id}.json`);
     if (desired?.generationId !== job.id) continue;
     if (job.lastQueuedAt && now.getTime() - new Date(job.lastQueuedAt).getTime() < 10 * 60_000) continue;
-    await send(job.id);
-    // Duplicate sends after a crash are safe. A lease protects this write against worker completion.
+    // Persist the handoff budget before sending, including crashes before worker startup.
     await store.withLease(`source-${job.source.id}`, async () => {
       const latest = await store.read<Job>(key);
-      if (latest?.status === 'pending') await store.write(key, { ...latest, lastQueuedAt: now.toISOString() });
+      const current = await store.read<SourceState>(`sources/${job.source.id}.json`);
+      if (!latest || latest.status !== 'pending' || current?.generationId !== latest.id || (latest.retryAt && new Date(latest.retryAt) > now)) return;
+      if (latest.lastQueuedAt && now.getTime() - new Date(latest.lastQueuedAt).getTime() < 10 * 60_000) return;
+      if ((latest.dispatches || 0) >= 20 || latest.attempts >= 5) {
+        await store.write(key, { ...latest, status: 'failed', error: 'Automatic recovery budget exhausted; operator replay required' }); return;
+      }
+      await store.write(key, { ...latest, dispatches: (latest.dispatches || 0) + 1, lastQueuedAt: now.toISOString() });
+      try { await send(job.id); }
+      catch (error) {
+        await store.write(key, { ...latest, dispatches: (latest.dispatches || 0) + 1, lastQueuedAt: undefined });
+        throw error;
+      }
     });
   }
 }

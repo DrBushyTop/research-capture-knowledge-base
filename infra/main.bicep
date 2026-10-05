@@ -3,7 +3,7 @@ param suffix string = '16681c6a'
 param vaultName string = 'kv-research-dev-16681c6a'
 param bootstrapPrincipalId string
 param processingVersion string = '2'
-param githubRepository string = 'DrBushyTop/research-capture-knowledge-base'
+param githubSubject string = 'repo:DrBushyTop@22717844/research-capture-knowledge-base@1405750793:ref:refs/heads/master'
 var tags = { application: 'research-capture-knowledge-base', environment: 'development' }
 var blobOwner = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
 var blobContributor = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
@@ -16,7 +16,7 @@ resource ciIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31
 resource federation 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2023-01-31' = {
   parent: ciIdentity
   name: 'github-master'
-  properties: { issuer: 'https://token.actions.githubusercontent.com', subject: 'repo:${githubRepository}:ref:refs/heads/master', audiences: ['api://AzureADTokenExchange'] }
+  properties: { issuer: 'https://token.actions.githubusercontent.com', subject: githubSubject, audiences: ['api://AzureADTokenExchange'] }
 }
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: 'stresearchdev${suffix}'

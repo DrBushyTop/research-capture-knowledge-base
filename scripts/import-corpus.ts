@@ -1,4 +1,5 @@
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import path from 'node:path';
 import { BlobStore } from '../apps/worker/src/storage.js';
 import { type Job, type SourceState } from '../apps/worker/src/pipeline.js';
@@ -8,7 +9,12 @@ import { applyCandidate } from '../shared/importer.js';
 const account = process.env.STORAGE_ACCOUNT;
 if (!account) throw new Error('STORAGE_ACCOUNT is required');
 const store = new BlobStore(account);
-const git = (...args: string[]) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+const execute = promisify(execFile);
+const git = async (...args: string[]) => {
+  await store.verifyLease();
+  const { stdout } = await execute('git', args, { encoding: 'utf8', timeout: 30_000, signal: store.leaseSignal });
+  return stdout.trim();
+};
 const root = path.resolve('content/research');
 await store.withLease('poll', async () => {
   const acknowledge: Job[] = [];
@@ -26,12 +32,12 @@ await store.withLease('poll', async () => {
     acknowledge.push(job);
   }
   if (!acknowledge.length) return;
-  git('add', '--', 'content/research');
-  const changes = git('diff', '--cached', '--name-only');
-  if (changes) git('commit', '-m', `content: import ${acknowledge.length} research capture(s) [skip worker]`);
+  await git('add', '--', 'content/research');
+  const changes = await git('diff', '--cached', '--name-only');
+  if (changes) await git('commit', '-m', `content: import ${acknowledge.length} research capture(s) [skip worker]`);
   // Push is never forced. If it fails, no cloud acknowledgements are written.
   // A retry starts from remote HEAD; receipts recover an already-pushed commit.
-  if (process.env.IMPORT_PUSH === 'true') git('push', 'origin', 'HEAD:master');
+  if (process.env.IMPORT_PUSH === 'true') await git('push', 'origin', 'HEAD:master');
   else if (process.env.GITHUB_ACTIONS === 'true') throw new Error('Workflow import requires IMPORT_PUSH=true');
   if (process.env.IMPORT_PUSH === 'true') {
     for (const job of acknowledge) await store.withLease(`source-${job.source.id}`, async () => {

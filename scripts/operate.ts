@@ -13,8 +13,11 @@ if (command === 'status') {
   const job = await store.read<Job>(`jobs/${id}.json`);
   if (!job) throw new Error('Unknown job');
   await store.withLease(`source-${job.source.id}`, async () => {
+    const current = await store.read<SourceState>(`sources/${job.source.id}.json`);
+    if (current?.generationId !== id) throw new Error('Superseded jobs cannot be replayed; reprocess the current source');
+    const latest = await store.read<Job>(`jobs/${id}.json`);
     // Replay resumes infrastructure failures; a new processing version regenerates cached analysis.
-    await store.write(`jobs/${id}.json`, { ...job, status: 'pending', attempts: 0, lastQueuedAt: undefined, retryAt: undefined, error: undefined });
+    await store.write(`jobs/${id}.json`, { ...latest, status: 'pending', attempts: 0, dispatches: 0, lastQueuedAt: undefined, retryAt: undefined, error: undefined });
     await store.send(id);
   });
   console.log(JSON.stringify({ jobId: id, replayed: true }));

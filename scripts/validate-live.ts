@@ -20,7 +20,7 @@ for (const key of await store.list('jobs/')) {
   const job = (await store.read<Job>(key))!;
   await processJob(store, job.id, { version: process.env.PROCESSING_VERSION || '2', model: required('FOUNDRY_DEPLOYMENT'),
     extract: snapshot => extract(snapshot, zotero, (hash, bytes, mime) => store.retainSource(snapshot.source.fingerprint, hash, bytes, mime), () => store.restoreSource(snapshot.source.fingerprint)),
-    enrich: text => enrich(text, required('FOUNDRY_ENDPOINT'), required('FOUNDRY_DEPLOYMENT')), rights: licenseEvidence });
+    enrich: (text, signal) => enrich(text, required('FOUNDRY_ENDPOINT'), required('FOUNDRY_DEPLOYMENT'), signal), rights: licenseEvidence });
   const note = await store.read<Note>(`staged/${job.id}.json`);
   console.log(JSON.stringify({ sourceId: job.source.id, status: (await store.read<Job>(key))?.status, extraction: note?.extraction.status, method: note?.extraction.method, reason: note?.extraction.reason, analyzed: Boolean(note?.analysis), model: note?.processing.model }));
 }

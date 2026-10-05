@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { discover, reconcile, type PipelineStore } from '../apps/worker/src/pipeline.js';
+import { discover, reconcile, type Job } from '../apps/worker/src/pipeline.js';
 import type { LibrarySnapshot } from '../shared/corpus.js';
 
 import { MemoryStore, snapshot } from './fixtures.js';
@@ -15,6 +15,14 @@ describe('durable observation', () => {
     expect(job?.source.id).toBe('zotero-users-12345-PBA4T3PN');
     expect(job?.status).toBe('pending');
   });
+});
+it('bounds recovery when queue deliveries never reach worker startup', async () => {
+  const store = new MemoryStore(); await discover(store, snapshot, 'v1');
+  const key = (await store.list('jobs/'))[0];
+  const start = Date.now(); let deliveries = 0;
+  for (let i = 0; i < 25; i++) await reconcile(store, async () => { deliveries++; }, new Date(start + i * 11 * 60_000));
+  expect(deliveries).toBe(20);
+  expect((await store.read<Job>(key))?.status).toBe('failed');
 });
 
 it('observes a child-only change and does not duplicate an unchanged observation', async () => {

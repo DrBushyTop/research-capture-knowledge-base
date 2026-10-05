@@ -46,14 +46,15 @@ export type Note = z.infer<typeof noteSchema>;
 export const publicationSchema = z.strictObject({
   note: z.enum(['PRIVATE', 'UNKNOWN', 'LINK_ONLY', 'ALLOW']),
   approvedFingerprint: z.string().regex(/^[a-f0-9]{64}$/).nullable(), approvedBy: z.string().max(200).nullable(),
+  approvedGenerationId: z.string().regex(/^[a-f0-9]{64}$/).nullable().default(null),
   artifact: z.enum(['PRIVATE', 'UNKNOWN', 'LINK_ONLY', 'ALLOW']),
   artifactHash: z.string().regex(/^[a-f0-9]{64}$/).nullable(), licenseUrl: httpUrl.nullable()
 });
 export type Publication = z.infer<typeof publicationSchema>;
-export const privatePublication: Publication = { note: 'PRIVATE', approvedFingerprint: null, approvedBy: null, artifact: 'UNKNOWN', artifactHash: null, licenseUrl: null };
+export const privatePublication: Publication = { note: 'PRIVATE', approvedFingerprint: null, approvedGenerationId: null, approvedBy: null, artifact: 'UNKNOWN', artifactHash: null, licenseUrl: null };
 export function publicNoteAllowed(note: Note, publication: Publication) {
   return note.source.active && ['LINK_ONLY', 'ALLOW'].includes(publication.note) &&
-    publication.approvedFingerprint === note.source.fingerprint && Boolean(publication.approvedBy?.trim());
+    publication.approvedFingerprint === note.source.fingerprint && publication.approvedGenerationId === note.generationId && Boolean(publication.approvedBy?.trim());
 }
 export function artifactRedistributionAllowed(note: Note, publication: Publication) {
   return publicNoteAllowed(note, publication) && publication.artifact === 'ALLOW' &&

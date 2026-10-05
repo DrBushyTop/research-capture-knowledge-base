@@ -24,4 +24,11 @@ it('recognizes a committed receipt when acknowledging a prior write failed', asy
   const root = await mkdtemp(path.join(os.tmpdir(), 'research-import-')); dirs.push(root);
   await applyCandidate(root, note);
   expect(await applyCandidate(root, note)).toBe('already-written');
+  const analysisFile = path.join(root, source.id, 'analysis.json');
+  const original = await readFile(analysisFile, 'utf8');
+  await writeFile(path.join(root, source.id, 'analysis.json'), '{"human":"edit after push"}');
+  expect(await applyCandidate(root, note)).toBe('conflict');
+  await writeFile(analysisFile, original);
+  await rm(path.join(root, source.id, 'index.md'));
+  expect(await applyCandidate(root, note)).toBe('conflict');
 });

@@ -14,10 +14,12 @@ it('public selection excludes private and stale approvals but allows an approved
     await applyCandidate(root, note);
     expect(await readCorpus(root, 'public')).toHaveLength(0);
     const publication = path.join(root, source.id, 'publication.json');
-    await writeFile(publication, JSON.stringify({ ...privatePublication, note: 'LINK_ONLY', approvedBy: 'owner', approvedFingerprint: source.fingerprint }));
+    await writeFile(publication, JSON.stringify({ ...privatePublication, note: 'LINK_ONLY', approvedBy: 'owner', approvedFingerprint: source.fingerprint, approvedGenerationId: note.generationId }));
     const selected = await readCorpus(root, 'public');
     expect(selected).toHaveLength(1);
     expect(selected[0].publication.artifact).toBe('UNKNOWN');
+    await applyCandidate(root, { ...note, generationId: 'b'.repeat(64), processing: { ...note.processing, version: '2' } });
+    expect(await readCorpus(root, 'public')).toHaveLength(0);
     await writeFile(publication, JSON.stringify({ ...privatePublication, note: 'ALLOW', approvedBy: 'owner', approvedFingerprint: '0'.repeat(64) }));
     expect(await readCorpus(root, 'public')).toHaveLength(0);
   } finally { await rm(root, { recursive: true, force: true }); }

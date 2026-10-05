@@ -14,11 +14,12 @@ export async function applyCandidate(root: string, input: Note): Promise<'writte
   catch (error) { if ((error as {code?: string}).code !== 'ENOENT') throw error; }
   const previousText = await readOptional(path.join(dir, '_receipt.json'));
   const receipt = previousText ? receiptSchema.parse(JSON.parse(previousText)) : undefined;
-  if (receipt?.generationId === note.generationId) return 'already-written';
   for (const file of ['index.md', 'analysis.json'] as const) {
     const existing = await readOptional(path.join(dir, file));
+    if (receipt && existing === undefined) return 'conflict';
     if (existing !== undefined && (!receipt || hash(existing) !== receipt.generatedHashes[file])) return 'conflict';
   }
+  if (receipt?.generationId === note.generationId) return 'already-written';
   const files = { 'index.md': renderMarkdown(note), 'analysis.json': JSON.stringify(note, null, 2) + '\n' };
   await mkdir(dir, { recursive: true });
   for (const [file, body] of Object.entries(files)) await writeFile(path.join(dir, file), body, 'utf8');

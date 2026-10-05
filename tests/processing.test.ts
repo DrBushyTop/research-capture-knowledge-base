@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { MemoryStore, snapshot } from './fixtures.js';
-import { discover, type Job } from '../apps/worker/src/pipeline.js';
+import { discover, reconcile, type Job } from '../apps/worker/src/pipeline.js';
 import { processJob, type Processor } from '../apps/worker/src/processing.js';
 import type { Analysis, Note } from '../shared/corpus.js';
 const analysis: Analysis = { summary: 'A narrative review reports uncertainty in the evidence.', topics: ['research-methods'], sourceCategory: 'research-paper', studyType: 'narrative review', keyFindings: [], limitations: ['Not a randomized trial.'], claims: [], relevance: [], population: null, participantCount: null, intervention: null, comparator: null, outcomes: [], funding: null, suggestedRelationships: [] };
@@ -42,4 +42,18 @@ it('rate limits leave a durable retry instead of caching a failed interpretation
   await store.write(`jobs/${job.id}.json`, { ...pending, retryAt: undefined });
   await processJob(store, job.id, processor);
   expect((await store.read<Note>(`staged/${job.id}.json`))?.analysis?.summary).toBe(analysis.summary);
+});
+it('stops automatically delivering a job after repeated unexpected failures', async () => {
+  const store = new MemoryStore(); await discover(store, snapshot, 'v1');
+  const key = (await store.list('jobs/'))[0]; const job = (await store.read<Job>(key))!;
+  const broken = { ...processor, rights: async () => { throw new Error('permanent configuration failure'); } };
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await expect(processJob(store, job.id, broken)).rejects.toThrow();
+    const pending = (await store.read<Job>(key))!;
+    await store.write(key, { ...pending, retryAt: undefined });
+  }
+  expect((await store.read<Job>(key))?.status).toBe('failed');
+  let deliveries = 0;
+  await reconcile(store, async () => { deliveries++; });
+  expect(deliveries).toBe(0);
 });

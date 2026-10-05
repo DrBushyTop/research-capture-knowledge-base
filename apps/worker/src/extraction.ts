@@ -75,7 +75,8 @@ export async function extract(snapshot: SourceSnapshot, zotero: Zotero, retain: 
   const cached = await restore?.();
   const artifacts = snapshot.root.data.itemType === 'attachment' ? [snapshot.root, ...snapshot.children] : snapshot.children;
   const attachment = artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && c.data.contentType === 'application/pdf') ||
-    artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && /^(text\/|image\/|application\/json$)/.test(String(c.data.contentType)));
+    artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && /^(text\/|application\/json$)/.test(String(c.data.contentType))) ||
+    artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && String(c.data.contentType).startsWith('image/'));
   if (cached) {
     bytes = cached.bytes; mime = cached.mime; evidence.retrievedAt = cached.retrievedAt;
   } else if (attachment) {

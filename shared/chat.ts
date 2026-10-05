@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { hash, noteSchema, sourceId } from './corpus.js';
+import { evidenceQuery } from './search.js';
 export const chatRequestSchema = z.strictObject({ question: z.string().trim().min(1).max(2000), sourceId: sourceId.optional(),
   history: z.array(z.strictObject({ role: z.enum(['user', 'assistant']), content: z.string().max(3000) })).max(6).default([]),
   visual: z.strictObject({ sourceId, page: z.number().int().min(1).max(200).default(1) }).optional() });
@@ -23,12 +24,13 @@ export function corpusEvidence(corpus: ChatCorpus): Evidence[] {
       ...(human ? chunkText({ ...base, kind: 'human', locator: 'Human Markdown notes' }, human) : [])];
   });
 }
-export function packEvidence(chunks: Evidence[], question: string): Evidence[] {
-  const words = [...new Set(question.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) || [])];
+export function packEvidence(chunks: Evidence[], question: string, required: Evidence[] = []): Evidence[] {
+  const words = evidenceQuery(question).split(' ').filter(Boolean);
   const ranked = chunks.map(chunk => ({ chunk, score: words.reduce((score, word) => score + (chunk.text.toLowerCase().includes(word) ? 1 : 0) + (chunk.title.toLowerCase().includes(word) ? 3 : 0), 0) + (chunk.kind === 'source' ? 0.5 : 0) })).sort((a, b) => b.score - a.score);
   const selected: Evidence[] = []; const sources = new Map<string, number>();
-  for (const { chunk } of ranked) {
+  for (const chunk of [...required, ...ranked.map(item => item.chunk)]) {
     if (selected.length >= 8) break;
+    if (selected.some(item => item.id === chunk.id)) continue;
     if ((sources.get(chunk.sourceId) || 0) >= 3 || (!sources.has(chunk.sourceId) && sources.size >= 4)) continue;
     if (JSON.stringify([...selected, chunk]).length > 18_000) continue;
     selected.push(chunk); sources.set(chunk.sourceId, (sources.get(chunk.sourceId) || 0) + 1);

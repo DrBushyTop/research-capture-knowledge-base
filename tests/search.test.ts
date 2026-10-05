@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { buildSearchIndex, loadSearchIndex, searchIds } from '../shared/search.js';
+import { buildSearchIndex, loadSearchIndex, rankEvidenceSources, searchIds } from '../shared/search.js';
 import { matchedSourceText, sourceText } from '../shared/source-text.js';
 import { normalize } from '../shared/corpus.js';
 import { snapshot } from './fixtures.js';
@@ -21,6 +21,7 @@ it('indexes document-only terms and rejects text from a different generation or 
   const body = matchedSourceText(note, stored);
   const index = await loadSearchIndex(JSON.stringify(buildSearchIndex([{ ...documents[0], body }])));
   expect(searchIds(index, 'polysomnograpy')).toEqual(['paper']);
+  expect(rankEvidenceSources(index, 'What does the stored paper say about polysomnography?')).toEqual(['paper']);
   expect(() => matchedSourceText(note, { ...stored, generationId: 'c'.repeat(64) })).toThrow('does not match');
   expect(() => matchedSourceText(note, { ...stored, artifactHash: 'd'.repeat(64) })).toThrow('does not match');
 });

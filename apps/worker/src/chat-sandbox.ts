@@ -4,6 +4,8 @@ import { SandboxGroupClient, endpointForRegion } from '@azure/containerapps-sand
 import { hash } from '../../../shared/corpus.js';
 import { chunkText, corpusEvidence, evidenceChunk, packEvidence, type ChatCorpus, type ChatJob, type Evidence } from '../../../shared/chat.js';
 import type { BlobStore } from './storage.js';
+import { createWorkspace, deleteWorkspace } from './sandbox-lifecycle.js';
+import { loadSearchIndex, rankEvidenceSources } from '../../../shared/search.js';
 const required = (key: string) => { const value = process.env[key]; if (!value) throw new Error(`Missing ${key}`); return value; };
 export function sandboxClient() {
   return new SandboxGroupClient(new DefaultAzureCredential(), endpointForRegion(required('SANDBOX_REGION')), required('AZURE_SUBSCRIPTION_ID'), required('AZURE_RESOURCE_GROUP'), required('SANDBOX_GROUP'));
@@ -12,19 +14,24 @@ export async function gatherEvidence(store: BlobStore, corpus: ChatCorpus, job: 
   const signal = AbortSignal.any([AbortSignal.timeout(180_000), ...(store.leaseSignal ? [store.leaseSignal] : [])]);
   const initial = corpusEvidence(corpus);
   const query = [job.request.question, ...job.request.history.filter(turn => turn.role === 'user').map(turn => turn.content)].join('\n');
+  const storedIndex = await store.read<{ revision: string; index: unknown }>(`chat/indexes/${corpus.revision}.json`);
+  if (storedIndex?.revision !== corpus.revision) throw new Error('Chat retrieval index does not match corpus');
+  const index = await loadSearchIndex(JSON.stringify(storedIndex.index));
+  if (index.documentCount !== corpus.sources.length || corpus.sources.some(source => !index.has(source.note.source.id))) throw new Error('Chat retrieval index contains different sources');
   const selected = job.request.sourceId ? corpus.sources.filter(entry => entry.note.source.id === job.request.sourceId) : (() => {
-    const ids = new Set(packEvidence(initial, query).map(chunk => chunk.sourceId));
-    return corpus.sources.filter(entry => ids.has(entry.note.source.id));
+    const ranked = rankEvidenceSources(index, query).slice(0, 4);
+    const ids = ranked.length ? ranked : [...new Set(packEvidence(initial, query).map(chunk => chunk.sourceId))];
+    return ids.map(id => corpus.sources.find(entry => entry.note.source.id === id)!).filter(Boolean);
   })();
   const visualSource = corpus.sources.find(entry => entry.note.source.id === job.request.visual?.sourceId);
   if (visualSource && !selected.includes(visualSource)) selected.unshift(visualSource);
   const sources = selected.slice(0, 4);
   const client = sandboxClient();
-  const sandbox = await client.sandboxes.beginCreate({ sourcesRef: { snapshot: { id: required('SANDBOX_SNAPSHOT') } } }, { abortSignal: signal }).pollUntilDone();
+  let id: string | undefined;
   let image: { dataUrl: string; evidence: Evidence } | undefined;
   try {
-    await record(sandbox.id);
-    await client.sandboxes.setLifecyclePolicy(sandbox.id, { autoSuspend: { enabled: true, interval: 120, mode: 'Disk' }, autoDelete: { enabled: true, deleteIntervalSeconds: 600 } }, { abortSignal: signal });
+    await createWorkspace(client, signal, async created => { id = created; await record(created); });
+    const sandbox = { id: id! };
     await client.egress.setPolicy(sandbox.id, { defaultAction: 'Deny', trafficInspection: 'Full', hostRules: [], rules: [] }, { abortSignal: signal });
     await client.files.write(sandbox.id, '/workspace/evidence.py', await readFile(new URL('../sandbox/evidence.py', import.meta.url)), { mode: '0444', createDirs: true, abortSignal: signal });
     await client.files.write(sandbox.id, '/workspace/corpus.json', JSON.stringify({ revision: corpus.revision, sources }), { mode: '0444', abortSignal: signal });
@@ -47,7 +54,7 @@ export async function gatherEvidence(store: BlobStore, corpus: ChatCorpus, job: 
     if (execution.exitCode !== 0) throw new Error('Sandbox source extraction failed');
     const content = await client.files.read(sandbox.id, '/workspace/evidence.json', { abortSignal: signal });
     const extracted = JSON.parse(Buffer.from(content).toString('utf8')) as { sourceId: string; hash: string; pages: { locator: string; text: string }[] }[];
-    const evidence = initial.filter(chunk => !job.request.sourceId || chunk.sourceId === job.request.sourceId);
+    const evidence = initial.filter(chunk => sources.some(source => source.note.source.id === chunk.sourceId));
     for (const artifact of extracted) {
       const note = sources.find(entry => entry.note.source.id === artifact.sourceId)?.note;
       if (!note || note.extraction.artifactHash !== artifact.hash) throw new Error('Sandbox returned unknown artifact');
@@ -62,11 +69,11 @@ export async function gatherEvidence(store: BlobStore, corpus: ChatCorpus, job: 
       const visual = evidenceChunk({ sourceId: visualSource.note.source.id, generationId: visualSource.note.generationId, title: visualSource.note.source.title,
         kind: 'visual', locator: `Selected source page ${job.request.visual.page}`, text: `Rendered image of the retained artifact, page ${job.request.visual.page}. Read only visible content; uncertain values must be stated as uncertain.` });
       image = { dataUrl: `data:image/png;base64,${bytes.toString('base64')}`, evidence: visual };
-      packed = [visual, ...packed.slice(0, 7)];
+      packed = packEvidence(evidence, query, [visual]);
     }
     return { evidence: packed, image };
   } finally {
     // Delete before inference, so waiting for the model consumes no sandbox compute.
-    await client.sandboxes.beginDelete(sandbox.id, { abortSignal: AbortSignal.timeout(30_000) }).pollUntilDone();
+    if (id) await deleteWorkspace(id);
   }
 }

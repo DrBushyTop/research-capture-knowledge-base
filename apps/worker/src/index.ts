@@ -9,7 +9,8 @@ import { extract } from './extraction.js';
 import { enrich, licenseEvidence } from './enrichment.js';
 import { processJob } from './processing.js';
 import { ChatAccessError, chatStatus, processChatJob, readerIdentity, reconcileChat, submitChat } from './chat-service.js';
-import { gatherEvidence } from './chat-sandbox.js';
+import { gatherEvidence, sandboxClient } from './chat-sandbox.js';
+import { deleteExpiredWorkspaces } from './sandbox-lifecycle.js';
 import { answerQuestion } from './chat-model.js';
 const required = (name: string) => { const value = process.env[name]; if (!value) throw new Error(`Missing configuration: ${name}`); return value; };
 const store = () => new BlobStore(required('STORAGE_ACCOUNT'));
@@ -54,6 +55,7 @@ app.http('chatGateway', {
 });
 app.timer('recoverChats', { schedule: '30 */5 * * * *', handler: async (_timer, context) => {
   const state = store(); await reconcileChat(state, id => state.sendChat(id));
+  await deleteExpiredWorkspaces(sandboxClient());
   context.log(JSON.stringify({ event: 'chat-reconciliation-complete' }));
 } });
 app.storageQueue('answerChat', { queueName: 'chat', connection: 'AzureWebJobsStorage', handler: async (message: unknown, context) => {
@@ -62,6 +64,7 @@ app.storageQueue('answerChat', { queueName: 'chat', connection: 'AzureWebJobsSto
   const state = store();
   await processChatJob(state, id, async (corpus, job, record) => {
     const { evidence, image } = await gatherEvidence(state, corpus, job, record);
+    context.log(JSON.stringify({ event: 'chat-evidence-ready', jobId: id, passages: evidence.length, visual: Boolean(image) }));
     return { answer: await answerQuestion(job.request, evidence, image?.dataUrl, state.leaseSignal), evidence };
   });
   context.log(JSON.stringify({ event: 'chat-processing-complete', jobId: /^[a-f0-9]{32}$/.test(id) ? id : 'invalid' }));

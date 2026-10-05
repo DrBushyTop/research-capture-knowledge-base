@@ -4,6 +4,7 @@ import path from 'node:path';
 import { BlobStore } from '../apps/worker/src/storage.js';
 import { readCorpus } from '../shared/reader.js';
 import { chatCorpusSchema } from '../shared/chat.js';
+import { loadSearchIndex } from '../shared/search.js';
 if (!process.env.STORAGE_ACCOUNT) throw new Error('STORAGE_ACCOUNT is required');
 const revision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 const entries = await readCorpus('content/research', 'private');
@@ -12,8 +13,13 @@ for (const { note } of entries) sources.push({ note, humanMarkdown: await readFi
 const corpus = chatCorpusSchema.parse({ revision, sources });
 if (Buffer.byteLength(JSON.stringify(corpus)) > 20 * 1024 * 1024) throw new Error('Chat corpus exceeds snapshot limit');
 const store = new BlobStore(process.env.STORAGE_ACCOUNT);
+const index = JSON.parse(await readFile('apps/reader/dist/search-index.json', 'utf8'));
+if (Buffer.byteLength(JSON.stringify(index)) > 25 * 1024 * 1024) throw new Error('Chat retrieval index exceeds size limit');
+const loaded = await loadSearchIndex(JSON.stringify(index));
+if (loaded.documentCount !== sources.length || sources.some(source => !loaded.has(source.note.source.id))) throw new Error('Build the private reader before synchronizing its chat corpus');
 await store.withLease('chat-corpus', async () => {
   await store.create(`chat/corpora/${revision}.json`, corpus);
+  await store.create(`chat/indexes/${revision}.json`, { revision, index });
   await store.write('chat/current.json', { revision, updatedAt: new Date().toISOString() });
 });
 console.log(JSON.stringify({ revision, chatSources: sources.length }));

@@ -28,3 +28,11 @@ it('can reprocess an archived input after the original file becomes unavailable'
   expect(result.text).toContain('reproduce a note after the original source becomes unavailable');
   expect(result.evidence.retrievedAt).toBe('2026-10-05T10:00:00Z');
 });
+it('prefers readable text over an image attachment on the same source', async () => {
+  const source = normalize(snapshot)[0];
+  source.children = [{ key: 'AAAAAA11', version: 1, data: { linkMode: 'imported_file', contentType: 'image/png' } },
+    { key: 'BBBBBB11', version: 1, data: { linkMode: 'imported_file', contentType: 'text/plain' } }];
+  const zotero = new Zotero('12345', 'synthetic-read-key');
+  zotero.request = async path => { expect(path).toBe('items/BBBBBB11/file'); return new Response('Readable document evidence should remain available when the same capture contains an image attachment before its text file.'); };
+  expect((await extract(source, zotero, async () => {})).text).toContain('Readable document evidence');
+});

@@ -16,4 +16,9 @@ it('packs a bounded and diverse evidence set without turning generated notes int
   expect(JSON.stringify(selected).length).toBeLessThanOrEqual(18_000);
   expect(packEvidence(chunks.filter(chunk => chunk.kind === 'machine'), 'pain').every(chunk => chunk.kind === 'machine')).toBe(true);
   for (const id of new Set(selected.map(chunk => chunk.sourceId))) expect(selected.filter(chunk => chunk.sourceId === id).length).toBeLessThanOrEqual(3);
+  const visual = evidenceChunk({ sourceId: 'visual-source', generationId: 'c'.repeat(64), title: 'Chart', kind: 'visual', locator: 'PDF page 2', text: 'Explicitly selected visual page.' });
+  const withImage = packEvidence(chunks, 'pain', [visual]);
+  expect(withImage[0]).toEqual(visual);
+  expect(new Set(withImage.map(chunk => chunk.sourceId)).size).toBeLessThanOrEqual(4);
+  expect(JSON.stringify(withImage).length).toBeLessThanOrEqual(18_000);
 });

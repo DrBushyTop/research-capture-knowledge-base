@@ -83,7 +83,7 @@ export async function processChatJob(store: PipelineStore, id: string, answer: (
       const result = await answer(corpus, job, async sandboxId => { job = { ...job!, sandboxId }; await store.write(key, job); });
       await store.write(key, { ...job, status: 'complete', result: validateAnswer(result.answer, result.evidence), error: undefined });
     } catch (error) {
-      console.error(JSON.stringify({ event: 'chat-attempt-failed', jobId: id, attempt: job.attempts, errorType: error instanceof Error ? error.name : 'Unknown' }));
+      console.error(JSON.stringify({ event: 'chat-attempt-failed', jobId: id, attempt: job.attempts, errorType: error instanceof Error ? error.name : 'Unknown', statusCode: (error as { statusCode?: number })?.statusCode }));
       await store.write(key, { ...job, status: job.attempts >= 2 ? 'failed' : 'pending', retryAt: new Date(Date.now() + 60_000).toISOString(),
         error: 'An answer could not be verified or completed. Retry the question if this persists.' });
     }

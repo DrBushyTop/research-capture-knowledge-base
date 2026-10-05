@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "generationId": "c3269e81e05484fd43499d3d1a29cbb2b6782444905bd0171bdc76d6ed8bc2aa",
+  "source": {
+    "id": "zotero-users-21976164-QB73QCBV",
+    "libraryType": "users",
+    "libraryId": "21976164",
+    "key": "QB73QCBV",
+    "fingerprint": "c9fc90e3fe8259d5a5cac57efde679dea0f7683e39dfff8df743734534875cf2",
+    "title": "Azure Container Apps Sandboxes overview (preview)",
+    "itemType": "webpage",
+    "authors": [],
+    "url": "https://learn.microsoft.com/en-us/azure/container-apps/sandboxes-overview",
+    "doi": null,
+    "publishedAt": null,
+    "capturedAt": "2026-10-05T16:46:29Z",
+    "tags": [
+      "azure",
+      "dev-verification"
+    ],
+    "active": true
+  },
+  "extraction": {
+    "status": "text",
+    "method": "html",
+    "reason": null,
+    "truncated": false,
+    "retrievedAt": "2026-10-05T16:50:09.557Z",
+    "artifactHash": "3fc35a995366b588e226f4d7a957b5cfd3358fdc53b7af96f59fd44104dd0cec"
+  },
+  "analysis": {
+    "summary": "The source describes Azure Container Apps Sandboxes as isolated compute environments with programmable lifecycle control, OCI-based disk images, snapshots, persistent volumes, and networking policies. It contrasts stateful sandboxes with apps, jobs, and dynamic sessions and outlines access requirements, architecture, resource tiers, and suspend behavior. Performance, security, scalability, and cost statements are product claims rather than independently demonstrated findings in the supplied text.",
+    "topics": [
+      "Azure Container Apps Sandboxes",
+      "Isolated code execution",
+      "Stateful AI agent workspaces",
+      "Suspend and resume",
+      "Snapshots and persistent storage",
+      "Cloud resource lifecycle management",
+      "Networking policies",
+      "Identity and access management"
+    ],
+    "sourceCategory": "webpage",
+    "studyType": null,
+    "keyFindings": [
+      "The source identifies Microsoft.App/SandboxGroups as the top-level Azure resource type, with sandboxes, images, snapshots, volumes, and secrets scoped to a sandbox group.",
+      "Sandbox lifecycle policies include idle auto-suspend, memory-and-disk or disk-only preservation, and auto-delete after a configured stopped period.",
+      "Management is split between an ARM control plane for sandbox groups and VNet connections and a data plane for individual sandboxes and their resources.",
+      "The source lists five resource tiers, ranging from 0.25 CPU cores, 0.5 GB memory, and 20 GB disk to 4 CPU cores, 8 GB memory, and 80 GB disk.",
+      "Azure Blob volumes can be mounted to multiple sandboxes simultaneously; Data Disk volumes are described as mountable to only one sandbox at a time.",
+      "Access requires Microsoft Entra ID and the Container Apps SandboxGroup Data Owner role; personal Microsoft accounts are not supported.",
+      "The source positions sandboxes as stateful, directly controlled environments, whereas dynamic sessions provide pool-managed, ephemeral execution."
+    ],
+    "limitations": [
+      "No empirical study, benchmark methodology, sample size, or independent validation is provided.",
+      "Sub-second startup and restore claims do not specify workload conditions, image sizes, snapshot sizes, latency distributions, or regional constraints.",
+      "Strong-isolation claims are not accompanied by implementation details, threat models, security testing, or guarantees.",
+      "Scaling to thousands of concurrent sandboxes is asserted without quota details or measured scaling results.",
+      "The statement that stopped sandboxes incur no CPU or memory fees does not establish total cost; storage, snapshot, networking, and other charges are not specified.",
+      "Publication date, product availability status, author, and source URL are unavailable in the supplied text.",
+      "The comparisons with dynamic sessions are source-provided descriptions, not controlled evaluations."
+    ],
+    "claims": [
+      {
+        "text": "Sandboxes offer sub-second startup from prewarmed pools and sub-second restoration.",
+        "evidence": "The source explicitly states these performance characteristics but provides no supporting measurements or test conditions."
+      },
+      {
+        "text": "Each sandbox provides a secure isolation boundary suitable for untrusted code execution.",
+        "evidence": "The source describes separate secure boundaries and individual CPU, memory, disk, and network boundaries; it supplies no security evaluation."
+      },
+      {
+        "text": "Snapshots can preserve memory and disk, enabling restoration of processes and data.",
+        "evidence": "The snapshots section describes full-state capture. The lifecycle section qualifies this by distinguishing memory mode from disk-only suspend mode."
+      },
+      {
+        "text": "Stopped sandboxes incur no CPU or memory fees.",
+        "evidence": "This is explicitly stated under scale to zero; other potential charges are not addressed."
+      },
+      {
+        "text": "The service can burst to thousands of concurrent sandboxes.",
+        "evidence": "The source asserts this under scale-out and burst workloads without documenting quotas or benchmark results."
+      },
+      {
+        "text": "Sandboxes support more explicit lifecycle and persistence control than dynamic sessions.",
+        "evidence": "The comparison table describes direct SDK and CLI control, snapshots, persistent volumes, and networking policies for sandboxes versus pool-managed ephemeral dynamic sessions."
+      }
+    ],
+    "relevance": [
+      "Provides architectural context for researching persistent, isolated execution environments for AI agents and generated code.",
+      "Supports descriptive comparison of Azure compute options by lifecycle, state persistence, storage, and developer control.",
+      "Identifies access, networking, and lifecycle constraints relevant to evaluating cloud sandbox platforms.",
+      "Highlights performance, isolation, scalability, and pricing claims that would require additional evidence for rigorous evaluation."
+    ],
+    "population": null,
+    "participantCount": null,
+    "intervention": null,
+    "comparator": null,
+    "outcomes": [],
+    "funding": null,
+    "suggestedRelationships": [
+      "Documentation on sandbox snapshots and state management",
+      "Documentation on sandbox egress policies and network controls",
+      "Azure Container Apps dynamic sessions documentation",
+      "Research on isolation for untrusted and AI-generated code",
+      "Benchmarks of cold-start and snapshot-restoration latency",
+      "Comparative analyses of persistent AI agent execution environments"
+    ]
+  },
+  "processing": {
+    "version": "2",
+    "model": "research-sol",
+    "processedAt": "2026-10-05T16:50:25.067Z"
+  },
+  "rightsEvidence": []
+}

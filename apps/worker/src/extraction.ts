@@ -10,6 +10,7 @@ import type { Zotero } from './zotero.js';
 export const maxBytes = 20 * 1024 * 1024;
 export class MissingArtifact extends Error {}
 export interface Extracted { text: string; evidence: Note['extraction']; }
+export interface RetainedArtifact { bytes: Uint8Array; mime: string; retrievedAt: string; }
 export function publicAddress(address: string) {
   let parsed = ipaddr.parse(address);
   if (parsed.kind() === 'ipv6' && (parsed as ipaddr.IPv6).isIPv4MappedAddress()) parsed = (parsed as ipaddr.IPv6).toIPv4Address();
@@ -67,14 +68,17 @@ async function boundedResponse(response: Response) {
   } finally { await reader.cancel().catch(() => undefined); }
   return Buffer.concat(chunks);
 }
-export async function extract(snapshot: SourceSnapshot, zotero: Zotero, retain: (hash: string, bytes: Uint8Array, mime: string) => Promise<void>): Promise<Extracted> {
+export async function extract(snapshot: SourceSnapshot, zotero: Zotero, retain: (hash: string, bytes: Uint8Array, mime: string) => Promise<void>, restore?: () => Promise<RetainedArtifact | undefined>): Promise<Extracted> {
   const evidence: Note['extraction'] = { status: 'metadata-only', method: 'none', reason: null, truncated: false, retrievedAt: new Date().toISOString(), artifactHash: null };
   if (!snapshot.source.active) return { text: '', evidence: { ...evidence, reason: 'Source is no longer in the observed library.' } };
   let bytes: Uint8Array; let mime: string;
+  const cached = await restore?.();
   const artifacts = snapshot.root.data.itemType === 'attachment' ? [snapshot.root, ...snapshot.children] : snapshot.children;
   const attachment = artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && c.data.contentType === 'application/pdf') ||
     artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && c.data.contentType === 'text/html');
-  if (attachment) {
+  if (cached) {
+    bytes = cached.bytes; mime = cached.mime; evidence.retrievedAt = cached.retrievedAt;
+  } else if (attachment) {
     let response: Response;
     try { response = await zotero.request(`items/${attachment.key}/file`); }
     catch { throw new MissingArtifact('The synced attachment is not available yet.'); }

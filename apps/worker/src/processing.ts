@@ -1,5 +1,6 @@
 import { noteSchema, type Analysis, type Note, type SourceSnapshot } from '../../../shared/corpus.js';
 import { MissingArtifact, type Extracted } from './extraction.js';
+import { TransientInference } from './enrichment.js';
 import type { Job, PipelineStore, SourceState } from './pipeline.js';
 
 export interface Processor {
@@ -31,10 +32,16 @@ export async function processJob(store: PipelineStore, id: string, processor: Pr
       let analysis: Analysis | null = null;
       if (extracted.text) {
         try { analysis = await processor.enrich(extracted.text); }
-        catch { extracted.evidence.status = 'needs-review'; extracted.evidence.reason = 'Machine analysis unavailable or invalid; source retained privately for replay.'; }
+        catch (error) {
+          if (error instanceof TransientInference && job.attempts < 2) {
+            await store.write(`jobs/${id}.json`, { ...job, attempts: job.attempts + 1, retryAt: new Date(Date.now() + 10 * 60_000).toISOString(), error: 'Transient inference failure' });
+            return;
+          }
+          extracted.evidence.status = 'needs-review'; extracted.evidence.reason = 'Machine analysis unavailable or invalid; source retained privately for reprocessing.';
+        }
       }
       note = noteSchema.parse({ schemaVersion: 1, generationId: id, source: snapshot.source, extraction: extracted.evidence, analysis,
-        processing: { version: processor.version, model: analysis ? processor.model : null, processedAt: new Date().toISOString() },
+        processing: { version: processor.version, model: extracted.text ? processor.model : null, processedAt: new Date().toISOString() },
         rightsEvidence: await processor.rights(snapshot.source.doi) });
       await store.create(`analysis/${id}.json`, note);
     }

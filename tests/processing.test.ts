@@ -31,3 +31,15 @@ it('does not stage an old generation after a newer attachment was observed', asy
   } });
   expect(await store.list('staged/')).toHaveLength(0);
 });
+it('rate limits leave a durable retry instead of caching a failed interpretation', async () => {
+  const { TransientInference } = await import('../apps/worker/src/enrichment.js');
+  const store = new MemoryStore(); await discover(store, snapshot, 'v1');
+  const job = (await store.read<Job>((await store.list('jobs/'))[0]))!;
+  await processJob(store, job.id, { ...processor, enrich: async () => { throw new TransientInference('rate limited'); } });
+  const pending = (await store.read<Job>(`jobs/${job.id}.json`))!;
+  expect(pending.status).toBe('pending');
+  expect(await store.list('staged/')).toHaveLength(0);
+  await store.write(`jobs/${job.id}.json`, { ...pending, retryAt: undefined });
+  await processJob(store, job.id, processor);
+  expect((await store.read<Note>(`staged/${job.id}.json`))?.analysis?.summary).toBe(analysis.summary);
+});

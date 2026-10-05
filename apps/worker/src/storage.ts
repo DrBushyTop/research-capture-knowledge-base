@@ -49,4 +49,13 @@ export class BlobStore implements PipelineStore {
     try { await this.raw.getBlockBlobClient(hash).upload(data, data.length, { conditions: { ifNoneMatch: '*' }, blobHTTPHeaders: { blobContentType: mime } }); }
     catch (error) { if (![409, 412].includes((error as { statusCode: number }).statusCode)) throw error; }
   }
+  async retainSource(fingerprint: string, hash: string, bytes: Uint8Array, mime: string) {
+    await this.retain(hash, bytes, mime);
+    await this.create(`artifacts/${fingerprint}.json`, { hash, mime, retrievedAt: new Date().toISOString() });
+  }
+  async restoreSource(fingerprint: string) {
+    const artifact = await this.read<{ hash: string; mime: string; retrievedAt: string }>(`artifacts/${fingerprint}.json`);
+    if (!artifact) return undefined;
+    return { bytes: await this.raw.getBlockBlobClient(artifact.hash).downloadToBuffer(), mime: artifact.mime, retrievedAt: artifact.retrievedAt };
+  }
 }

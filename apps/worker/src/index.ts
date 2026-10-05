@@ -39,7 +39,7 @@ app.storageQueue('processCapture', {
     try {
       const state = store();
       await processJob(state, id, { version: process.env.PROCESSING_VERSION || processingVersion, model: required('FOUNDRY_DEPLOYMENT'),
-        extract: async snapshot => extract(snapshot, await zotero(), (hash, bytes, mime) => state.retain(hash, bytes, mime)),
+        extract: async snapshot => extract(snapshot, await zotero(), (hash, bytes, mime) => state.retainSource(snapshot.source.fingerprint, hash, bytes, mime), () => state.restoreSource(snapshot.source.fingerprint)),
         enrich: text => enrich(text, required('FOUNDRY_ENDPOINT'), required('FOUNDRY_DEPLOYMENT')), rights: licenseEvidence });
       context.log(JSON.stringify({ event: 'processing-complete', jobId: id }));
     } catch {

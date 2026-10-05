@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 
-export const processingVersion = '1';
+export const processingVersion = '2';
 export const httpUrl = z.url().refine(value => {
   try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password; }
   catch { return false; }

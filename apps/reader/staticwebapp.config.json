@@ -1,0 +1,11 @@
+{
+  "routes": [
+    { "route": "/.auth/login/aad", "statusCode": 404 },
+    { "route": "/.auth/*", "allowedRoles": ["anonymous"] },
+    { "route": "/login.html", "allowedRoles": ["anonymous"] },
+    { "route": "/*", "allowedRoles": ["reader"] }
+  ],
+  "responseOverrides": { "401": { "redirect": "/login.html", "statusCode": 302 }, "403": { "rewrite": "/login.html", "statusCode": 403 } },
+  "globalHeaders": { "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "X-Frame-Options": "DENY", "Cache-Control": "private, no-store" },
+  "platform": { "apiRuntime": "node:22" }
+}

@@ -1,0 +1,79 @@
+name: Research pipeline
+on:
+  push:
+    branches: [master]
+  pull_request:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: research-pipeline
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build:worker
+  import-and-deploy:
+    if: always() && github.event_name != 'pull_request' && (needs.verify.result == 'success' || needs.verify.result == 'skipped')
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      STORAGE_ACCOUNT: ${{ vars.STORAGE_ACCOUNT }}
+      READER_MODE: private
+      IMPORT_PUSH: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - run: npm ci
+      - name: Import the current validated candidates
+        run: |
+          git config user.name 'research-capture-bot'
+          git config user.email 'research-capture-bot@users.noreply.github.com'
+          npm run import
+      - run: npm run build:reader
+      - name: Deploy the private reader from this commit
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          action: upload
+          app_location: apps/reader/dist
+          skip_app_build: true
+          skip_api_build: true
+          production_branch: master
+      - name: Package the Functions worker
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          npm run build:worker
+          npm install --prefix .function-package --omit=dev
+      - name: Deploy the Functions worker
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ vars.FUNCTION_APP }}
+          package: .function-package
+          sku: flexconsumption

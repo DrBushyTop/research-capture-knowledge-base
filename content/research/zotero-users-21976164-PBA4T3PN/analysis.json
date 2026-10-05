@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "generationId": "3850c8a60b733b16245e354888f4704ca9f7eaf715dadfcf6b2fb9b163efacd7",
+  "source": {
+    "id": "zotero-users-21976164-PBA4T3PN",
+    "libraryType": "users",
+    "libraryId": "21976164",
+    "key": "PBA4T3PN",
+    "fingerprint": "87b80461157174bbf9a8d05ca2f701f201c57d4def72ba6dda20f49fe2d9476c",
+    "title": "Management of Fibromyalgia Syndrome",
+    "itemType": "journalArticle",
+    "authors": [
+      "Don L Goldenberg",
+      "Carol Burckhardt",
+      "Leslie Crofford"
+    ],
+    "url": null,
+    "doi": null,
+    "publishedAt": null,
+    "capturedAt": "2026-10-05T14:59:03Z",
+    "tags": [],
+    "active": true
+  },
+  "extraction": {
+    "status": "needs-review",
+    "method": "pdf-text",
+    "reason": "Machine analysis unavailable or invalid; source retained privately for replay.",
+    "truncated": false,
+    "retrievedAt": "2026-10-05T15:49:08.399Z",
+    "artifactHash": "61f5db704d9c35d07cf7c765bc4d3d624a68ccc9ec4aa8c32423a4d0e41b65b1"
+  },
+  "analysis": null,
+  "processing": {
+    "version": "1",
+    "model": null,
+    "processedAt": "2026-10-05T15:49:11.869Z"
+  },
+  "rightsEvidence": []
+}

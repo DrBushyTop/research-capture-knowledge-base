@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "generationId": "6e2e85a75a8e4bdaeb514ce0913dc266cee84843464e37b2ee74fdbe6e408e33",
+  "source": {
+    "id": "zotero-users-21976164-HPG888WX",
+    "libraryType": "users",
+    "libraryId": "21976164",
+    "key": "HPG888WX",
+    "fingerprint": "e88e8170d622851f3a3cdebb4527d007caa157fe865e0d6a0fcc21b09de5242b",
+    "title": "ScienceDirect",
+    "itemType": "webpage",
+    "authors": [],
+    "url": "https://www.sciencedirect.com/science/article/abs/pii/S0002934309008237",
+    "doi": null,
+    "publishedAt": null,
+    "capturedAt": "2026-10-05T15:00:44Z",
+    "tags": [],
+    "active": true
+  },
+  "extraction": {
+    "status": "needs-review",
+    "method": "none",
+    "reason": "Source extraction unavailable; review or replay this capture.",
+    "truncated": false,
+    "retrievedAt": "2026-10-05T15:49:12.610Z",
+    "artifactHash": null
+  },
+  "analysis": null,
+  "processing": {
+    "version": "1",
+    "model": null,
+    "processedAt": "2026-10-05T15:49:12.610Z"
+  },
+  "rightsEvidence": []
+}

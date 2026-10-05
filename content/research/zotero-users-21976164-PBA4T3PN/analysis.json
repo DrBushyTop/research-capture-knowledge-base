@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generationId": "3850c8a60b733b16245e354888f4704ca9f7eaf715dadfcf6b2fb9b163efacd7",
+  "generationId": "b1f0fe0e60ee1491410e7a577afd08a027f895078c69d82a905c4b13e9ca5f0c",
   "source": {
     "id": "zotero-users-21976164-PBA4T3PN",
     "libraryType": "users",
@@ -22,18 +22,117 @@
     "active": true
   },
   "extraction": {
-    "status": "needs-review",
+    "status": "text",
     "method": "pdf-text",
-    "reason": "Machine analysis unavailable or invalid; source retained privately for replay.",
+    "reason": null,
     "truncated": false,
-    "retrievedAt": "2026-10-05T15:49:08.399Z",
+    "retrievedAt": "2026-10-05T16:00:39.001Z",
     "artifactHash": "61f5db704d9c35d07cf7c765bc4d3d624a68ccc9ec4aa8c32423a4d0e41b65b1"
   },
-  "analysis": null,
+  "analysis": {
+    "summary": "This 2004 JAMA clinical review by Goldenberg, Burckhardt, and Crofford synthesizes 505 articles to develop evidence-based fibromyalgia management guidance. The authors judged low-dose tricyclic medications, aerobic exercise, cognitive behavioral therapy, patient education, and multidisciplinary programs to have the strongest evidence available at that time. Medication benefits were generally modest and predominantly short-term. The review highlights inadequate masking, small samples, inconsistent outcome measures, and uncertain long-term effectiveness. Its treatment rankings, diagnostic framework, and regulatory statements reflect evidence available through 2004, not current clinical guidance.",
+    "topics": [
+      "Fibromyalgia syndrome",
+      "Chronic widespread pain",
+      "Pharmacological treatment evidence",
+      "Aerobic exercise and strength training",
+      "Cognitive behavioral therapy",
+      "Patient education and self-management",
+      "Multidisciplinary pain management",
+      "Clinical trial methodology",
+      "Pain processing and patient heterogeneity"
+    ],
+    "sourceCategory": "research-paper",
+    "studyType": "Evidence-based clinical review with a structured literature search and expert-panel evidence grading; not an original clinical trial or a new pooled meta-analysis.",
+    "keyFindings": [
+      "The panel reviewed 505 articles and ranked efficacy evidence as strong, moderate, or weak according to study design and consistency of positive findings.",
+      "Tricyclic agents, particularly amitriptyline and cyclobenzaprine, received the strongest medication evidence rating, but overall benefit was described as modest.",
+      "The review reports significant clinical responses to tricyclic agents in 25% to 37% of patients; in a 208-patient trial, early improvement was no longer evident at 26 weeks.",
+      "Aerobic exercise, CBT, patient education, and multidisciplinary programs received strong evidence ratings, although nonmedicinal trials generally lacked blinding.",
+      "Tramadol, selected SSRIs and SNRIs, and pregabalin had promising but less established evidence; some findings were available only as conference abstracts.",
+      "Acupuncture results were mixed: one electroacupuncture trial favored treatment over sham, while another reported similar improvement with traditional and sham acupuncture.",
+      "Many commonly used therapies lacked adequate evaluation. Missing trials do not establish that a therapy is ineffective."
+    ],
+    "limitations": [
+      "The evidence search ends in 2004; conclusions do not incorporate subsequent trials, diagnostic criteria, or regulatory developments.",
+      "Most medication trials lasted only 6 to 12 weeks, limiting conclusions about sustained effectiveness in a chronic condition.",
+      "The authors identify small samples, inadequate blinding, and nonstandardized outcome measures in medication trials.",
+      "Exercise, education, and CBT trials generally used wait-list, flexibility, or education controls and could not be adequately blinded, leaving possible expectancy and attention effects.",
+      "Some emerging medication and acupuncture findings were cited as abstracts without complete trial reports.",
+      "Although databases and grading criteria are described, the supplied text does not provide a reproducible search strategy, study-selection flow, or detailed study-level risk-of-bias assessment.",
+      "The review reports no treatment trials including patients with concurrent rheumatic diseases such as rheumatoid arthritis or systemic lupus erythematosus, limiting generalizability.",
+      "Few trials combined medication with nonpharmacological interventions in ways that isolated each component's contribution.",
+      "Evidence classifications are not entirely consistent: massage is grouped with weak evidence in the treatment box but described as having moderate evidence in the conclusions.",
+      "No total unique participant count is reported across the reviewed literature; individual trial and review sample sizes cannot be safely summed."
+    ],
+    "claims": [
+      {
+        "text": "Tricyclic medications improve several fibromyalgia symptoms compared with placebo, with modest overall efficacy.",
+        "evidence": "The review cites two meta-analyses reporting improvements in sleep, pain, fatigue, and well-being. One reported significant clinical responses in 25% to 37% of patients; another found no improvement in tender-point pain. Most contributing trials were short."
+      },
+      {
+        "text": "Aerobic exercise improves fitness and some pain-related outcomes.",
+        "evidence": "A cited systematic review included 16 trials and 724 participants. The article reports aerobic performance changes of +17.1% with exercise versus +0.5% in controls, pain-pressure threshold changes of +28.1% versus -7.0%, and pain changes of -11.4% versus +1.6%. These are reported review-level comparisons, not newly calculated estimates; uncertainty intervals are not supplied."
+      },
+      {
+        "text": "CBT and patient education can improve symptoms and functioning, with some sustained gains.",
+        "evidence": "The authors cite controlled trials and systematic reviews showing improvements in pain, fatigue, mood, function, and self-efficacy. Education benefits were reported as maintained for 3 to 12 months. Lack of blinding and variable comparators limit interpretation."
+      },
+      {
+        "text": "Multidisciplinary programs combining education or CBT with exercise have beneficial effects.",
+        "evidence": "The review describes randomized trials reporting improved FIQ scores, self-efficacy, pain, and walking performance, with some gains maintained during follow-up of 3 months to 2 years. These findings do not establish the optimal combination or each component's independent effect."
+      },
+      {
+        "text": "Pregabalin showed efficacy in an early placebo-controlled fibromyalgia trial.",
+        "evidence": "A cited abstract described a 529-patient trial. The review reports a mean pain difference of -0.93 for the highlighted treatment group versus placebo, plus improvements in sleep, fatigue, and health-related quality of life. A confidence interval and full trial report are not supplied."
+      },
+      {
+        "text": "Several frequently used treatments had no adequate efficacy evidence at the time of the review.",
+        "evidence": "The authors report no fibromyalgia RCTs of opioids or trigger-point injections, and insufficient evaluation of many supplements. They separately report negative controlled findings for prednisone and guaifenesin; absence of trials and negative trial results are different evidence states."
+      },
+      {
+        "text": "No medication had specific US FDA approval for fibromyalgia when the article was published.",
+        "evidence": "This is an explicit historical statement in the 2004 review, not evidence of current regulatory status."
+      }
+    ],
+    "relevance": [
+      "Provides a historical baseline for comparing later fibromyalgia reviews and treatment guidelines.",
+      "Useful for research on multimodal chronic pain management and patient-centered outcomes.",
+      "Highlights methodological challenges in behavioral and exercise trials, especially masking and comparator choice.",
+      "Identifies gaps in long-term effectiveness, combined-treatment evaluation, and subgroup-specific treatment response."
+    ],
+    "population": "Patients with fibromyalgia syndrome across the reviewed human studies; several cited trials enrolled women specifically. Eligibility criteria and demographics varied, and no aggregate population profile is reported.",
+    "participantCount": null,
+    "intervention": "Multiple pharmacological, exercise, psychological, educational, multidisciplinary, and complementary interventions evaluated across the reviewed studies.",
+    "comparator": "Varied across studies: placebo, sham treatment, wait-list or untreated controls, education or attention controls, flexibility training, and active treatments; some studies were uncontrolled.",
+    "outcomes": [
+      "Pain severity and pain relief",
+      "Tender-point counts and pressure-pain thresholds",
+      "Sleep quality",
+      "Fatigue",
+      "Global well-being and health-related quality of life",
+      "Fibromyalgia Impact Questionnaire scores",
+      "Physical function and work status",
+      "Depression and anxiety",
+      "Self-efficacy",
+      "Aerobic fitness, walking performance, and muscle strength",
+      "Treatment discontinuation",
+      "Maintenance of treatment gains"
+    ],
+    "funding": "Sponsored by the American Pain Society. The disclosure states that the sponsor did not participate in study design or conduct, data collection, analysis or interpretation, or manuscript preparation, review or approval. The methods also describe the Society as commissioning the review and selecting the expert panel.",
+    "suggestedRelationships": [
+      "Historical predecessor to later fibromyalgia treatment guidelines and systematic reviews",
+      "Related evidence syntheses on antidepressants and cyclobenzaprine for fibromyalgia",
+      "Related systematic reviews of aerobic exercise and multidisciplinary rehabilitation",
+      "Related studies of CBT, education, and chronic pain self-management",
+      "Related research on altered pain processing and fibromyalgia subgroup heterogeneity",
+      "Related work on standardized fibromyalgia outcome measurement"
+    ]
+  },
   "processing": {
-    "version": "1",
-    "model": null,
-    "processedAt": "2026-10-05T15:49:11.869Z"
+    "version": "2",
+    "model": "research-sol",
+    "processedAt": "2026-10-05T16:01:34.495Z"
   },
   "rightsEvidence": []
 }

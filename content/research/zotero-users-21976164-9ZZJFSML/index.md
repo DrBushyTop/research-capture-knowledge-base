@@ -7,9 +7,9 @@ doi: null
 captured_at: "2026-10-05T14:59:59Z"
 published_at: null
 authors: []
-topics: ["literature search","search criteria","article filtering","bibliographic search"]
+topics: ["Academic literature searching","Search filters"]
 evidence_status: "text"
-processing: {"version":"1","model":"research-mini","processedAt":"2026-10-05T15:49:17.067Z"}
+processing: {"version":"2","model":"research-sol","processedAt":"2026-10-05T16:01:46.380Z"}
 publication: {"status":"private"}
 ---
 
@@ -25,7 +25,7 @@ Authors not provided.
 
 ## Machine interpretation
 
-The source text appears to be a set of instructions or options for conducting a literature search, specifying criteria such as including all words, exact phrases, at least one word, excluding words, location of words in the article, author names, publication sources, and date ranges\.
+The saved text appears to contain labels from an academic article search interface rather than an article or research report\. It describes filters for search terms, authors, publications, and date ranges\. No substantive research evidence is available\.
 
 ## Key findings
 
@@ -33,13 +33,13 @@ Not reported.
 
 ## Limitations
 
-- The text is instructional and does not present empirical findings\.
-- No evidence or data is provided to support any claims\.
+- The text contains only apparent search-interface labels and examples, not article content\.
+- The originating website and any intended research topic cannot be established from the supplied text\.
+- No methods, participants, results, or funding information are provided\.
 
 ## Why this is relevant
 
-- Useful for designing or understanding literature search strategies\.
-- Relevant for researchers conducting systematic reviews or database searches\.
+- Potentially relevant to literature-search workflows, but not usable as evidence for a research question\.
 
 ## Evidence status
 

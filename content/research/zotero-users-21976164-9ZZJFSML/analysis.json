@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generationId": "ba457105d2a8ef0eb291a22f90d5719ac66cee9d466c6e60800c4461c1d8de63",
+  "generationId": "bc234849ebf6bf2feb9c350471c5b498485767303415f0126f7fef37fb738e06",
   "source": {
     "id": "zotero-users-21976164-9ZZJFSML",
     "libraryType": "users",
@@ -22,46 +22,42 @@
     "method": "html",
     "reason": null,
     "truncated": false,
-    "retrievedAt": "2026-10-05T15:49:13.296Z",
-    "artifactHash": "b85e9e28b3913fb121b8fc993fee0a0badbcbda20ff91974b6bd6e6b8944902b"
+    "retrievedAt": "2026-10-05T16:01:35.617Z",
+    "artifactHash": "ca8ab1df8b8f0dc45e82db6c6aa02bdd8f3cdaa8ff5781395459566fdc877535"
   },
   "analysis": {
-    "summary": "The source text appears to be a set of instructions or options for conducting a literature search, specifying criteria such as including all words, exact phrases, at least one word, excluding words, location of words in the article, author names, publication sources, and date ranges.",
+    "summary": "The saved text appears to contain labels from an academic article search interface rather than an article or research report. It describes filters for search terms, authors, publications, and date ranges. No substantive research evidence is available.",
     "topics": [
-      "literature search",
-      "search criteria",
-      "article filtering",
-      "bibliographic search"
+      "Academic literature searching",
+      "Search filters"
     ],
     "sourceCategory": "webpage",
     "studyType": null,
     "keyFindings": [],
     "limitations": [
-      "The text is instructional and does not present empirical findings.",
-      "No evidence or data is provided to support any claims."
+      "The text contains only apparent search-interface labels and examples, not article content.",
+      "The originating website and any intended research topic cannot be established from the supplied text.",
+      "No methods, participants, results, or funding information are provided."
     ],
     "claims": [],
     "relevance": [
-      "Useful for designing or understanding literature search strategies.",
-      "Relevant for researchers conducting systematic reviews or database searches."
+      "Potentially relevant to literature-search workflows, but not usable as evidence for a research question."
     ],
     "population": null,
     "participantCount": null,
     "intervention": null,
     "comparator": null,
-    "outcomes": [
-      "Search results filtered by specified criteria"
-    ],
+    "outcomes": [],
     "funding": null,
     "suggestedRelationships": [
-      "Describes relationships between search terms and filtering options.",
-      "Indicates how author, publication, and date criteria relate to search results."
+      "Academic search interfaces",
+      "Literature-search methods"
     ]
   },
   "processing": {
-    "version": "1",
-    "model": "research-mini",
-    "processedAt": "2026-10-05T15:49:17.067Z"
+    "version": "2",
+    "model": "research-sol",
+    "processedAt": "2026-10-05T16:01:46.380Z"
   },
   "rightsEvidence": []
 }

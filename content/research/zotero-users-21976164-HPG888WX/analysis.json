@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generationId": "6e2e85a75a8e4bdaeb514ce0913dc266cee84843464e37b2ee74fdbe6e408e33",
+  "generationId": "2a641e28726c2aab37b3de96219b088b6efd1af1fbf259b820f026fddedf8b37",
   "source": {
     "id": "zotero-users-21976164-HPG888WX",
     "libraryType": "users",
@@ -22,14 +22,14 @@
     "method": "none",
     "reason": "Source extraction unavailable; review or replay this capture.",
     "truncated": false,
-    "retrievedAt": "2026-10-05T15:49:12.610Z",
+    "retrievedAt": "2026-10-05T16:00:24.251Z",
     "artifactHash": null
   },
   "analysis": null,
   "processing": {
-    "version": "1",
+    "version": "2",
     "model": null,
-    "processedAt": "2026-10-05T15:49:12.610Z"
+    "processedAt": "2026-10-05T16:00:24.251Z"
   },
   "rightsEvidence": []
 }

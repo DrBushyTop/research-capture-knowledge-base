@@ -12,19 +12,19 @@ Astro static reader from the implementation brief. TypeScript worker and shared 
 
 ## Users
 
-One person captures research through Zotero on Android and desktop, then finds and reads it later on either device. Desktop capture still requires user acceptance testing.
+One person saves sources through Zotero on Android and desktop, then finds, reads and discusses them later on either device. One non-technical admin configures categories and templates through the app. Desktop capture still requires user acceptance testing.
 
 ## Product Purpose
 
-A private personal research corpus that keeps source facts, machine interpretation, limitations, and human notes distinguishable.
+A private personal corpus for research, news, recipes, guides, social posts and other saved material. Source facts, generated analysis and human notes remain distinguishable.
 
 ## Operating Context
 
-Capture happens in Zotero. Processing happens asynchronously. Canonical notes are Markdown and JSON in a private GitHub repository. The signed-in reader offers static search and topic, source-type, and publication-year filters.
+Capture happens in Zotero. Processing happens asynchronously. Canonical notes are Markdown and JSON in a private GitHub repository. The signed-in reader offers search, filters and freeform chat. The planned category editor stores versioned settings privately and requires no Git or JSON editing.
 
 ## Capabilities and Constraints
 
-Human notes survive reprocessing. Source artifacts remain private and outside Git. Publication eligibility is explicit and conservative. All four MVP phases are in scope. The user delegated implementation and visual choices; the background reader prototype established the notebook composition.
+Human notes survive reprocessing. Source artifacts remain private and outside Git. Publication eligibility is explicit and conservative. The four initial MVP phases are implemented. Editable categories, category-specific analysis and bulk re-evaluation are the next extension described in the brief. Existing notes stay readable during re-evaluation.
 
 ## Evidence on Hand
 

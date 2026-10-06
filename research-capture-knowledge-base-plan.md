@@ -1,12 +1,15 @@
-# Research Capture & Knowledge Base — Implementation Handoff
+# Research capture and knowledge base implementation brief
 
-**Status:** Initial implementation plan  
-**Date:** 2026-10-05  
-**Primary goal:** Make saving research extremely easy, while keeping processing, storage, search, presentation, and future publishing under our control.
+**Status:** Initial MVP implemented; category and template extension planned
+
+**Updated:** 2026-10-06
+**Primary goal:** Make saving and revisiting sources easy, while keeping processing, storage, search, presentation, and future publishing under our control.
+
+Sections 4 and 7 describe the planned category-aware data model. The deployed version still uses a single research-oriented analysis schema. Section 14 lists the work needed to implement the extension.
 
 ## 1. Product idea
 
-Build a small personal research system for collecting and revisiting sources found on the web.
+Build a small personal knowledge base for collecting and revisiting sources found on the web.
 
 The main user is non-technical. **Capture must be essentially one action**:
 
@@ -23,9 +26,12 @@ Likely source types include:
 - PDFs;
 - ordinary webpages;
 - news/articles/blog posts;
+- recipes;
+- social posts;
+- tutorials and guides;
 - other reference material encountered while researching a topic.
 
-An initial use case is research around fibromyalgia, but the system should not be healthcare-specific. The same structure should work for arbitrary investigations or research topics.
+An initial use case is research around fibromyalgia. Saved content also includes cooking, news, social posts and other interests. Analysis sections must suit the content rather than assume every source reports a study.
 
 The resulting corpus should be:
 
@@ -178,10 +184,10 @@ Example:
 ```yaml
 ---
 id: zotero-ABC123
-title: "Example paper"
-source_type: research-paper
-source_url: "https://example.org/paper"
-doi: "10.xxxx/example"
+title: "Example recipe"
+source_type: webpage
+source_url: "https://example.org/recipe"
+doi: null
 captured_at: 2026-10-05T09:30:00Z
 published_at: 2026-04-12
 
@@ -190,12 +196,13 @@ authors:
   - John Example
 
 topics:
-  - fibromyalgia
-  - exercise
-  - chronic-pain
+  - cooking
+  - weeknight-meals
 
-study_type: randomized-controlled-trial
-evidence_quality: moderate
+category: recipe
+template_revision: 2
+category_assignment: automatic
+evidence_status: text
 
 publication:
   status: link-only
@@ -210,21 +217,21 @@ processing:
 Then normal Markdown:
 
 ```markdown
-# Example paper
+# Example recipe
 
 ## Summary
 
 ...
 
-## Why this is relevant
+## Ingredients
 
 ...
 
-## Key findings
+## Steps
 
 ...
 
-## Limitations
+## Time and servings
 
 ...
 
@@ -245,20 +252,40 @@ analysis.json
 visualizations.json
 ```
 
-For example, `analysis.json` may later contain:
+Keep source identity, bibliographic facts, original Zotero item type, retained artifacts, extraction status, rights evidence and human commentary independent of category. A PDF is a file format; its content might be research, a recipe or a guide. Topics describe subjects and remain separate from the single category that chooses an analysis template.
+
+Every generated note records its category, assignment method and exact template revision. It also records the section labels and display formats used at generation time, so an older note remains readable after the admin edits its template. Use stable section identifiers; labels can change without breaking stored values.
+
+For example, the analysis inside `analysis.json` may contain:
 
 ```json
 {
-  "population": {},
-  "interventions": [],
-  "outcomes": [],
-  "claims": [],
-  "citations": [],
-  "evidenceAssessment": {}
+  "summary": "A recipe for an example dish.",
+  "topics": ["cooking"],
+  "categoryId": "recipe",
+  "templateRevision": 2,
+  "sections": [
+    {
+      "id": "ingredients",
+      "heading": "Ingredients",
+      "format": "bullets",
+      "text": null,
+      "items": ["Ingredient amounts reported by the source"]
+    },
+    {
+      "id": "steps",
+      "heading": "Steps",
+      "format": "steps",
+      "text": null,
+      "items": ["Instructions reported by the source"]
+    }
+  ]
 }
 ```
 
-This lets the frontend build richer interfaces without making the Markdown unpleasant to edit.
+This example describes the planned model, not the existing schema. The backend takes section identifiers, headings and formats from the selected template and validates the model's section values. The model does not invent the note layout. Section values initially support text, bullets and numbered steps; a visual schema builder is unnecessary.
+
+Markdown and the reader render the same sections. Missing source facts stay missing. A recipe has no compulsory study-design or participant fields, and an inaccessible social post must not acquire invented captions or media. Extraction status and provenance remain visible for every category.
 
 ---
 
@@ -350,12 +377,12 @@ A deterministic `sourceId` / Zotero item key plus processing version should make
 The queue-triggered worker should:
 
 1. retrieve current Zotero metadata;
-2. determine the source type;
+2. identify available artifact formats;
 3. obtain source content;
 4. preserve a private raw source if appropriate;
 5. enrich bibliographic metadata;
-6. send extracted text/metadata to the configured Foundry model;
-7. validate the structured model output;
+6. classify the source into an enabled category, respecting any admin override;
+7. analyse the source with that category's pinned template revision and validate the structured output;
 8. generate/update Markdown and JSON;
 9. update processing state;
 10. trigger or allow the frontend to rebuild.
@@ -397,36 +424,63 @@ research: ingest Zotero item ABC123
 
 AI processing must happen **after successful capture**.
 
-Use structured outputs rather than asking the model to directly author uncontrolled Markdown/front matter.
+Use structured outputs rather than asking the model to directly author uncontrolled Markdown/front matter. Keep a shared summary and topics, then generate the selected template's sections. Research-specific fields belong in the research template, with clinical study details only where the source reports them.
 
-Possible normalized output:
+### 7.1 Categories and templates
 
-```json
-{
-  "summary": "...",
-  "topics": ["fibromyalgia", "exercise"],
-  "sourceCategory": "research-paper",
-  "studyType": "randomized-controlled-trial",
-  "keyFindings": [],
-  "limitations": [],
-  "claims": [],
-  "relevance": [],
-  "suggestedRelationships": []
-}
-```
+Start with these editable presets. The section examples are useful defaults, not fields every source must fill.
 
-For research papers, additional useful fields may include:
+| Category | Example sections |
+|---|---|
+| Research | Question, methods, findings, limitations, funding |
+| News | What happened, dates and people, reported claims, attribution |
+| Recipe | Ingredients, steps, time and servings, substitutions |
+| Guide | Purpose, prerequisites, instructions, cautions |
+| Social post | Caption, creator, linked material, context |
+| Other | Summary, key points |
 
-- population;
-- participant count;
-- intervention;
-- comparator;
-- outcome measures;
-- study design;
-- follow-up period;
-- evidence limitations;
-- conflicts/funding if available;
-- retraction/correction signals if discoverable.
+The non-technical admin edits these through a private **Categories** page in the app. Each category has a name and a short description of what belongs in it. Its template has ordered sections with a heading, plain-language instructions and a display choice of text, bullets or numbered steps. For example, "Ingredients" can instruct the model to "List each ingredient and its amount. Preserve the units used in the source."
+
+Support adding a category, duplicating a preset, adding or removing sections, reordering sections and previewing a draft against a chosen saved source. Show the generated sample before saving. A preview is a model call; saving only applies the settings and does not overwrite the sampled note. Drafts and validation errors must preserve the admin's edits.
+
+The UI requires no prompt syntax, JSON, Git access or database concepts. Labels should describe actions, such as "Add category", "Add section", "Preview" and "Save". Avoid introductory slogans. The editor and preview must work on a phone.
+
+Keep a permanent Other fallback. Archive unused categories rather than delete revisions referenced by existing notes. Archived categories receive no new automatic assignments. Notes already assigned to them remain readable; offer an explicit move to another category with re-evaluation.
+
+### 7.2 Classification before analysis
+
+After extraction, make a small classification call using the source facts, bounded available text and enabled category descriptions. Use the same configured model. Ask it to choose one known category identifier and give a short reason. Cache that result for the source fingerprint and category-routing revision, then make the analysis call with the selected template. This adds a classification call for new or deliberately reclassified material, not for every queue retry.
+
+Use Zotero item type as a hint. Do not treat every webpage as Other or every PDF as Research. A recipe saved as a webpage should select Recipe. Category names and descriptions guide routing; section instructions guide analysis. Model output cannot create categories or alter templates.
+
+Allow the admin to change a source's category in its note. Record the assignment as manual and preserve it through future automatic classification. Unsupported or ambiguous captures use Other with an honest explanation. Missing source text must remain explicit; classification from metadata does not justify inventing the source's contents.
+
+Treat source text as untrusted data. Keep template instructions separate from it, validate returned section identifiers and values against the pinned template, and escape generated content for Markdown and HTML. Template editing does not grant code execution, additional tools or publication rights.
+
+### 7.3 Changes and re-evaluation
+
+Saving a change creates a new immutable template revision. Before applying it, show the number of affected notes and offer:
+
+- **Apply to future captures**. Existing notes keep their recorded revision and appear in an "Older template" filter.
+- **Re-evaluate existing documents**. Choose all affected notes or a subset, preview one result, then start a background batch. Show the number of documents that will make model calls before starting.
+
+Re-evaluation uses retained source material where available. It preserves human notes, source facts, original artifacts and category overrides. Keep the existing published note readable until a validated replacement has been imported and deployed. Failed documents retain their earlier note and can be retried individually.
+
+Show batch progress with completed, pending and failed counts. Allow the admin to stop work that has not started. Bound concurrency and retries. Each batch pins its target template revision; editing the template again cannot change jobs already running. Duplicate requests or queue deliveries must reuse the same job and cached successful output.
+
+Adding a category or changing its routing description can also offer **Check categories** for existing automatically assigned sources. Keep this separate from updating the analysis of sources already in a category. A new Recipe category could reclassify earlier Other notes, while changing Recipe's ingredient instructions should only re-evaluate Recipe notes. Manual assignments are preserved unless the admin explicitly includes them.
+
+Include the category identifier, template revision, assignment revision and processing version in generation identity, alongside the source fingerprint. A source or assignment changed during a batch supersedes the earlier job; an older result cannot replace it. Track the desired generation separately from the currently readable generation. A regenerated note expires its previous public approval under the existing rules.
+
+### 7.4 Configuration storage and admin access
+
+Store live category settings and immutable revisions in the existing private Blob Storage, behind authenticated Function endpoints. The browser edits forms and the API reads and writes the configuration. Git remains the generated corpus store and is not the settings UI. A separate database is not required for these infrequent edits by one admin.
+
+Use conditional writes for concurrent tabs and retain previous revisions. If settings changed while a form was open, show the conflict and preserve the unsaved draft. Keep source assignments and bulk-job records in private durable storage alongside existing ingestion state. Configuration and template history must not inherit the short retention used for chat.
+
+Only the designated GitHub admin identity can change settings, assign categories or start re-evaluation. Check this on the server; hiding the editor link is insufficient. Existing reader access does not confer admin access.
+
+The static reader refreshes through the existing import and deployment workflow. Show "Processing" and "Updating reader" as separate states so completing model calls does not imply the deployed site has changed. Search and chat consume the same deployed note generations and all template sections, while preserving the distinction between source text and generated interpretation.
 
 Do not treat AI output as authoritative scientific or licensing metadata. Preserve provenance and distinguish:
 
@@ -696,6 +750,9 @@ doi: 10.xxxx/...       # optional
 captured_at: ...
 processed_at: ...
 processing_version: 1
+category_id: recipe
+template_revision: 2
+category_assignment: automatic
 ```
 
 AI-derived fields should remain distinguishable from captured metadata.
@@ -760,6 +817,19 @@ Success criterion:
 
 > A public build cannot publish restricted source artifacts merely because they exist privately.
 
+### Phase 5: category-aware analysis and admin editing
+
+Implement this extension in four steps. The initial MVP remains usable throughout.
+
+1. Add the category registry, immutable template revisions and a versioned note schema. Keep a read adapter for existing schema-version-1 notes and retain stable source paths. Update Markdown and Astro rendering together so all categories use their own sections. Add fixtures for research, recipes and metadata-only social posts.
+2. Add classification, pinned template analysis and manual category assignment. Include settings revisions in generation identity and cached output. Preserve extraction evidence, importer conflict handling, human commentary and publication checks. Update search and chat to read every generated section.
+3. Add the admin API and phone-friendly Categories editor with presets, draft validation, preview, save conflicts and server-side identity checks. Editing settings must not require repository access. Reader accounts cannot modify them.
+4. Add bulk re-evaluation and optional reclassification with affected-note counts, one-document preview, progress, stopping pending work and retrying failed documents. Verify that notes stay readable during jobs, stale jobs cannot overwrite newer assignments, and successful replacements reach both search and chat after deployment.
+
+Success criterion:
+
+> The admin can add a category and edit its analysis sections through the app, save a recipe without research-study headings, and deliberately update older notes without losing human commentary or making the corpus unavailable.
+
 ---
 
 ## 15. Explicit non-goals for the first implementation
@@ -807,6 +877,9 @@ Add infrastructure only after a concrete requirement appears.
 | AI | Azure AI Foundry |
 | Search | Static index first |
 | Database | None initially |
+| Category settings | Admin forms backed by existing private Blob Storage |
+| Analysis layout | Editable category templates with immutable revisions |
+| Template changes | Future captures by default; explicit background re-evaluation |
 | Infrastructure as code | Bicep |
 | Public publishing | Conservative, rights-aware |
 

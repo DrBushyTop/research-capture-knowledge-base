@@ -12,7 +12,7 @@ Deploy `infra/sql.bicep` with the Entra administrator's object ID and login. It 
 
 Firewall rules must include the operator IP and application egress. The current Flex Consumption app has no fixed outbound IP list, so the deployment uses Azure-services firewall access plus an operator IP. Entra-only authentication and database permissions still apply. This network rule admits connectivity from other Azure tenants, not authorization. Use fixed egress or a private endpoint if stricter network isolation becomes necessary.
 
-Set `SQL_SERVER` and `SQL_DATABASE`, then run `npm run db:migrate`. Runtime identities receive only data permissions through `scripts/sql-grant.ts`; schema migration uses the administrator. The Functions app uses its managed identity, never a SQL password.
+Set `SQL_SERVER` and `SQL_DATABASE`, then run `npm run db:migrate`. Runtime identities receive only data permissions through `scripts/sql-grant.ts`; schema migration uses the administrator. Pass the application client ID for managed identities and service principals, or the object ID for human users. The Functions app uses its managed identity, never a SQL password.
 
 ## Local development
 

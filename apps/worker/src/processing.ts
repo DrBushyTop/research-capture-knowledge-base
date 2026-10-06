@@ -4,13 +4,14 @@ import { MissingArtifact, savedMetadata, type Extracted } from './extraction.js'
 import { TransientInference } from './enrichment.js';
 import type { Job, PipelineStore, SourceState } from './pipeline.js';
 import { sourceText } from '../../../shared/source-text.js';
+import type { SourceImage } from './image-input.js';
 
 export interface Processor {
   version: string; model: string;
   extract(snapshot: SourceSnapshot): Promise<Extracted>;
-  enrich(text: string, signal?: AbortSignal): Promise<Analysis>;
-  classify?(source: SourceSnapshot['source'], text: string, registry: Registry, signal?: AbortSignal): Promise<{ categoryId: string; reason: string }>;
-  analyzeTemplate?(text: string, template: Template, signal?: AbortSignal, source?: Note['source']): Promise<TemplateAnalysis>;
+  enrich(text: string, signal?: AbortSignal, images?: SourceImage[]): Promise<Analysis>;
+  classify?(source: SourceSnapshot['source'], text: string, registry: Registry, signal?: AbortSignal, images?: SourceImage[]): Promise<{ categoryId: string; reason: string }>;
+  analyzeTemplate?(text: string, template: Template, signal?: AbortSignal, source?: Note['source'], images?: SourceImage[]): Promise<TemplateAnalysis>;
   rights(doi: string | null): Promise<Note['rightsEvidence']>;
 }
 export async function processJob(store: PipelineStore, id: string, processor: Processor) {
@@ -54,11 +55,12 @@ export async function processJob(store: PipelineStore, id: string, processor: Pr
         }
         if (!assignment) {
           const routing = registry.categories.filter(category => !category.archived).map(({ id, name, description }) => ({ id, name, description }));
-          const cacheKey = `categories/classifications/${hash(canonical({ fingerprint: snapshot.source.fingerprint, routing, version: processor.version, model: processor.model }))}.json`;
+          const cacheKey = `categories/classifications/${hash(canonical({ fingerprint: snapshot.source.fingerprint, routing, version: processor.version, model: processor.model,
+            images: extracted.images?.map(image => hash(image.bytes)) || [] }))}.json`;
           let classified = await store.read<{ categoryId: string; reason: string }>(cacheKey);
           if (!classified) {
             if (!processor.classify) throw new Error('Category classification is not configured');
-            classified = await processor.classify(snapshot.source, extracted.text, registry, store.leaseSignal);
+            classified = await processor.classify(snapshot.source, extracted.text, registry, store.leaseSignal, extracted.images);
             if (!registry.categories.some(category => category.id === classified!.categoryId && !category.archived)) throw new Error('Invalid category classification');
             await store.create(cacheKey, classified);
           }
@@ -76,9 +78,9 @@ export async function processJob(store: PipelineStore, id: string, processor: Pr
         if ((await store.read<SourceState>(`sources/${snapshot.source.id}.json`))?.generationId !== id) return;
         await store.write(`categories/assignments/${snapshot.source.id}.json`, assignment);
       }
-      if (extracted.text) {
-        await store.create(`source-text/${id}.json`, sourceText({ source: snapshot.source, generationId: id, extraction: extracted.evidence }, extracted.text));
-        try { analysis = template ? await processor.analyzeTemplate!(extracted.text, template, store.leaseSignal, snapshot.source) : await processor.enrich(extracted.text, store.leaseSignal); }
+      if (extracted.text) await store.create(`source-text/${id}.json`, sourceText({ source: snapshot.source, generationId: id, extraction: extracted.evidence }, extracted.text));
+      if (extracted.text || extracted.images?.length) {
+        try { analysis = template ? await processor.analyzeTemplate!(extracted.text, template, store.leaseSignal, snapshot.source, extracted.images) : await processor.enrich(extracted.text, store.leaseSignal, extracted.images); }
         catch (error) {
           store.leaseSignal?.throwIfAborted();
           if (error instanceof TransientInference && job.attempts < 3) {
@@ -92,7 +94,7 @@ export async function processJob(store: PipelineStore, id: string, processor: Pr
         await store.write(`jobs/${id}.json`, { ...job, status: 'failed', error: 'Analysis could not be generated. The existing note is still available. Retry this document.' }); return;
       }
       note = noteSchema.parse({ schemaVersion: category ? 2 : 1, ...(category ? { category } : {}), generationId: id, source: snapshot.source, extraction: extracted.evidence, analysis,
-        processing: { version: processor.version, model: extracted.text ? processor.model : null, processedAt: new Date().toISOString() },
+        processing: { version: processor.version, model: extracted.text || extracted.images?.length ? processor.model : null, processedAt: new Date().toISOString() },
         rightsEvidence: await processor.rights(snapshot.source.doi) });
       await store.create(`analysis/${id}.json`, note);
     }

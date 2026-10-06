@@ -6,10 +6,11 @@ import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 import { hash, type SourceSnapshot, type Note } from '../../../shared/corpus.js';
 import type { Zotero } from './zotero.js';
+import { sourceImage, type SourceImage } from './image-input.js';
 
 export const maxBytes = 20 * 1024 * 1024;
 export class MissingArtifact extends Error {}
-export interface Extracted { text: string; evidence: Note['extraction']; }
+export interface Extracted { text: string; images?: SourceImage[]; evidence: Note['extraction']; }
 export interface RetainedArtifact { bytes: Uint8Array; mime: string; retrievedAt: string; }
 export function savedMetadata(snapshot: SourceSnapshot, evidence: Note['extraction']): Extracted {
   const abstract = snapshot.root.data.abstractNote;
@@ -22,7 +23,7 @@ export function savedMetadata(snapshot: SourceSnapshot, evidence: Note['extracti
   } finally { dom.window.close(); }
   if (!text) return { text: '', evidence };
   return { text: text.slice(0, 60_000), evidence: { ...evidence, status: 'metadata-only', method: 'zotero-metadata', truncated: text.length > 60_000,
-    reason: 'Analysis uses the description or caption saved in Zotero. The original document or post text was unavailable.' } };
+    reason: `${evidence.reason ? evidence.reason + ' ' : ''}Analysis uses the description or caption saved in Zotero. The original document or post text was unavailable.`.slice(0, 1000) } };
 }
 export function publicAddress(address: string) {
   let parsed = ipaddr.parse(address);
@@ -89,7 +90,8 @@ export async function extract(snapshot: SourceSnapshot, zotero: Zotero, retain: 
   const artifacts = snapshot.root.data.itemType === 'attachment' ? [snapshot.root, ...snapshot.children] : snapshot.children;
   const attachment = artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && c.data.contentType === 'application/pdf') ||
     artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && /^(text\/|application\/json$)/.test(String(c.data.contentType))) ||
-    artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && String(c.data.contentType).startsWith('image/'));
+    artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && String(c.data.contentType).startsWith('image/')) ||
+    artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && String(c.data.contentType).startsWith('video/'));
   if (cached) {
     bytes = cached.bytes; mime = cached.mime; evidence.retrievedAt = cached.retrievedAt;
   } else if (attachment) {
@@ -131,8 +133,22 @@ export async function extract(snapshot: SourceSnapshot, zotero: Zotero, retain: 
     evidence.method = 'html'; evidence.truncated = text.length > 60_000;
   } else if (mime.startsWith('text/') || mime === 'application/json') {
     text = Buffer.from(bytes).toString('utf8'); evidence.method = 'text'; evidence.truncated = text.length > 60_000;
-  } else return savedMetadata(snapshot, { ...evidence, status: 'needs-review', reason: mime.startsWith('image/') ? 'Image retained privately. Use a visual chat question to inspect it; text search needs OCR.' : 'Unsupported source format.' });
+  } else if (mime.startsWith('image/')) {
+    let image: SourceImage;
+    try { image = sourceImage(bytes, mime); }
+    catch (error) {
+      return savedMetadata(snapshot, { ...evidence, status: 'needs-review', reason: error instanceof Error ? error.message : 'Image cannot be analyzed.' });
+    }
+    const metadata = savedMetadata(snapshot, evidence);
+    return { text: metadata.text, images: [image], evidence: { ...evidence, status: 'image', method: 'image-vision',
+      reason: 'Analysis uses the retained image and any saved caption. Visual interpretation is generated, not a verified text transcription. The original page may contain material outside this image.' } };
+  } else return savedMetadata(snapshot, { ...evidence, status: 'needs-review', reason: mime.startsWith('video/') ? 'Video analysis is not supported. Save a still screenshot as a PNG, JPEG or WebP attachment.' : 'Unsupported source format.' });
   text = text.slice(0, 60_000).trim();
-  if (text.length < 80) return savedMetadata(snapshot, { ...evidence, status: 'needs-review', reason: evidence.method === 'html' ? 'No readable page text was extracted. The page may require sign-in or block capture.' : 'No usable text layer. A scan may need OCR or manual review.' });
+  if (text.length < 80) {
+    // A saved screenshot can rescue an empty HTML snapshot. Do not fetch page image URLs or external resources.
+    const image = snapshot.root.data.itemType !== 'attachment' && artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && String(c.data.contentType).startsWith('image/'));
+    if (image) return extract({ ...snapshot, children: [image] }, zotero, retain);
+    return savedMetadata(snapshot, { ...evidence, status: 'needs-review', reason: evidence.method === 'html' ? 'No readable page text was extracted. The page may require sign-in or block capture. Automatic browser screenshots are not configured. Save a screenshot as a synced image attachment.' : 'No usable text layer. A scan may need OCR or manual review.' });
+  }
   return { text, evidence: { ...evidence, status: 'text' } };
 }

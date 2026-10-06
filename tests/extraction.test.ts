@@ -3,6 +3,71 @@ import { downloadPublic, extract } from '../apps/worker/src/extraction.js';
 import { normalize } from '../shared/corpus.js';
 import { snapshot } from './fixtures.js';
 import { Zotero } from '../apps/worker/src/zotero.js';
+const screenshot = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+
+it('retains synced screenshot bytes and passes them to vision with an honest evidence label', async () => {
+  const source = normalize(structuredClone(snapshot))[0];
+  source.children[0].data.contentType = 'image/png';
+  source.root.data.abstractNote = '<p>The saved caption.</p>';
+  const zotero = new Zotero('12345', 'synthetic-read-key');
+  zotero.request = async () => new Response(screenshot, { headers: { 'content-type': 'image/png' } });
+  let retained: Uint8Array | undefined;
+  const result = await extract(source, zotero, async (_hash, bytes) => { retained = bytes; });
+  expect(result.images?.[0].bytes).toEqual(retained);
+  expect(result.images?.[0].mime).toBe('image/png');
+  expect(result.text).toBe('The saved caption.');
+  expect(result.evidence.status).toBe('image');
+  expect(result.evidence.method).toBe('image-vision');
+  expect(result.evidence.reason).toContain('not a verified text transcription');
+});
+
+it('can analyze a retained image again without the original Zotero file', async () => {
+  const source = normalize(structuredClone(snapshot))[0];
+  const zotero = new Zotero('12345', 'synthetic-read-key');
+  zotero.request = async () => { throw new Error('File unavailable'); };
+  const result = await extract(source, zotero, async () => {}, async () => ({ bytes: screenshot, mime: 'image/png', retrievedAt: '2026-10-05T10:00:00Z' }));
+  expect(result.text).toBe('');
+  expect(result.images?.[0].bytes).toEqual(screenshot);
+  expect(result.evidence.retrievedAt).toBe('2026-10-05T10:00:00Z');
+});
+
+it('retains invalid or unsupported images without pretending that vision evidence is available', async () => {
+  const source = normalize(structuredClone(snapshot))[0]; source.children[0].data.contentType = 'image/svg+xml';
+  const zotero = new Zotero('12345', 'synthetic-read-key');
+  zotero.request = async () => new Response('<svg></svg>');
+  let retained = false;
+  const result = await extract(source, zotero, async () => { retained = true; });
+  expect(retained).toBe(true);
+  expect(result.images).toBeUndefined();
+  expect(result.evidence.status).toBe('needs-review');
+  expect(result.evidence.reason).toContain('not supported');
+});
+
+it('uses a synced screenshot when a saved page snapshot has no readable article text', async () => {
+  const source = normalize(structuredClone(snapshot))[0];
+  source.children = [{ key: 'AAAAAA11', version: 1, data: { linkMode: 'imported_url', contentType: 'text/html' } },
+    { key: 'BBBBBB11', version: 1, data: { linkMode: 'imported_file', contentType: 'image/png' } }];
+  const zotero = new Zotero('12345', 'synthetic-read-key');
+  const requests: string[] = [];
+  zotero.request = async path => {
+    requests.push(path);
+    return path.includes('AAAAAA11') ? new Response('<html><body>Sign in</body></html>') : new Response(screenshot);
+  };
+  const result = await extract(source, zotero, async () => {});
+  expect(requests).toEqual(['items/AAAAAA11/file', 'items/BBBBBB11/file']);
+  expect(result.evidence.method).toBe('image-vision');
+  expect(result.images?.[0].bytes).toEqual(screenshot);
+});
+
+it('marks retained videos as unsupported and directs the user to save a still image', async () => {
+  const source = normalize(structuredClone(snapshot))[0]; source.children[0].data.contentType = 'video/mp4';
+  const zotero = new Zotero('12345', 'synthetic-read-key');
+  zotero.request = async () => new Response('synthetic unsupported video');
+  const result = await extract(source, zotero, async () => {});
+  expect(result.images).toBeUndefined();
+  expect(result.evidence.status).toBe('needs-review');
+  expect(result.evidence.reason).toContain('Video analysis is not supported');
+});
 it('rejects loopback, mapped IPv6 and credential-bearing destinations before downloading', async () => {
   for (const url of ['http://127.0.0.1/', 'http://[::ffff:127.0.0.1]/', 'http://10.0.0.1/', 'https://name:password@example.org/']) {
     await expect(downloadPublic(url)).rejects.toThrow();

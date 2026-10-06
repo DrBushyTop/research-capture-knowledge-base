@@ -46,7 +46,7 @@ app.timer('discoverCaptures', {
 });
 app.http('chatGateway', {
   route: 'chat', methods: ['GET', 'POST'], authLevel: 'function',
-  handler: async (request): Promise<HttpResponseInit> => {
+  handler: async (request, context): Promise<HttpResponseInit> => {
     try {
       const owner = readerIdentity(request.headers.get('x-ms-client-principal'));
       const state = store();
@@ -103,6 +103,7 @@ app.http('chatGateway', {
       })();
       return { status: request.method === 'POST' ? 202 : 200, jsonBody: result, headers: { 'Cache-Control': 'private, no-store' } };
     } catch (error) {
+      context.error(JSON.stringify({ event: 'gateway-error', name: (error as Error).name, code: (error as { code?: string }).code, number: (error as { number?: number }).number }));
       return { status: error instanceof ChatAccessError || error instanceof CategoryError ? error.status : 503, jsonBody: { error: error instanceof ChatAccessError || error instanceof CategoryError ? error.message : 'The service is temporarily unavailable. Try again.' }, headers: { 'Cache-Control': 'private, no-store' } };
     }
   }
@@ -128,13 +129,13 @@ app.storageQueue('processCapture', {
     const id = (payload as { jobId: string }).jobId;
     try {
       const state = store();
-      const analyzeTemplate = (text: string, template: import('../../../shared/categories.js').Template, signal?: AbortSignal, source?: import('../../../shared/corpus.js').Note['source']) => enrichTemplate(text, template, required('FOUNDRY_ENDPOINT'), required('FOUNDRY_DEPLOYMENT'), signal, source);
+      const analyzeTemplate = (text: string, template: import('../../../shared/categories.js').Template, signal?: AbortSignal, source?: import('../../../shared/corpus.js').Note['source'], images?: import('./image-input.js').SourceImage[]) => enrichTemplate(text, template, required('FOUNDRY_ENDPOINT'), required('FOUNDRY_DEPLOYMENT'), signal, source, images);
       if (id.startsWith('b_')) { await dispatchBatch(state, id, next => state.send(next)); return; }
       if (id.startsWith('p_')) { await processPreview(state, id, analyzeTemplate); return; }
       await processJob(state, id, { version: process.env.PROCESSING_VERSION || processingVersion, model: required('FOUNDRY_DEPLOYMENT'),
         extract: async snapshot => extract(snapshot, await zotero(), (hash, bytes, mime) => state.retainSource(snapshot.source.fingerprint, hash, bytes, mime), () => state.restoreSource(snapshot.source.fingerprint)),
-        enrich: (text, signal) => enrich(text, required('FOUNDRY_ENDPOINT'), required('FOUNDRY_DEPLOYMENT'), signal),
-        classify: (source, text, registry, signal) => classifySource(source, text, registry, required('FOUNDRY_ENDPOINT'), required('FOUNDRY_DEPLOYMENT'), signal),
+        enrich: (text, signal, images) => enrich(text, required('FOUNDRY_ENDPOINT'), required('FOUNDRY_DEPLOYMENT'), signal, images),
+        classify: (source, text, registry, signal, images) => classifySource(source, text, registry, required('FOUNDRY_ENDPOINT'), required('FOUNDRY_DEPLOYMENT'), signal, images),
         analyzeTemplate, rights: licenseEvidence });
       context.log(JSON.stringify({ event: 'processing-complete', jobId: id }));
     } catch {

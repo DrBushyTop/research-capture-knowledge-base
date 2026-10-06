@@ -1,6 +1,6 @@
 import { sqlPool, closeSql } from '../apps/worker/src/sql-connection.js';
 const [name, principalId] = process.argv.slice(2);
-if (!/^[a-zA-Z][a-zA-Z0-9_]{0,63}$/.test(name || '') || !/^[a-f0-9-]{36}$/i.test(principalId || '')) throw new Error('Usage: tsx scripts/sql-grant.ts <database-user-name> <Entra-object-id>');
+if (!/^[a-zA-Z][a-zA-Z0-9_]{0,63}$/.test(name || '') || !/^[a-f0-9-]{36}$/i.test(principalId || '')) throw new Error('Usage: tsx scripts/sql-grant.ts <database-user-name> <user-object-id-or-application-client-id>');
 try {
   await (await sqlPool()).request().batch(`
     IF DATABASE_PRINCIPAL_ID('${name}') IS NULL BEGIN

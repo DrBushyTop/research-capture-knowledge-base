@@ -35,7 +35,7 @@ export const licenseEvidenceSchema = z.strictObject({
 export const legacyNoteSchema = z.strictObject({
   schemaVersion: z.literal(1), generationId: z.string().regex(/^[a-f0-9]{64}$/), source: sourceSchema,
   extraction: z.strictObject({
-    status: z.enum(['text', 'metadata-only', 'needs-review']), method: z.enum(['pdf-text', 'html', 'text', 'zotero-metadata', 'none']),
+    status: z.enum(['text', 'image', 'metadata-only', 'needs-review']), method: z.enum(['pdf-text', 'html', 'text', 'image-vision', 'zotero-metadata', 'none']),
     reason: z.string().max(1000).nullable(), truncated: z.boolean(), retrievedAt: z.string(),
     artifactHash: z.string().regex(/^[a-f0-9]{64}$/).nullable(), artifactMime: z.string().max(100).optional()
   }),

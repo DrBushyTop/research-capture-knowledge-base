@@ -34,14 +34,31 @@ it('human notes are rendered without executable HTML or tracking images', async 
     expect(selected.humanHtml).not.toMatch(/<script|<img|href=["']javascript:/);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
-it('the private hosting rules protect arbitrary search and asset paths', async () => {
+it('the private hosting rules authorize SPA rewrites without swallowing assets or API routes', async () => {
   const config = JSON.parse(await readFile('apps/reader/staticwebapp.config.json', 'utf8'));
-  const allowed = (pathname: string) => config.routes.find((r: {route: string}) => r.route.endsWith('*') ? pathname.startsWith(r.route.slice(0,-1)) : pathname === r.route).allowedRoles;
-  expect(allowed('/pagefind/pagefind.js')).toEqual(['library_member']);
-  expect(allowed('/research/saved-note/')).toEqual(['library_member']);
-  expect(allowed('/_astro/font.woff2')).toEqual(['library_member']);
-  expect(allowed('/login.html')).toEqual(['anonymous']);
-  expect(allowed('/search-index.json')).not.toContain('reader');
-  expect(allowed('/api/categories')).toEqual(['library_member']);
+  const matches = (pattern: string, pathname: string) => {
+    if (pattern.includes('*.{')) {
+      const extensions = pattern.slice(pattern.indexOf('{') + 1, -1).split(',');
+      return extensions.some(extension => pathname.endsWith('.' + extension));
+    }
+    return pattern.endsWith('*') ? pathname.startsWith(pattern.slice(0, -1)) : pathname === pattern;
+  };
+  const rule = (pathname: string) => config.routes.find((r: { route: string }) => matches(r.route, pathname));
+  for (const pathname of ['/', '/sources/', '/sources/example/', '/chat/conversation/', '/categories/', '/unknown-route']) {
+    expect(rule(pathname).allowedRoles).toEqual(['library_member']);
+    expect(rule(pathname).rewrite).toBe('/index.html');
+  }
+  for (const pathname of ['/assets/main.js', '/assets/font.woff2', '/assets/missing.svg', '/missing.css', '/api/chat', '/api/categories']) {
+    expect(rule(pathname).allowedRoles).toEqual(['library_member']);
+    expect(rule(pathname).rewrite).toBeUndefined();
+  }
+  for (const pathname of ['/login.html', '/access.css', '/access.js', '/.auth/me']) {
+    expect(rule(pathname).allowedRoles).toEqual(['anonymous']);
+    expect(rule(pathname).rewrite).toBeUndefined();
+  }
+  expect(rule('/.auth/login/aad').statusCode).toBe(404);
+  // Azure skips route authorization for navigationFallback. Use authorized route rewrites instead.
   expect(config.navigationFallback).toBeUndefined();
+  expect(config.responseOverrides['403']).toEqual({ rewrite: '/login.html', statusCode: 403 });
+  expect(config.globalHeaders['Cache-Control']).toBe('private, no-store');
 });

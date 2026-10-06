@@ -1,2 +1,21 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="robots" content="noindex,nofollow" /><title>Sign in · Research library</title></head><body data-pagefind-ignore><main><h1>Sign in</h1><p>Use your invited GitHub account.</p><a href="/.auth/login/github?post_login_redirect_uri=/">Sign in with GitHub</a><p>Signed in but unable to open the library? Your account needs a reader invitation.</p></main></body></html>
-<style>body{margin:0;background:#edf1f5;color:#202d3d;font:18px/1.6 system-ui,sans-serif}main{max-width:32rem;margin:15vh auto;padding:2rem}h1{font-size:2.2rem;line-height:1.2}a{display:inline-block;background:#2356a5;color:#fff;padding:.7rem 1.2rem;border-radius:6px;text-decoration:none}a:focus-visible{outline:3px solid #202d3d;outline-offset:4px}p{margin:1.4rem 0}</style>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Access · Research library</title>
+  <link rel="stylesheet" href="/access.css">
+  <script type="module" src="/access.js"></script>
+</head>
+<body><main>
+  <h1 id="heading">Sign in</h1>
+  <p id="message" role="status">Use your invited GitHub account.</p>
+  <div class="actions">
+    <a id="primary" href="/.auth/login/github?post_login_redirect_uri=%2F">Sign in with GitHub</a>
+    <button id="check" type="button">Check access again</button>
+  </div>
+  <a id="switch" href="/.auth/logout?post_logout_redirect_uri=%2Flogin.html" hidden>Sign out or switch account</a>
+  <noscript><p>JavaScript is needed to check your access status. Sign in above, or sign out before switching accounts.</p><a href="/.auth/logout?post_logout_redirect_uri=%2Flogin.html">Sign out</a></noscript>
+</main></body>
+</html>

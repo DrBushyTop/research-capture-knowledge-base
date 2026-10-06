@@ -213,7 +213,7 @@ At the same mobile breakpoint, chat history moves into a drawer. Messages keep 1
 
 **The reading width rule.** On source detail pages, the article fills the space beside the source list with responsive side padding. Titles, section navigation, summaries, original text, and details share that width. The separate legacy note layout retains its 72ch cap. Long titles and source URLs wrap within their pane.
 
-Source pages offer Add notes and Edit notes inline, with a labeled textarea, explicit Save and Cancel, retained local drafts, and conflict recovery that keeps the draft beside the latest saved text. Both readers share the saved notes. Internal links use Astro's client router without animated page transitions. Search initializes after each route swap and retains its loaded index for the session.
+Source pages offer Add notes and Edit notes inline, with a labeled textarea, explicit Save and Cancel, retained local drafts, and conflict recovery that keeps the draft beside the latest saved text. Both readers share the saved notes. Internal links use TanStack Router without animated page transitions. Search reads the shared live Query cache and rebuilds its index when corpus data changes.
 
 ## Elevation & Depth
 

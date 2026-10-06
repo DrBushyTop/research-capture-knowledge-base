@@ -8,7 +8,7 @@ web
 
 ## Stack
 
-Astro static reader from the implementation brief. TypeScript worker and shared schemas selected under the user's delegated judgement on 2026-10-05.
+React reader built with Vite, TanStack Router and TanStack Query. The user approved replacing Astro on 2026-10-06. The TypeScript worker and shared schemas remain unchanged.
 
 ## Users
 

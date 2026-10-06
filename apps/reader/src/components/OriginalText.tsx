@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { sourceTextQuery } from '../lib/queries';
 import { FileText } from 'lucide-react';
 
 type Props = { sourceId: string; artifactMime?: string | null; sourceUrl?: string | null };
@@ -7,21 +9,12 @@ const documentTypes: Record<string, 'pdf' | 'image'> = { 'application/pdf': 'pdf
 
 /** Saved original text and retained file for one source, read from the private chat API. */
 export default function OriginalText({ sourceId, artifactMime, sourceUrl }: Props) {
-  const [state, setState] = useState<State>({ status: 'loading' });
   const [expanded, setExpanded] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
   const kind = artifactMime ? documentTypes[artifactMime] : undefined;
   const documentUrl = `/api/chat?document=${encodeURIComponent(sourceId)}`;
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch(`/api/chat?source=${encodeURIComponent(sourceId)}`, { credentials: 'same-origin', signal: controller.signal }).then(async response => {
-      if (response.status === 401 || response.status === 403 || !response.headers.get('content-type')?.includes('application/json')) throw new Error('Sign in with an invited account to read the original text.');
-      const value = await response.json();
-      if (!response.ok) throw new Error(value.error || 'Original text could not be loaded.');
-      setState({ status: 'ready', text: String(value.text || '') });
-    }).catch(error => { if (!controller.signal.aborted) setState({ status: 'error', message: (error as Error).message }); });
-    return () => controller.abort();
-  }, [sourceId]);
+  const text = useQuery(sourceTextQuery(sourceId));
+  const state: State = text.data ? { status: 'ready', text: String(text.data.text || '') } : text.error ? { status: 'error', message: text.error.message } : { status: 'loading' };
   const long = state.status === 'ready' && state.text.length > 2400;
   return <>
     {kind === 'image' && (imageFailed ? <p className="original-missing">The saved image could not be loaded.</p>

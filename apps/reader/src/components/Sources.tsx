@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Link, useNavigate } from '@tanstack/react-router';
 import type { Note } from '../../../../shared/corpus';
 import { categoryTone, sourceTypeLabel } from '../lib/labels';
 import SourceAsk from './SourceAsk';
 import ReaderNotes from './ReaderNotes';
 import OriginalText from './OriginalText';
 import { buildSearchIndex, searchIds } from '../../../../shared/search';
-import { cachedLibrary, clearLibrary, rememberLibrary, type LibraryEntry } from '../lib/library-cache';
+import { libraryQuery, type LibraryEntry } from '../lib/queries';
+import { sourcesRoute, type SourcesSearch } from '../app/router';
 
 type Entry = LibraryEntry;
 type Section = { id: string; heading: string; format: 'text' | 'bullets' | 'steps'; text: string | null; items: string[] };
-const selectedId = () => new URLSearchParams(location.search).get('source') || location.pathname.match(/^\/research\/([^/]+)/)?.[1] || '';
+const noEntries: Entry[] = [];
 const year = (value: string | null) => value?.match(/\b(?:19|20)\d{2}\b/)?.[0] || 'Unknown';
 const category = (note: Note) => note.schemaVersion === 2 ? note.category : null;
 function sections(note: Note): Section[] {
@@ -29,36 +32,21 @@ function sections(note: Note): Section[] {
 }
 
 export default function Sources() {
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [selected, setSelected] = useState('');
-  const [query, setQuery] = useState('');
-  const [filters, setFilters] = useState({ category: '', topic: '', type: '', year: '' });
+  const search = sourcesRoute.useSearch();
+  const navigate = useNavigate({ from: '/sources' });
+  const library = useQuery(libraryQuery);
+  const entries = library.data ?? noEntries;
+  const selected = search.source || '';
+  // The field keeps its own value so typing never waits for the router; the URL follows it.
+  const [query, setQuery] = useState(search.q || '');
+  useEffect(() => { if (document.activeElement?.id !== 'search') setQuery(search.q || ''); }, [search.q]);
+  const filters = { category: search.category || '', topic: search.topic || '', type: search.type || '', year: search.year || '' };
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const controller = new AbortController();
-    setSelected(selectedId());
-    const cached = cachedLibrary();
-    if (cached) { setEntries(cached); setLoading(false); }
-    fetch('/api/chat?library=1', { signal: controller.signal }).then(async response => {
-      if (response.status === 401 || response.status === 403 || !response.headers.get('content-type')?.includes('application/json')) {
-        clearLibrary(); setEntries([]);
-      }
-      if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw new Error('Sources could not load. Sign in to the private reader and try again.');
-      return response.json() as Promise<Entry[]>;
-    }).then(entries => { rememberLibrary(entries); setEntries(entries); }).catch(error => { if (!controller.signal.aborted) setError(error.message); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    const pop = () => setSelected(selectedId());
-    window.addEventListener('popstate', pop);
-    return () => { controller.abort(); window.removeEventListener('popstate', pop); };
-  }, []);
-  const select = (id: string) => {
-    if (!document.dispatchEvent(new Event('astro:before-preparation', { cancelable: true }))) return;
-    history.pushState({}, '', id ? `/sources/?source=${encodeURIComponent(id)}` : '/sources/');
-    setSelected(id);
-    document.querySelector('.reading-pane')?.scrollTo(0, 0);
-  };
+  const loading = library.isPending;
+  const error = library.error ? (library.error as Error).message : '';
+  // Typing and filters replace the entry, so Back leaves the list rather than undoing keystrokes.
+  const setSearch = (change: Partial<SourcesSearch>) => void navigate({ search: previous => ({ ...previous, ...change }), replace: true });
+  useEffect(() => { document.querySelector('.reading-pane')?.scrollTo(0, 0); }, [selected]);
   const current = entries.find(e => e.note.source.id === selected);
   const index = useMemo(() => buildSearchIndex(entries.map(({ note, searchText }) => ({
     id: note.source.id, title: note.source.title, authors: note.source.authors.join(' '),
@@ -70,7 +58,7 @@ export default function Sources() {
     const matched = new Set(ids);
     return query.trim() ? ids.map(id => entries.find(entry => entry.note.source.id === id)!).filter(Boolean)
       : entries.filter(entry => matched.has(entry.note.source.id));
-  }, [entries, filters, query, index]);
+  }, [entries, query, filters.category, filters.topic, filters.type, filters.year, index]);
   const options = {
     category: [...new Map(entries.flatMap(({ note }) => { const c = category(note); return c ? [[c.id, c.name] as const] : []; })).entries()],
     topic: [...new Set(entries.flatMap(({ note }) => note.analysis?.topics || note.source.tags))].sort().map(v => [v, v]),
@@ -81,13 +69,13 @@ export default function Sources() {
     <aside className="source-list" aria-label="Saved sources">
       <div className="source-list-head"><h1 className="source-list-title">Sources</h1>
         <div className="source-search"><label className="visually-hidden" htmlFor="search">Search sources</label>
-          <input id="search" type="search" placeholder="Search titles, findings, notes" value={query} onChange={e => setQuery(e.target.value)} />
+          <input id="search" type="search" placeholder="Search titles, findings, notes" value={query} onChange={e => { setQuery(e.target.value); setSearch({ q: e.target.value || undefined }); }} />
           <button className="filter-toggle" type="button" aria-expanded={filtersOpen} aria-controls="filters" onClick={() => setFiltersOpen(!filtersOpen)}>Filters</button>
         </div>
         <div className="filters" id="filters" data-open={filtersOpen ? '' : undefined}>
           {(Object.keys(filters) as (keyof typeof filters)[]).map(key => <div key={key}>
             <label htmlFor={key}>{key.charAt(0).toUpperCase() + key.slice(1)}</label>
-            <select id={key} value={filters[key]} onChange={e => setFilters({ ...filters, [key]: e.target.value })}>
+            <select id={key} value={filters[key]} onChange={e => setSearch({ [key]: e.target.value || undefined })}>
               <option value="">All</option>{options[key].map(([v, label]) => <option value={v} key={v}>{label}</option>)}
             </select></div>)}
         </div>
@@ -96,27 +84,27 @@ export default function Sources() {
       </div>
       <ul className="source-rows" id="results">{visible.map(({ note }) => {
         const c = category(note);
-        return <li key={note.source.id}><a href={`/sources/?source=${note.source.id}`} aria-current={selected === note.source.id ? 'page' : undefined}
-          data-tone={categoryTone(c?.id)} onClick={e => { if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; e.preventDefault(); select(note.source.id); }}>
+        return <li key={note.source.id}><Link to="/sources/" search={previous => ({ ...previous, source: note.source.id })} aria-current={selected === note.source.id ? 'page' : undefined}
+          data-tone={categoryTone(c?.id)}>
           <span className="source-meta">{c && <span className="category-chip">{c.name}</span>}<span>{sourceTypeLabel(note.source.itemType)} · {year(note.source.publishedAt)}</span></span>
           <span className="source-title">{note.source.title}</span><span className="source-summary">{note.analysis?.summary || note.extraction.reason || 'Metadata saved; analysis unavailable.'}</span>
           {note.extraction.status !== 'text' && <span className="status attention">Needs review</span>}
-        </a></li>;
+        </Link></li>;
       })}</ul>
     </aside>
-    {current ? <Reading key={`reading:${current.note.source.id}`} entry={current} back={() => select('')} /> : <main id="main" className="reading-pane reading-empty">
+    {current ? <Reading key={`reading:${current.note.source.id}`} entry={current} /> : <main id="main" className="reading-pane reading-empty">
       <p>{selected && !loading ? 'This source is unavailable. Select another source.' : 'Select a source to read it here.'}</p>
     </main>}
     {current && <SourceAsk key={`ask:${current.note.source.id}`} sourceId={current.note.source.id} title={current.note.source.title} />}
   </div>;
 }
 
-function Reading({ entry: { note, humanHtml }, back }: { entry: Entry; back: () => void }) {
+function Reading({ entry: { note, humanHtml } }: { entry: Entry }) {
   const { source, analysis } = note, c = category(note), content = sections(note);
   return <main id="main" className="reading-pane" data-tone={categoryTone(c?.id)}>
-    <article className="research-note"><nav className="reading-back" aria-label="Breadcrumb"><a href="/sources/" onClick={e => { e.preventDefault(); back(); }}>Sources</a></nav>
+    <article className="research-note"><nav className="reading-back" aria-label="Breadcrumb"><Link to="/sources/" search={previous => ({ ...previous, source: undefined })}>Sources</Link></nav>
       <header className="note-head">
-        <p className="note-kind"><a className={`category-chip${c ? '' : ' is-unset'}`} href={`/categories/?source=${source.id}`}>{c?.name || 'Set category'}</a>
+        <p className="note-kind"><Link className={`category-chip${c ? '' : ' is-unset'}`} to="/categories/" search={{ source: source.id }}>{c?.name || 'Set category'}</Link>
           <span>{sourceTypeLabel(source.itemType)}</span><span>{source.publishedAt?.slice(0, 10)}</span></p>
         <h1>{source.title}</h1><p className="citation">{source.authors.join(', ') || 'Authors not provided'}</p>
         <div className="note-actions"><button className="ask-button" type="button" data-ask-open aria-controls="source-ask" aria-expanded="false">Ask about this source</button>

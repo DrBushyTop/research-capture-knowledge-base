@@ -1,11 +1,6 @@
 {
   "routes": [
     {
-      "route": "/research/*",
-      "rewrite": "/sources/index.html",
-      "allowedRoles": ["library_member"]
-    },
-    {
       "route": "/.auth/login/aad",
       "statusCode": 404
     },
@@ -22,7 +17,38 @@
       ]
     },
     {
+      "route": "/access.js",
+      "allowedRoles": [
+        "anonymous"
+      ]
+    },
+    {
+      "route": "/access.css",
+      "allowedRoles": [
+        "anonymous"
+      ]
+    },
+    {
+      "route": "/api/*",
+      "allowedRoles": [
+        "library_member"
+      ]
+    },
+    {
+      "route": "/assets/*",
+      "allowedRoles": [
+        "library_member"
+      ]
+    },
+    {
+      "route": "/*.{html,js,css,json,map,woff,woff2,ttf,otf,png,jpg,jpeg,gif,svg,webp,ico,pdf,txt,xml}",
+      "allowedRoles": [
+        "library_member"
+      ]
+    },
+    {
       "route": "/*",
+      "rewrite": "/index.html",
       "allowedRoles": [
         "library_member"
       ]

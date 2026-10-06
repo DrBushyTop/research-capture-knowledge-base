@@ -1,6 +1,0 @@
----
-import Layout from '../../components/Layout.astro';
-import Chat from '../../components/Chat';
-export function getStaticPaths() { return process.env.READER_MODE === 'public' ? [] : [{ params: { path: undefined } }]; }
----
-<Layout title="Chat"><Chat client:load /><noscript><p>Chat needs JavaScript.</p></noscript></Layout>

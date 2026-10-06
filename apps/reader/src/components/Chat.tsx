@@ -6,15 +6,17 @@ import { Conversation, ConversationContent, ConversationScrollButton } from './a
 import { Message, MessageContent, MessageResponse } from './ai-elements/message';
 import { InlineCitation, InlineCitationQuote, InlineCitationSource } from './ai-elements/inline-citation';
 import { citationLabel, maxMessageImages } from '../../../../shared/chat-client';
-import type { ChatActivity, ChatAsset, ChatConversation, ChatImage, ChatJob } from '../../../../shared/chat';
+import type { ChatActivity, ChatAsset, ChatImage, ChatJob } from '../../../../shared/chat';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link as RouterLink, useNavigate, useParams } from '@tanstack/react-router';
+import { ApiError, postBlob, postJson } from '../lib/api';
+import { conversationQuery, conversationsQuery, jobQuery, keys, terminalJob, type Conversation as SavedConversation, type HistoryItem, type SourceContext } from '../lib/queries';
+import { conversationIdPattern, sourceHref } from '../app/router';
 import '../styles/chat.css';
 
 type Result = NonNullable<ChatJob['result']>;
 type Citation = Result['citations'][number];
 type Turn = { jobId: string; question: string; images?: ChatImage[]; result?: Result; failure?: string; activities?: ChatActivity[] };
-type SourceContext = { sourceId: string; title: string };
-type HistoryItem = { id: string; title: string; updatedAt: string; sourceContext?: SourceContext };
-type Conversation = ChatConversation & { sourceContext?: SourceContext };
 type Active = { id: string; conversationId: string; question: string; images?: ChatImage[] };
 type Draft = { key: string; preview: string; status: 'uploading' | 'ready' | 'failed'; image?: ChatImage; error?: string };
 const endpoint = '/api/chat';
@@ -35,7 +37,6 @@ const sourceSuggestions = [
   { icon: SearchCheck, text: 'What evidence does this source give for its main claims?' },
   { icon: GitCompare, text: 'Which other saved sources cover the same topic?' }
 ];
-const noteUrl = (sourceId: string) => `/research/${encodeURIComponent(sourceId)}/`;
 
 /** Temporary uploads and rendered pages expire after a day; saved conversations outlive them. */
 function ExpiringImage({ src, alt, className, ...rest }: React.ImgHTMLAttributes<HTMLImageElement> & { src: string; alt: string }) {
@@ -44,18 +45,8 @@ function ExpiringImage({ src, alt, className, ...rest }: React.ImgHTMLAttributes
   return <img src={src} alt={alt} className={className} onError={() => setFailed(true)} {...rest} />;
 }
 
-class RequestError extends Error { constructor(message: string, readonly status: number) { super(message); } }
-
-async function parse<T>(response: Response): Promise<T> {
-  if (response.status === 401 || response.status === 403 || !response.headers.get('content-type')?.includes('application/json')) throw new RequestError('Sign in with an invited account to use chat.', 403);
-  const value = await response.json();
-  if (!response.ok) throw new RequestError(value.error || 'Chat is unavailable. Try again.', response.status);
-  return value as T;
-}
-async function request<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
-  return parse<T>(await fetch(endpoint + path, { credentials: 'same-origin', signal,
-    ...(body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}) }));
-}
+const readStorage = (storage: Storage, key: string) => { try { return storage.getItem(key); } catch { return null; } };
+const readActive = (key: string): Active | undefined => { try { return JSON.parse(readStorage(sessionStorage, key) || 'null') || undefined; } catch { return undefined; } };
 
 /** Scales a screenshot to the 2048px box the model reads at high detail and keeps it under the 5 MB server limit. */
 async function prepareImage(file: Blob): Promise<Blob> {
@@ -93,7 +84,7 @@ function CitationDetail({ cite, jobId }: { cite: Citation; jobId: string }) {
     {cite.assetId && <a className="chat-cited-image" href={fileUrl(jobId, { asset: cite.assetId })} target="_blank" rel="noreferrer"><ExpiringImage src={fileUrl(jobId, { asset: cite.assetId })} alt={cite.title} loading="lazy" />Open image</a>}
     {(cite.quote || cite.excerpt) && <InlineCitationQuote className="chat-citation-quote">{cite.quote || cite.excerpt}</InlineCitationQuote>}
     <div className="chat-source-links">
-      <a href={noteUrl(cite.sourceId)} target="_blank" rel="noreferrer">Open note</a>
+      <a href={sourceHref(cite.sourceId)} target="_blank" rel="noreferrer">Open note</a>
       {cite.pdf && <a href={fileUrl(jobId, { file: cite.sourceId, evidence: cite.evidenceId })} target="_blank" rel="noreferrer">Open PDF</a>}
       {safeUrl(cite.sourceUrl) && <a href={safeUrl(cite.sourceUrl)} target="_blank" rel="noreferrer">Open site</a>}
     </div>
@@ -256,66 +247,69 @@ type Props = {
 
 export default function Chat({ source, embedded = false, onClose }: Props = {}) {
   const phone = usePhone();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const recentKey = source ? `research-chat-source:${source.sourceId}` : 'research-chat';
   const activeKey = source ? `research-chat-active:${source.sourceId}` : 'research-chat-active';
-  const [context, setContext] = useState<SourceContext | undefined>(source);
+  // The global chat keeps its conversation in the URL; a source panel remembers its own in this browser.
+  const routeId = useParams({ strict: false, select: params => (params as { conversationId?: string }).conversationId });
+  const [panelId, setPanelId] = useState<string | undefined>(() => embedded ? readStorage(localStorage, recentKey) || undefined : undefined);
+  const conversationId = embedded ? panelId : routeId;
+  const validId = !conversationId || conversationIdPattern.test(conversationId);
   const root = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const [question, setQuestion] = useState('');
   const [drafts, setDrafts] = useState<Draft[]>([]);
-  const [turns, setTurns] = useState<Turn[]>([]);
-  const [conversationId, setConversationId] = useState<string>();
+  // Turns asked in this tab. Saved conversations hold only finished answers, so pending and failed turns live here.
+  const [local, setLocal] = useState<(Turn & { conversationId: string })[]>([]);
   const [active, setActive] = useState<Active>();
-  const [history, setHistory] = useState<HistoryItem[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [confirming, setConfirming] = useState<string>();
-  const [deleting, setDeleting] = useState<string>();
-  const [sending, setSending] = useState(false);
   const [stopping, setStopping] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState('');
   const [announcement, setAnnouncement] = useState('');
-  const busy = !!active || sending || loading;
-  const uploading = drafts.some(draft => draft.status === 'uploading');
-  const ready = drafts.filter(draft => draft.status === 'ready').map(draft => draft.image!);
-  const refreshHistory = async () => { try { setHistory(await request<HistoryItem[]>('?conversations=1')); } catch { /* A send or open reports authentication errors. */ } };
-  const openConversation = async (id: string) => {
-    setHistoryOpen(false); setLoading(true); setError('');
-    try {
-      const value = await request<Conversation>(`?conversation=${id}`);
-      setConversationId(id); setTurns(value.turns); setContext(value.sourceContext); localStorage.setItem(recentKey, id);
-    } catch (error) { setError((error as Error).message); } finally { setLoading(false); }
-  };
+  const detail = useQuery({ ...conversationQuery(conversationId || ''), enabled: !!conversationId && validId });
+  const history = useQuery({ ...conversationsQuery, enabled: !embedded });
+  const job = useQuery({ ...jobQuery(active?.id || ''), enabled: !!active });
+  const loading = !!conversationId && validId && detail.isPending;
+  const unavailable = !!conversationId && (!validId || (!!detail.error && !detail.data));
+  const context = conversationId ? detail.data?.sourceContext ?? (detail.data ? undefined : source) : source;
+  const saved = detail.data?.turns ?? [];
+  const savedIds = new Set(saved.map(turn => turn.jobId));
+  const turns: Turn[] = [...saved, ...local.filter(turn => turn.conversationId === conversationId && !savedIds.has(turn.jobId))];
+
+  const remember = (id: string) => { try { localStorage.setItem(recentKey, id); } catch { /* Storage can be disabled. */ } };
+  const forget = () => { try { localStorage.removeItem(recentKey); } catch { /* Storage can be disabled. */ } };
+  const finish = () => { setActive(undefined); setStopping(false); try { sessionStorage.removeItem(activeKey); } catch { /* Storage can be disabled. */ } };
+  const patchLocal = (jobId: string, change: Partial<Turn>) => setLocal(previous => previous.map(turn => turn.jobId === jobId ? { ...turn, ...change } : turn));
+
+  // The plain chat address reopens the conversation this browser used last, including one still answering.
+  const restored = useRef(false);
+  useEffect(() => {
+    if (embedded || restored.current) return;
+    restored.current = true;
+    if (routeId) return;
+    const id = readActive(activeKey)?.conversationId || readStorage(localStorage, recentKey);
+    if (id && conversationIdPattern.test(id)) void navigate({ to: '/chat/$conversationId/', params: { conversationId: id }, replace: true });
+  }, []);
+  useEffect(() => {
+    if (!conversationId) return;
+    if (detail.data) remember(conversationId);
+    else if (detail.error || !validId) { if (readStorage(localStorage, recentKey) === conversationId) forget(); }
+  }, [conversationId, detail.data, detail.error]);
+  // A stored running answer resumes when its conversation is open; one from another conversation stays stored for it.
+  useEffect(() => {
+    const pending = readActive(activeKey);
+    if (pending && pending.conversationId === conversationId && active?.id !== pending.id) {
+      setActive(pending);
+      setLocal(previous => previous.some(turn => turn.jobId === pending.id) ? previous : [...previous, { conversationId: pending.conversationId, jobId: pending.id, question: pending.question, images: pending.images }]);
+    } else if (active && active.conversationId !== conversationId) { setActive(undefined); setStopping(false); }
+  }, [conversationId]);
 
   useEffect(() => {
-    let live = true;
-    const restore = async () => {
-      const linked = embedded ? null : new URLSearchParams(location.search).get('conversation');
-      if (linked) window.history.replaceState(null, '', location.pathname);
-      let pending: Active | undefined;
-      try {
-        const recent = localStorage.getItem(recentKey);
-        pending = JSON.parse(sessionStorage.getItem(activeKey) || 'null') || undefined;
-        const id = linked && /^[a-f0-9]{32}$/.test(linked) ? linked : pending?.conversationId || recent;
-        if (id) {
-          const value = await request<Conversation>(`?conversation=${id}`);
-          if (!live) return;
-          setConversationId(id); if (linked) localStorage.setItem(recentKey, id); setContext(value.sourceContext ?? source);
-          // A pending answer from another conversation stays stored so that conversation can resume it.
-          const own = pending?.conversationId === id ? pending : undefined;
-          setTurns(own && !value.turns.some(turn => turn.jobId === own.id) ? [...value.turns, { jobId: own.id, question: own.question, images: own.images }] : value.turns);
-          if (own) setActive(own);
-        }
-      } catch {
-        localStorage.removeItem(recentKey);
-        if (!linked || pending?.conversationId === linked) sessionStorage.removeItem(activeKey);
-      }
-      finally { if (live) { setLoading(false); if (!embedded) void refreshHistory(); } }
-    };
-    void restore();
-    if (embedded) return () => { live = false; };
+    if (embedded) return;
     const resize = () => {
       if (!root.current) return;
       const top = root.current.getBoundingClientRect().top;
@@ -325,7 +319,7 @@ export default function Chat({ source, embedded = false, onClose }: Props = {}) 
     resize(); window.addEventListener('resize', resize); window.visualViewport?.addEventListener('resize', resize); window.visualViewport?.addEventListener('scroll', resize);
     const masthead = document.querySelector('.masthead');
     const observer = new ResizeObserver(resize); if (masthead) observer.observe(masthead);
-    return () => { live = false; observer.disconnect(); window.removeEventListener('resize', resize); window.visualViewport?.removeEventListener('resize', resize); window.visualViewport?.removeEventListener('scroll', resize); };
+    return () => { observer.disconnect(); window.removeEventListener('resize', resize); window.visualViewport?.removeEventListener('resize', resize); window.visualViewport?.removeEventListener('scroll', resize); };
   }, []);
 
   useEffect(() => {
@@ -335,32 +329,25 @@ export default function Chat({ source, embedded = false, onClose }: Props = {}) 
 
   useEffect(() => {
     if (!active) return;
-    const controller = new AbortController(); let timer: ReturnType<typeof setTimeout>;
-    const poll = async () => {
-      try {
-        const job = await request<{ status: ChatJob['status']; result?: Result; activities?: ChatActivity[]; error?: string }>(`?id=${active.id}`, undefined, controller.signal);
-        if (controller.signal.aborted) return;
-        setTurns(previous => previous.map(turn => turn.jobId === active.id ? { ...turn, result: job.result, activities: job.activities,
-          failure: job.status === 'failed' ? job.error || 'No answer returned. Try again.' : job.status === 'cancelled' ? 'Stopped' : undefined } : turn));
-        if (['complete', 'failed', 'cancelled'].includes(job.status)) {
-          setActive(undefined); setStopping(false); sessionStorage.removeItem(activeKey);
-          setAnnouncement(job.status === 'complete' ? 'Answer ready' : job.status === 'cancelled' ? 'Stopped' : 'Answer failed');
-          if (job.status === 'failed') setError(job.error || 'No answer returned. Try again.');
-          void refreshHistory(); return;
-        }
-        setError(''); timer = setTimeout(() => void poll(), 2000);
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          setError((error as Error).message);
-          if (error instanceof RequestError && [400, 401, 403, 404, 410].includes(error.status)) {
-            setTurns(previous => previous.map(turn => turn.jobId === active.id ? { ...turn, failure: (error as Error).message } : turn));
-            setActive(undefined); setStopping(false); sessionStorage.removeItem(activeKey); setAnnouncement('Answer unavailable');
-          } else timer = setTimeout(() => void poll(), 5000);
-        }
+    const value = job.data;
+    if (value) {
+      patchLocal(active.id, { result: value.result, activities: value.activities,
+        failure: value.status === 'failed' ? value.error || 'No answer returned. Try again.' : value.status === 'cancelled' ? 'Stopped' : undefined });
+      if (terminalJob(value.status)) {
+        finish();
+        setAnnouncement(value.status === 'complete' ? 'Answer ready' : value.status === 'cancelled' ? 'Stopped' : 'Answer failed');
+        if (value.status === 'failed') setError(value.error || 'No answer returned. Try again.');
+        void queryClient.invalidateQueries({ queryKey: keys.conversation(active.conversationId) });
+        void queryClient.invalidateQueries({ queryKey: keys.conversations });
+        queryClient.removeQueries({ queryKey: keys.job(active.id) });
+      } else setError('');
+    } else if (job.error) {
+      setError(job.error.message);
+      if (job.error instanceof ApiError && [400, 401, 403, 404, 410].includes(job.error.status)) {
+        patchLocal(active.id, { failure: job.error.message }); finish(); setAnnouncement('Answer unavailable');
       }
-    };
-    void poll(); return () => { controller.abort(); clearTimeout(timer); };
-  }, [active?.id]);
+    }
+  }, [job.data, job.error, job.errorUpdatedAt]);
 
   const addImages = (files: File[]) => {
     const images = files.filter(file => file.type.startsWith('image/'));
@@ -373,7 +360,7 @@ export default function Chat({ source, embedded = false, onClose }: Props = {}) 
       void (async () => {
         try {
           const blob = await prepareImage(file);
-          const image = await parse<ChatImage>(await fetch(`${endpoint}?upload=1`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': blob.type }, body: blob }));
+          const image = await postBlob<ChatImage>(`${endpoint}?upload=1`, blob);
           setDrafts(previous => previous.map(draft => draft.key === key ? { ...draft, status: 'ready', image } : draft));
         } catch (error) {
           setDrafts(previous => previous.map(draft => draft.key === key ? { ...draft, status: 'failed', error: (error as Error).message } : draft));
@@ -383,60 +370,89 @@ export default function Chat({ source, embedded = false, onClose }: Props = {}) 
   };
   const removeDraft = (key: string) => setDrafts(previous => previous.filter(draft => { if (draft.key === key) URL.revokeObjectURL(draft.preview); return draft.key !== key; }));
   const clearDrafts = () => setDrafts(previous => { previous.forEach(draft => URL.revokeObjectURL(draft.preview)); return []; });
+  useEffect(() => () => clearDrafts(), []);
+
+  const ask = useMutation({
+    mutationFn: (body: { question: string; images: ChatImage[] }) => postJson<{ id: string; conversationId: string }>(endpoint, { question: body.question, ...(body.images.length ? { images: body.images.map(image => image.id) } : {}),
+      ...(conversationId ? { conversationId } : source ? { sourceId: source.sourceId } : {}) }, 'Chat is unavailable. Try again.'),
+    onMutate: () => setError(''),
+    onError: failure => setError(failure.message)
+  });
+  const busy = !!active || ask.isPending || loading;
+  const uploading = drafts.some(draft => draft.status === 'uploading');
+  const ready = drafts.filter(draft => draft.status === 'ready').map(draft => draft.image!);
 
   const send = async (retry?: Turn | string) => {
     const submitted = (typeof retry === 'string' ? retry : retry ? retry.question : question).trim();
     const images = typeof retry === 'object' ? retry.images || [] : retry ? [] : ready;
-    if (busy || uploading || (!submitted && !images.length)) return;
+    if (busy || uploading || unavailable || (!submitted && !images.length)) return;
     if (!retry && drafts.some(draft => draft.status === 'failed')) { setError('Remove the images that failed to upload.'); return; }
-    setSending(true); setError('');
-    try {
-      const job = await request<{ id: string; conversationId: string }>('', { question: submitted, ...(images.length ? { images: images.map(image => image.id) } : {}), ...(conversationId ? { conversationId } : source ? { sourceId: source.sourceId } : {}) });
-      const next = { ...job, question: submitted, images };
-      setConversationId(job.conversationId); localStorage.setItem(recentKey, job.conversationId); sessionStorage.setItem(activeKey, JSON.stringify(next));
-      setTurns(previous => [...previous, { jobId: job.id, question: submitted, images }]); setActive(next);
-      if (!retry) { setQuestion(''); clearDrafts(); }
-      if (!conversationId) setContext(source);
-      setAnnouncement('Answering');
-    } catch (error) { setError((error as Error).message); } finally { setSending(false); }
+    const created = await ask.mutateAsync({ question: submitted, images }).catch(() => undefined);
+    if (!created) return;
+    const next = { ...created, question: submitted, images };
+    try { sessionStorage.setItem(activeKey, JSON.stringify(next)); } catch { /* The answer still shows in this tab. */ }
+    remember(created.conversationId);
+    setLocal(previous => [...previous, { conversationId: created.conversationId, jobId: created.id, question: submitted, images }]);
+    setActive(next);
+    if (!retry) { setQuestion(''); clearDrafts(); }
+    setAnnouncement('Answering');
+    if (!conversationId) {
+      // The server stores the new conversation with no finished turns yet.
+      queryClient.setQueryData<SavedConversation>(keys.conversation(created.conversationId), previous => previous ?? { id: created.conversationId, owner: '', createdAt: '', updatedAt: '', turns: [], ...(source ? { sourceContext: source } : {}) });
+      if (embedded) setPanelId(created.conversationId);
+      else void navigate({ to: '/chat/$conversationId/', params: { conversationId: created.conversationId } });
+    }
   };
-  const stop = async () => {
-    if (!active || stopping) return;
-    setStopping(true);
-    try { await request('', { action: 'cancel', id: active.id }); } catch (error) { setError((error as Error).message); setStopping(false); }
+  const stop = useMutation({
+    mutationFn: (id: string) => postJson(endpoint, { action: 'cancel', id }, 'Chat is unavailable. Try again.'),
+    onMutate: () => setStopping(true),
+    // The job poll reports the cancelled state.
+    onError: failure => { setError(failure.message); setStopping(false); }
+  });
+  const startNew = () => {
+    setQuestion(''); clearDrafts(); setError(''); setHistoryOpen(false); forget();
+    if (embedded) setPanelId(undefined); else void navigate({ to: '/' });
+    input.current?.focus();
   };
-  const newChat = () => { setConversationId(undefined); setContext(source); setTurns([]); setQuestion(''); clearDrafts(); setError(''); setHistoryOpen(false); localStorage.removeItem(recentKey); input.current?.focus(); };
-  const remove = async (id: string) => {
-    setDeleting(id); setError('');
-    try {
-      await request('', { action: 'delete', conversationId: id });
-      setHistory(previous => previous.filter(item => item.id !== id));
+  const remove = useMutation({
+    mutationFn: (id: string) => postJson(endpoint, { action: 'delete', conversationId: id }, 'Chat is unavailable. Try again.'),
+    onMutate: () => setError(''),
+    onSuccess: (_, id) => {
+      queryClient.setQueryData<HistoryItem[]>(keys.conversations, previous => previous?.filter(item => item.id !== id));
+      queryClient.removeQueries({ queryKey: keys.conversation(id) });
+      if (readActive(activeKey)?.conversationId === id) finish();
+      setLocal(previous => previous.filter(turn => turn.conversationId !== id));
       if (id === conversationId) {
-        sessionStorage.removeItem(activeKey); setActive(undefined); setStopping(false);
-        setConversationId(undefined); setContext(source); setTurns([]); localStorage.removeItem(recentKey);
+        forget();
+        if (embedded) setPanelId(undefined); else void navigate({ to: '/', replace: true });
       }
       setAnnouncement('Chat deleted');
-    } catch (error) { setError((error as Error).message); } finally { setDeleting(undefined); setConfirming(undefined); }
-  };
+    },
+    onError: failure => setError(failure.message),
+    onSettled: () => setConfirming(undefined)
+  });
+  const deleting = remove.isPending ? remove.variables : undefined;
+  const items = history.data ?? [];
 
   const historyList = <>
-    <button className="chat-new" type="button" disabled={busy} onClick={newChat}><SquarePen size={18} />New chat</button>
+    <button className="chat-new" type="button" disabled={busy} onClick={startNew}><SquarePen size={18} />New chat</button>
     <h2>Recent</h2>
-    {history.length ? <ul>{history.map(item => <li key={item.id} className={confirming === item.id ? 'is-confirming' : undefined}>
+    {items.length ? <ul>{items.map(item => <li key={item.id} className={confirming === item.id ? 'is-confirming' : undefined}>
       {confirming === item.id ? <div className="chat-confirm" role="group" aria-label={`Delete ${item.title}?`}>
         <span>Delete this chat?</span>
-        <button type="button" className="chat-confirm-delete" disabled={deleting === item.id} onClick={() => void remove(item.id)}>{deleting === item.id ? 'Deleting…' : 'Delete'}</button>
+        <button type="button" className="chat-confirm-delete" disabled={deleting === item.id} onClick={() => remove.mutate(item.id)}>{deleting === item.id ? 'Deleting…' : 'Delete'}</button>
         <button type="button" disabled={deleting === item.id} onClick={() => setConfirming(undefined)}>Cancel</button>
       </div> : <>
-        <button type="button" className="chat-history-open" aria-current={item.id === conversationId ? 'page' : undefined} disabled={busy} onClick={() => void openConversation(item.id)}>
-          <span>{item.title}</span>{item.sourceContext && <small><FileText size={12} aria-hidden="true" /><span>{item.sourceContext.title}</span></small>}</button>
+        <RouterLink className="chat-history-open" to="/chat/$conversationId/" params={{ conversationId: item.id }} aria-current={item.id === conversationId ? 'page' : undefined}
+          disabled={busy} aria-disabled={busy || undefined} onClick={() => { setHistoryOpen(false); setError(''); }}>
+          <span>{item.title}</span>{item.sourceContext && <small><FileText size={12} aria-hidden="true" /><span>{item.sourceContext.title}</span></small>}</RouterLink>
         <button type="button" className="chat-icon-button chat-history-delete" aria-label={`Delete ${item.title}`} disabled={!!deleting} onClick={() => setConfirming(item.id)}><Trash2 size={16} /></button>
       </>}
-    </li>)}</ul> : <p className="chat-history-empty">No conversations</p>}
+    </li>)}</ul> : <p className="chat-history-empty">{history.isPending ? 'Loading…' : history.error ? 'History could not load.' : 'No conversations'}</p>}
   </>;
 
   const composer = <div className="chat-composer-area">
-    {error && <div className="chat-error" role="alert"><p>{error}</p>{error.startsWith('Sign in') && <a href={`/.auth/login/github?post_login_redirect_uri=${encodeURIComponent(location.pathname)}`}>Sign in</a>}</div>}
+    {error && <div className="chat-error" role="alert"><p>{error}</p>{error.startsWith('Sign in') && <a href="/login.html">Sign in</a>}</div>}
     <form className={`chat-composer${dragging ? ' is-dragging' : ''}`} onSubmit={event => { event.preventDefault(); void send(); }}
       onDragOver={event => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); setDragging(true); } }}
       onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); addImages([...event.dataTransfer.files]); }}>
@@ -452,26 +468,29 @@ export default function Chat({ source, embedded = false, onClose }: Props = {}) 
         <textarea ref={input} id="chat-message" rows={1} maxLength={8000} value={question} placeholder={source ? 'Ask about this or other sources' : 'Ask about saved sources or paste a screenshot'} onChange={event => setQuestion(event.target.value)}
           onPaste={event => { const files = [...event.clipboardData.files]; if (files.some(file => file.type.startsWith('image/'))) { event.preventDefault(); addImages(files); } }}
           onKeyDown={event => { if (!phone && event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); } }} />
-        {active ? <button className="chat-send" type="button" aria-label={stopping ? 'Stopping' : 'Stop'} disabled={stopping} onClick={() => void stop()}><Square size={15} fill="currentColor" /></button>
+        {active ? <button className="chat-send" type="button" aria-label={stopping ? 'Stopping' : 'Stop'} disabled={stopping} onClick={() => { if (active && !stopping) stop.mutate(active.id); }}><Square size={15} fill="currentColor" /></button>
           : <button className="chat-send" type="submit" aria-label="Send" disabled={busy || uploading || (!question.trim() && !ready.length)}><ArrowUp size={21} strokeWidth={2.4} /></button>}
       </div>
     </form>
   </div>;
 
-  const empty = !turns.length && !loading;
+  const empty = !turns.length && !loading && !unavailable;
   const Main = embedded ? 'section' : 'main';
-  const contextLine = context && <p className="chat-context"><FileText size={15} aria-hidden="true" /><span>{embedded && context.sourceId === source?.sourceId ? 'Started from this source' : <>Started from <a href={noteUrl(context.sourceId)}>{context.title}</a></>}</span></p>;
+  const contextLine = context && <p className="chat-context"><FileText size={15} aria-hidden="true" /><span>{embedded && context.sourceId === source?.sourceId ? 'Started from this source' : <>Started from <RouterLink to="/sources/" search={{ source: context.sourceId }}>{context.title}</RouterLink></>}</span></p>;
   return <div ref={root} className={`discussion-chat${embedded ? ' is-embedded' : ''}`}>
     {!embedded && <aside className="chat-history" aria-label="Chat history">{historyList}</aside>}
     <Main {...(embedded ? { 'aria-label': 'Ask about this source' } : { id: 'main', tabIndex: -1 })} className={`chat-main${empty ? ' is-empty' : ''}`}>
       <header className="chat-toolbar">{embedded ? <h2>Ask</h2> : <h1>Chat</h1>}<div>
-        {!embedded && <button type="button" className="chat-icon-button chat-history-toggle" aria-label="History" disabled={busy} onClick={() => { void refreshHistory(); setHistoryOpen(true); }}><History size={20} /></button>}
-        {embedded && conversationId && <a className="chat-icon-button" href={`/?conversation=${conversationId}`} aria-label="Continue in Chat" title="Continue in Chat"><ExternalLink size={18} /></a>}
-        <button type="button" className="chat-icon-button" aria-label="New chat" disabled={busy} onClick={newChat}><SquarePen size={19} /></button>
+        {!embedded && <button type="button" className="chat-icon-button chat-history-toggle" aria-label="History" disabled={busy} onClick={() => { void history.refetch(); setHistoryOpen(true); }}><History size={20} /></button>}
+        {embedded && conversationId && <RouterLink className="chat-icon-button" to="/chat/$conversationId/" params={{ conversationId }} aria-label="Continue in Chat" title="Continue in Chat"><ExternalLink size={18} /></RouterLink>}
+        <button type="button" className="chat-icon-button" aria-label="New chat" disabled={busy && !unavailable} onClick={startNew}><SquarePen size={19} /></button>
         {onClose && <button type="button" className="chat-icon-button" aria-label="Close" onClick={onClose}><X size={20} /></button>}
       </div></header>
-      {!empty && contextLine}
-      {empty ? <section className="chat-start" aria-labelledby={embedded ? undefined : 'chat-start-title'} aria-label={embedded ? 'New conversation' : undefined}>
+      {!empty && !unavailable && contextLine}
+      {unavailable ? <section className="chat-start" aria-label="Conversation unavailable">
+        <p className="chat-error" role="alert">{validId ? detail.error?.message || 'This conversation could not be opened.' : 'This chat address is not valid.'} It may have been deleted. Start a new chat or pick one from history.</p>
+        <button className="chat-new" type="button" onClick={startNew}><SquarePen size={18} />New chat</button>
+      </section> : empty ? <section className="chat-start" aria-labelledby={embedded ? undefined : 'chat-start-title'} aria-label={embedded ? 'New conversation' : undefined}>
         {embedded ? <p className="chat-start-source">{source?.title}</p> : <h2 id="chat-start-title">Ask about your saved sources</h2>}
         {composer}
         <ul className="chat-suggestions" aria-label="Suggested questions">{(source ? sourceSuggestions : suggestions).map(({ icon: Icon, text }) => <li key={text}>

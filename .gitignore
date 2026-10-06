@@ -1,6 +1,5 @@
 node_modules/
 .agents/
-.astro/
 dist/
 .function-package/
 .local/
@@ -10,6 +9,3 @@ local.settings.json
 coverage/
 
 .impeccable/review/
-apps/reader/public/reader-search.js
-apps/reader/public/search-index.json
-apps/reader/public/reader-chat.js

@@ -1,20 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, Archive, ArchiveRestore, Copy, List, ListOrdered, Pilcrow, Plus, RefreshCw, RotateCcw, Square, Trash2, X } from 'lucide-react';
-import type { Registry, Template, TemplateAnalysis } from '../../../../shared/categories';
+import type { Template, TemplateAnalysis } from '../../../../shared/categories';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link, useBlocker } from '@tanstack/react-router';
+import { ApiError, forgetPrivateData, isAuthError, postJson } from '../lib/api';
+import { activeBatchStates as active, categoriesQuery, keys, previewQuery, type CategorySource, type Overview } from '../lib/queries';
+import { categoriesRoute } from '../app/router';
 import '../styles/categories.css';
 
-type SourceCategory = { id: string; name: string; templateRevision: number; assignment?: string };
-type Source = { id: string; title: string; category: SourceCategory | null; assignment?: { categoryId: string; method: string }; needsUpdate: boolean; status: string };
-type Entry = { sourceId: string; status: string; error?: string };
-type Batch = { id: string; createdAt: string; cancelled: boolean; entries: Entry[] };
-type Overview = { registry: Registry; sources: Source[]; batches: Batch[] };
+type Source = CategorySource;
 type Section = Template['sections'][number];
 type Tab = 'templates' | 'documents' | 'updates';
 type Confirm = { mode: 'apply' | 'reclassify'; categoryId: string; requestId: string };
 
 const endpoint = '/api/categories';
 const maxSelected = 200;
-const active = ['pending', 'processing', 'updating-reader'];
 const states: Record<string, string> = {
   pending: 'Queued', processing: 'Processing', 'updating-reader': 'Updating reader', complete: 'Done',
   failed: 'Failed', superseded: 'Replaced by newer update', cancelled: 'Stopped'
@@ -25,18 +25,7 @@ const formats: { value: Section['format']; label: string; icon: typeof List }[] 
   { value: 'steps', label: 'Numbered steps', icon: ListOrdered }
 ];
 
-class ApiError extends Error { constructor(message: string, readonly status: number) { super(message); } }
-async function api(body?: unknown, query = '') {
-  const response = await fetch(endpoint + query, {
-    method: body ? 'POST' : 'GET', headers: body ? { 'Content-Type': 'application/json' } : undefined,
-    body: body ? JSON.stringify(body) : undefined
-  });
-  if (!response.headers.get('content-type')?.includes('application/json')) throw new ApiError('Sign in with an admin GitHub account to edit categories.', response.status);
-  const result = await response.json();
-  if (!response.ok) throw new ApiError(result.error || 'The request failed. Try again.', response.status);
-  if (body) document.dispatchEvent(new Event('reader:library-changed'));
-  return result;
-}
+const api = <T = any,>(body: unknown) => postJson<T>(endpoint, body);
 const clone = <T,>(value: T): T => structuredClone(value);
 const identifier = (prefix: string) => prefix + '-' + crypto.randomUUID().slice(0, 8);
 const blankSection = (): Section => ({ id: identifier('section'), heading: '', instructions: '', format: 'bullets' });
@@ -46,20 +35,24 @@ const categoryOf = (source: Source) => source.assignment?.categoryId || source.c
 const dateTime = (value: string) => new Date(value).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 export default function Categories() {
-  const [data, setData] = useState<Overview>();
+  const queryClient = useQueryClient();
+  const linked = categoriesRoute.useSearch().source;
+  const overview = useQuery(categoriesQuery);
+  const data = overview.data;
   const [tab, setTab] = useState<Tab>('templates');
   const [draft, setDraft] = useState<Template>();
   const [baseline, setBaseline] = useState('');
   const [isNew, setIsNew] = useState(false);
   const [pendingSwitch, setPendingSwitch] = useState<() => void>();
   const [notice, setNotice] = useState<{ kind: 'error' | 'done' | 'conflict'; text: string }>();
-  const [loadError, setLoadError] = useState('');
+  const loadError = overview.error && !data ? overview.error.message : '';
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [previewSource, setPreviewSource] = useState('');
   const [previewId, setPreviewId] = useState('');
   const [preview, setPreview] = useState<TemplateAnalysis>();
   const [previewError, setPreviewError] = useState('');
+  const previewJob = useQuery({ ...previewQuery(previewId), enabled: !!previewId });
   const [selected, setSelected] = useState<string[]>([]);
   const [filter, setFilter] = useState('');
   const [query, setQuery] = useState('');
@@ -73,46 +66,45 @@ export default function Categories() {
     setDraft(clone(template)); setDraftRevision(revision); setPreviewId(''); setBaseline(fresh ? '' : JSON.stringify(template)); setIsNew(fresh);
     setPreview(undefined); setPreviewError(''); setNotice(undefined);
   }
-  async function load(initial = false) {
-    const value: Overview = await api();
-    setData(value); setLoadError('');
-    if (!initial) return value;
-    const params = new URLSearchParams(location.search);
-    const source = params.get('source');
-    const match = source ? value.sources.find(s => s.id === source) : undefined;
-    const current = value.registry.categories.find(c => c.id === (match && categoryOf(match))) || value.registry.categories[0];
-    select(current, false, value.registry.revision);
+  // The categories, source views and saved analysis can all change after a category write.
+  async function load() {
+    void queryClient.invalidateQueries({ queryKey: keys.library });
+    return queryClient.fetchQuery({ ...categoriesQuery, staleTime: 0 });
+  }
+  const started = useRef(false);
+  useEffect(() => {
+    if (!data || started.current) return;
+    started.current = true;
+    const match = linked ? data.sources.find(s => s.id === linked) : undefined;
+    const current = data.registry.categories.find(c => c.id === (match && categoryOf(match))) || data.registry.categories[0];
+    select(current, false, data.registry.revision);
     if (match) {
       setTab('documents'); setSelected([match.id]); setFocusSource(match.id); setPreviewSource(match.id);
-      setConfirm({ mode: 'apply', requestId: crypto.randomUUID(), categoryId: value.registry.categories.find(c => !c.archived && c.id !== categoryOf(match))?.id || '' });
-    } else setPreviewSource(value.sources[0]?.id || '');
-    return value;
-  }
-  useEffect(() => { load(true).catch(e => setLoadError(e.message)); }, []);
+      setConfirm({ mode: 'apply', requestId: crypto.randomUUID(), categoryId: data.registry.categories.find(c => !c.archived && c.id !== categoryOf(match))?.id || '' });
+    } else setPreviewSource(data.sources[0]?.id || '');
+  }, [data]);
   const running = !!data?.batches.some(b => b.entries.some(e => active.includes(e.status)));
+  const wasRunning = useRef(running);
   useEffect(() => {
-    if (!running) return;
-    const timer = setInterval(() => { load().catch(() => undefined); }, 8000);
-    return () => clearInterval(timer);
+    // Finished documents have new analysis and possibly new text for the reader.
+    if (wasRunning.current && !running) {
+      void queryClient.invalidateQueries({ queryKey: keys.library });
+      void queryClient.invalidateQueries({ queryKey: ['source-text'] });
+    }
+    wasRunning.current = running;
   }, [running]);
   useEffect(() => {
-    if (!previewId) return;
-    let stopped = false;
-    const timer = setInterval(async () => {
-      try {
-        const value = await api(undefined, '?preview=' + encodeURIComponent(previewId));
-        if (stopped || value.status === 'pending') return;
-        if (value.status === 'complete') setPreview(value.result); else setPreviewError(value.error || 'The preview failed. Try again.');
-        setPreviewId('');
-      } catch (e) { if ((e as ApiError).status === 503) return; if (!stopped) { setPreviewError((e as Error).message); setPreviewId(''); } }
-    }, 2500);
-    return () => { stopped = true; clearInterval(timer); };
-  }, [previewId]);
+    const value = previewJob.data;
+    if (!previewId || !value || value.status === 'pending') return;
+    if (value.status === 'complete') setPreview(value.result); else setPreviewError(value.error || 'The preview failed. Try again.');
+    setPreviewId('');
+  }, [previewJob.data]);
   useEffect(() => {
-    const handler = (event: BeforeUnloadEvent) => { if (dirty) event.preventDefault(); };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [dirty]);
+    const failure = previewJob.error as ApiError | null;
+    if (!previewId || !failure || failure.status === 503) return;
+    setPreviewError(failure.message); setPreviewId('');
+  }, [previewJob.error]);
+  const blocker = useBlocker({ shouldBlockFn: () => true, disabled: !dirty, withResolver: true });
   useEffect(() => {
     if (!focusSource || tab !== 'documents') return;
     document.getElementById('doc-' + focusSource)?.scrollIntoView({ block: 'center' });
@@ -123,6 +115,7 @@ export default function Categories() {
     try { await action(); }
     catch (e) {
       const error = e as ApiError;
+      if (isAuthError(error)) { forgetPrivateData(queryClient); return; }
       setNotice(error.status === 409
         ? { kind: 'conflict', text: 'Someone else saved categories while you were editing. Your changes are still here. Reload the latest categories, check your changes, then save again.' }
         : { kind: 'error', text: error.message });
@@ -164,7 +157,7 @@ export default function Categories() {
     run(async () => {
       const result = await api({ action: 'save', registryRevision: draftRevision, template: draft });
       const saved: Template = result.registry.categories.find((c: Template) => c.id === draft.id);
-      setData({ ...data, registry: result.registry }); select(saved, false, result.registry.revision);
+      queryClient.setQueryData<Overview>(keys.categories, previous => previous && { ...previous, registry: result.registry }); select(saved, false, result.registry.revision);
       const count = data.sources.filter(s => categoryOf(s) === saved.id).length;
       setNotice({ kind: 'done', text: `Saved. New captures in ${saved.name} use this template.${count ? ` ${plural(count, 'existing document')} keep their current analysis until you update them in Documents.` : ''}` });
       await load();
@@ -216,7 +209,7 @@ export default function Categories() {
 
   if (!data) return <main id="main" className="cat-page">
     <h1 className="cat-title">Categories</h1>
-    {loadError ? <div className="cat-notice error" role="alert"><p>{loadError}</p><button className="cat-button" onClick={() => load(true).catch(e => setLoadError(e.message))}><RefreshCw size={18} aria-hidden />Try again</button></div>
+    {loadError ? <div className="cat-notice error" role="alert"><p>{loadError}</p><button className="cat-button" onClick={() => void overview.refetch()}><RefreshCw size={18} aria-hidden />Try again</button></div>
       : <div className="cat-skeleton" role="status" aria-label="Loading categories"><span /><span /><span /></div>}
   </main>;
 
@@ -237,6 +230,12 @@ export default function Categories() {
       <p>{notice.text}</p>
       {notice.kind === 'conflict' && <button className="cat-button" disabled={busy} onClick={reloadKeepingDraft}><RefreshCw size={18} aria-hidden />Reload latest categories</button>}
       <button className="cat-icon" aria-label="Dismiss message" onClick={() => setNotice(undefined)}><X size={18} aria-hidden /></button>
+    </div>}
+
+    {blocker.status === 'blocked' && <div className="cat-notice conflict" role="alertdialog" aria-label="Unsaved changes">
+      <p>You have unsaved changes to {draft?.name || 'this new category'}. Leave and discard them?</p>
+      <div className="cat-row"><button className="cat-button danger" autoFocus onClick={() => blocker.proceed()}>Discard changes</button>
+        <button className="cat-button" onClick={() => { blocker.reset(); document.getElementById('template-name')?.focus(); }}>Keep editing</button></div>
     </div>}
 
     {pendingSwitch && <div className="cat-notice conflict" role="alertdialog" aria-label="Unsaved changes">
@@ -363,7 +362,7 @@ export default function Categories() {
               {s.assignment?.method === 'manual' && <span>Chosen by admin</span>}
               {s.needsUpdate && s.category && <span className="warn">Older template (version {s.category.templateRevision})</span>}
               {busyState && <span className={s.status === 'failed' ? 'bad' : 'live'}>{states[s.status]}</span>}
-              <a href={`/research/${s.id}/`}>Open</a>
+              <Link to="/sources/" search={{ source: s.id }}>Open</Link>
             </p>
           </div>
         </li>;
@@ -417,7 +416,7 @@ export default function Categories() {
           </header>
           <div className="cat-progress" aria-hidden><span style={{ width: `${(done / batch.entries.length) * 100}%` }} /><span className="bad" style={{ width: `${(failed / batch.entries.length) * 100}%` }} /></div>
           <ul>{[...batch.entries].sort((a, b) => order(a.status) - order(b.status)).map(entry => <li key={entry.sourceId}>
-            <a href={`/research/${entry.sourceId}/`}>{data.sources.find(s => s.id === entry.sourceId)?.title || entry.sourceId}</a>
+            <Link to="/sources/" search={{ source: entry.sourceId }}>{data.sources.find(s => s.id === entry.sourceId)?.title || entry.sourceId}</Link>
             <span className={`cat-state ${entry.status}`}>{states[entry.status] || entry.status}</span>
             {entry.error && <p>{entry.error}</p>}
             {entry.status === 'failed' && !batch.cancelled && <button className="cat-button quiet small" disabled={busy} onClick={() => batchAction('retry', batch.id, entry.sourceId)}><RotateCcw size={16} aria-hidden />Retry</button>}

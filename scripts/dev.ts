@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
-import { dev } from 'astro';
+import { createServer as createVite } from 'vite';
 import { createStore } from '../apps/worker/src/sql-store.js';
 import { readLibrary } from '../apps/worker/src/library.js';
 import { categoryOverview, startBatch, startPreview, getPreview, changeBatch } from '../apps/worker/src/category-work.js';
@@ -43,7 +43,8 @@ const api = createServer(async (request, response) => {
   } catch (error) { response.statusCode = (error as { status?: number }).status || 503; response.end(JSON.stringify({ error: (error as Error).message })); }
 });
 api.listen(7072, '127.0.0.1');
-const astro = await dev({ root: './apps/reader', server: { host: '0.0.0.0', port: 4360 }, vite: { server: { allowedHosts: ['m1.saiga-bleak.ts.net'], proxy: { '/api': 'http://127.0.0.1:7072' } } } });
+const vite = await createVite({ configFile: 'apps/reader/vite.config.ts', server: { host: '0.0.0.0', port: 4360, strictPort: true, allowedHosts: ['m1.saiga-bleak.ts.net'], proxy: { '/api': 'http://127.0.0.1:7072' } } });
+await vite.listen();
 console.log('Local reader ready. Notes, categories and source reading use the development SQL database. Model work requires npm run dev:worker with Foundry settings.');
-process.on('SIGINT', () => { void astro.stop().then(closeSql).finally(() => { api.close(); process.exit(); }); });
+process.on('SIGINT', () => { void vite.close().then(closeSql).finally(() => { api.close(); process.exit(); }); });
 await new Promise(() => {});

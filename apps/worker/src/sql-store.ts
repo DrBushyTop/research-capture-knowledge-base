@@ -9,6 +9,7 @@ import { buildSearchIndex } from '../../../shared/search.js';
 import { matchedSourceText } from '../../../shared/source-text.js';
 
 type Frame = { key: string; owner: string; controller: AbortController; revisions: Map<string, string | undefined>; parent?: Frame };
+const snapshots = new Map<string, { signature: string; promise: Promise<{ revision: string; sources: ChatCorpus['sources'] }> }>();
 export class SqlStore extends BlobStore {
   private readonly frames = new AsyncLocalStorage<Frame>();
   override get leaseSignal(): AbortSignal | undefined {
@@ -144,6 +145,16 @@ export class SqlStore extends BlobStore {
     const result = await (await this.request()).query('SELECT note_json,human_markdown FROM dbo.Sources WHERE active=1 ORDER BY captured_at DESC,source_id');
     return result.recordset.map(row => ({ note: noteSchema.parse(JSON.parse(row.note_json)), humanMarkdown: row.human_markdown }));
   }
+  async sourceInputs() {
+    const result = await (await this.request()).query(`SELECT s.source_id,t.document AS source_text,n.document AS reader_note
+      FROM dbo.Sources s
+      LEFT JOIN dbo.Records t ON t.record_key=N'source-text/'+s.generation_id+N'.json'
+      LEFT JOIN dbo.Records n ON n.record_key=N'reader-notes/'+s.source_id+N'.json'
+      WHERE s.active=1;`);
+    return new Map<string, { text?: unknown; readerNote?: { markdown: string } }>(result.recordset.map(row => [
+      row.source_id, { text: row.source_text ? JSON.parse(row.source_text) : undefined, readerNote: row.reader_note ? JSON.parse(row.reader_note) : undefined }
+    ]));
+  }
   async expireTemporaryRecords() {
     // Conversations, templates and reader notes are durable. Only transient chat records expire.
     await (await this.request()).query(`DELETE TOP (500) FROM dbo.Records
@@ -152,15 +163,29 @@ export class SqlStore extends BlobStore {
         OR record_key LIKE 'chat/assets/%' OR record_key LIKE 'chat/cancellations/%');`);
   }
   private async snapshot() {
+    const signatureRows = await (await this.request()).query(`SELECT source_id,generation_id,revision FROM dbo.Sources WHERE active=1 ORDER BY source_id;
+      SELECT record_key,revision FROM dbo.Records WHERE kind IN (N'source-text',N'reader-notes') ORDER BY record_key;`);
+    const signature = hash(JSON.stringify(signatureRows.recordsets));
+    const key = `${process.env.SQL_SERVER}/${process.env.SQL_DATABASE}/${process.env.SQL_CONNECTION_STRING ? 'local' : 'entra'}`;
+    const previous = snapshots.get(key);
+    if (previous?.signature === signature) return previous.promise;
+    const promise = this.buildSnapshot();
+    snapshots.set(key, { signature, promise });
+    promise.catch(() => { if (snapshots.get(key)?.promise === promise) snapshots.delete(key); });
+    return promise;
+  }
+  private async buildSnapshot() {
     const sources = await this.sources();
-    const documents = await Promise.all(sources.map(async ({ note, humanMarkdown }) => {
-      const text = await this.read(`source-text/${note.generationId}.json`);
+    const inputs = await this.sourceInputs();
+    const documents = sources.map(({ note, humanMarkdown }) => {
+      const input = inputs.get(note.source.id);
+      const text = input?.text;
       return { id: note.source.id, title: note.source.title, authors: note.source.authors.join(' '),
         type: note.source.itemType, category: note.schemaVersion === 2 ? note.category.id : '',
         year: note.source.publishedAt?.match(/\b(?:19|20)\d{2}\b/)?.[0] || 'Unknown',
         topics: (note.analysis?.topics || note.source.tags).join('\n'),
-        body: `${JSON.stringify(note.analysis)}\n${humanMarkdown}\n${text ? matchedSourceText(note, text) : ''}` };
-    }));
+        body: `${JSON.stringify(note.analysis)}\n${humanMarkdown}\n${input?.readerNote?.markdown || ''}\n${text ? matchedSourceText(note, text) : ''}` };
+    });
     const index = JSON.parse(JSON.stringify(buildSearchIndex(documents)));
     const revision = chatSnapshotRevision(hash('sql'), sources, index);
     await this.create(`chat/corpora/${revision}.json`, { revision, sources });

@@ -22,7 +22,8 @@ const handler = admin => async request => {
   if (uploading) url.searchParams.set('upload', '1');
   if (admin && request.query.has('preview')) url.searchParams.set('preview', request.query.get('preview'));
   if (!admin && !notes && request.method === 'GET') {
-    if (request.query.has('source') || request.query.has('document')) {
+    if (request.query.has('library')) url.searchParams.set('library', '1');
+    else if (request.query.has('source') || request.query.has('document')) {
       const field = request.query.has('source') ? 'source' : 'document';
       const id = request.query.get(field) || '';
       if (!/^zotero-(users|groups)-[0-9]+-[A-Z0-9]{8}$/.test(id)) return error(404, 'Document not found');

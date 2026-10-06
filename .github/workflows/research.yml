@@ -29,13 +29,11 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       id-token: write
     env:
       STORAGE_ACCOUNT: ${{ vars.STORAGE_ACCOUNT }}
       READER_MODE: private
-      SEARCH_SOURCE_TEXT: azure
-      IMPORT_PUSH: 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,11 +49,6 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - run: npm ci
-      - name: Import the current validated candidates
-        run: |
-          git config user.name 'research-capture-bot'
-          git config user.email 'research-capture-bot@users.noreply.github.com'
-          npm run import
       - run: npm run build:reader
       - name: Package the private chat proxy
         run: npm ci --prefix apps/chat-proxy --omit=dev
@@ -81,5 +74,3 @@ jobs:
           app-name: ${{ vars.FUNCTION_APP }}
           package: .function-package
           sku: flexconsumption
-      - name: Synchronize the deployed private chat corpus
-        run: npx tsx scripts/sync-chat-corpus.ts

@@ -6,6 +6,6 @@ await mkdir(destination + '/sandbox', { recursive: true });
 await copyFile('apps/worker/sandbox/evidence.py', destination + '/sandbox/evidence.py');
 await build({ entryPoints: ['apps/worker/src/index.ts'], bundle: true, platform: 'node', target: 'node22', format: 'esm', packages: 'external', outfile: destination + '/dist/index.js', sourcemap: false });
 const pkg = JSON.parse(await readFile('package.json', 'utf8'));
-const dependencies = Object.fromEntries(Object.entries(pkg.dependencies).filter(([name]) => name.startsWith('@azure/') || ['@mozilla/readability', 'pdfjs-dist', 'jsdom', 'ipaddr.js', 'zod', 'minisearch'].includes(name)));
+const dependencies = Object.fromEntries(Object.entries(pkg.dependencies).filter(([name]) => name.startsWith('@azure/') || ['@mozilla/readability', 'pdfjs-dist', 'jsdom', 'ipaddr.js', 'zod', 'minisearch', 'mssql', 'marked', 'sanitize-html'].includes(name)));
 await writeFile(destination + '/package.json', JSON.stringify({ name: 'research-worker', private: true, type: 'module', main: 'dist/index.js', dependencies }, null, 2));
 await copyFile('apps/worker/host.json', destination + '/host.json');

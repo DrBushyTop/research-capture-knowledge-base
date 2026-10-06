@@ -1,5 +1,6 @@
 import { canonical, hash, normalize, type LibrarySnapshot, type SourceSnapshot } from '../../../shared/corpus.js';
 import type { Registry, Template, CategoryAssignment } from '../../../shared/categories.js';
+import type { Note } from '../../../shared/corpus.js';
 
 export interface PipelineStore {
   readonly leaseSignal?: AbortSignal;
@@ -8,6 +9,7 @@ export interface PipelineStore {
   create(key: string, value: unknown): Promise<void>;
   list(prefix: string): Promise<string[]>;
   withLease<T>(key: string, fn: () => Promise<T>): Promise<T>;
+  publishNote?(note: Note): Promise<void>;
 }
 export interface CategoryPlan { registry: Registry; assignment?: CategoryAssignment; template?: Template; batchId?: string; preserveExisting?: boolean; }
 export interface Job { id: string; source: SourceSnapshot['source']; snapshotKey: string; status: 'pending' | 'staged' | 'imported' | 'failed'; attempts: number; dispatches?: number; observedAt: string; lastQueuedAt?: string; error?: string; retryAt?: string; categoryPlan?: CategoryPlan; }

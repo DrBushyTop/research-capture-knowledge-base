@@ -1,5 +1,5 @@
 ---
 import Layout from '../../components/Layout.astro';
-import SourceList from '../../components/SourceList.astro';
+import Sources from '../../components/Sources';
 ---
-<Layout title="Sources"><div class="sources-shell is-index"><SourceList /><main id="main" class="reading-pane reading-empty"><p>Select a source to read it here.</p></main></div></Layout>
+<Layout title="Sources"><Sources client:only="react" /></Layout>

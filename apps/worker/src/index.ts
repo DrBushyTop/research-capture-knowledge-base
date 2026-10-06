@@ -2,7 +2,7 @@ import { app, type HttpResponseInit } from '@azure/functions';
 import { DefaultAzureCredential } from '@azure/identity';
 import { SecretClient } from '@azure/keyvault-secrets';
 import { processingVersion } from '../../../shared/corpus.js';
-import { BlobStore } from './storage.js';
+import { createStore } from './sql-store.js';
 import { Zotero } from './zotero.js';
 import { discover, reconcile } from './pipeline.js';
 import { extract } from './extraction.js';
@@ -19,8 +19,9 @@ import { readChatFile } from './chat-files.js';
 import { readSourceDocument, readSourceText } from './source-reader.js';
 import { chatUploadLimits, readUpload, saveUpload } from './chat-uploads.js';
 import { readReaderNote, saveReaderNote } from './reader-notes.js';
+import { readLibrary } from './library.js';
 const required = (name: string) => { const value = process.env[name]; if (!value) throw new Error(`Missing configuration: ${name}`); return value; };
-const store = () => new BlobStore(required('STORAGE_ACCOUNT'));
+const store = createStore;
 let zoteroPromise: Promise<Zotero> | undefined;
 async function zotero() {
   return zoteroPromise ??= (async () => {
@@ -49,6 +50,7 @@ app.http('chatGateway', {
     try {
       const owner = readerIdentity(request.headers.get('x-ms-client-principal'));
       const state = store();
+      if (request.method === 'GET' && request.query.has('library')) return { status: 200, jsonBody: await readLibrary(state), headers: { 'Cache-Control': 'private, no-store' } };
       if (request.query.has('notes')) {
         const headers = { 'Cache-Control': 'private, no-store' };
         if (request.method === 'GET') return { status: 200, jsonBody: await readReaderNote(state, request.query.get('notes') || ''), headers };

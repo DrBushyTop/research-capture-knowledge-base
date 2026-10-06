@@ -1,3 +1,7 @@
+# Current SQL storage
+
+The SQL cutover replaces the Git import and Blob JSON paths described in older sections of this document. See [SQL operations and local development](sql.md) for the authoritative current workflow. Original artifacts and queue delivery still use Azure Storage.
+
 # Development operations
 
 The GitHub map is the canonical plan and ticket tracker. This file explains how to operate the implementation.

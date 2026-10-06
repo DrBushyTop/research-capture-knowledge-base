@@ -4,6 +4,8 @@ param vaultName string = 'kv-research-dev-16681c6a'
 param bootstrapPrincipalId string
 param processingVersion string = '2'
 param readerGithubUsers string = 'pinaatti,DrBushyTop'
+param sqlServer string = 'sql-research-dev-16681c6a.database.windows.net'
+param sqlDatabase string = 'research'
 param sandboxSnapshot string = '4daeeb76-0b95-4d8b-9c36-32ea7167fcde'
 param githubSubject string = 'repo:DrBushyTop@22717844/research-capture-knowledge-base@1405750793:ref:refs/heads/master'
 var tags = { application: 'research-capture-knowledge-base', environment: 'development' }
@@ -171,6 +173,8 @@ resource settings 'Microsoft.Web/sites/config@2024-04-01' = {
     AzureWebJobsStorage__credential: 'managedidentity'
     AzureWebJobsStorage__clientId: workerIdentity.properties.clientId
     STORAGE_ACCOUNT: storage.name
+    SQL_SERVER: sqlServer
+    SQL_DATABASE: sqlDatabase
     AZURE_CLIENT_ID: workerIdentity.properties.clientId
     KEY_VAULT_URI: vault.properties.vaultUri
     FOUNDRY_ENDPOINT: 'https://${ai.name}.openai.azure.com'

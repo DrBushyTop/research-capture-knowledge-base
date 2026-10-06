@@ -20,7 +20,7 @@ A private personal corpus for research, news, recipes, guides, social posts and 
 
 ## Operating Context
 
-Capture happens in Zotero. Processing happens asynchronously. Canonical notes are Markdown and JSON in a private GitHub repository. The signed-in reader offers search, filters and freeform chat. The Categories page edits templates (name, when to use, ordered analysis sections shown as paragraph, bullets or numbered steps), previews a draft on one saved document, and starts separate document updates. Saving affects future captures only. Settings are versioned privately; no Git or JSON editing. The reader is private only. Public presentation is deferred and has no UI.
+Capture happens in Zotero. Processing happens asynchronously. Canonical source notes, human notes, categories and processing records are in Azure SQL Database. PDFs and images remain in private Blob Storage. Git contains code and historical Markdown exports. The signed-in reader offers search, filters and freeform chat. The Categories page edits templates (name, when to use, ordered analysis sections shown as paragraph, bullets or numbered steps), previews a draft on one saved document, and starts separate document updates. Saving affects future captures only. Settings are versioned privately; no Git or JSON editing. The reader is private only. Public presentation is deferred and has no UI.
 
 ## Capabilities and Constraints
 

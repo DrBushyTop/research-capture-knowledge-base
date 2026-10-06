@@ -1,10 +1,8 @@
-import { BlobStore } from '../apps/worker/src/storage.js';
+import { createStore } from '../apps/worker/src/sql-store.js';
 import { type Job, type SourceState } from '../apps/worker/src/pipeline.js';
 import { sourceId } from '../shared/corpus.js';
 import { reprocessSource } from '../apps/worker/src/reprocessing.js';
-const account = process.env.STORAGE_ACCOUNT;
-if (!account) throw new Error('STORAGE_ACCOUNT is required');
-const store = new BlobStore(account);
+const store = createStore();
 const [command, id] = process.argv.slice(2);
 if (command === 'status') {
   const jobs: Record<string, number> = {};

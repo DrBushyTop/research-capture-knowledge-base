@@ -58,3 +58,7 @@ The person who configures categories and templates, corrects category assignment
 
 **Publication status**:
 An explicit decision about a source's eligibility for public presentation or redistribution. Eligibility to publish a summary and eligibility to distribute a source artifact are separate decisions.
+
+## Persistence
+
+Azure SQL Database is authoritative for source notes, category revisions and assignments, human notes, processing state and conversations. Blob Storage holds source artifacts and temporary binary files. Git is not a runtime database. A completed processing job updates the live reader without publishing another static build.

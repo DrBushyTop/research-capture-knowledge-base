@@ -99,7 +99,8 @@ export async function processJob(store: PipelineStore, id: string, processor: Pr
     const desired = await store.read<SourceState>(`sources/${found.source.id}.json`);
     if (desired?.generationId !== id) return;
     await store.create(`staged/${id}.json`, noteSchema.parse(note));
-    await store.write(`jobs/${id}.json`, { ...job, status: 'staged', retryAt: undefined, error: undefined });
+    if (store.publishNote) await store.publishNote(note);
+    await store.write(`jobs/${id}.json`, { ...job, status: store.publishNote ? 'imported' : 'staged', retryAt: undefined, error: undefined });
     } catch (error) {
       await store.write(`jobs/${id}.json`, { ...job, status: job.attempts >= 5 ? 'failed' : 'pending',
         retryAt: new Date(Date.now() + 5 * 60_000).toISOString(), error: 'Worker failed; source snapshot retained for operator recovery' });

@@ -1,6 +1,11 @@
 {
   "routes": [
     {
+      "route": "/research/*",
+      "rewrite": "/sources/index.html",
+      "allowedRoles": ["library_member"]
+    },
+    {
       "route": "/.auth/login/aad",
       "statusCode": 404
     },

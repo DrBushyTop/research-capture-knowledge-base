@@ -24,3 +24,7 @@ Source pages support shared reader notes without switching to Zotero. Saves use 
 Public publishing is deferred. The build accepts private mode only, and the current UI has no publication controls. Existing rights records remain available for a future publishing design.
 
 See [operations](docs/operations.md) for infrastructure, identity, replay, reprocessing, conflicts, retention, costs and the remaining human acceptance checks. See [the brief](research-capture-knowledge-base-plan.md) for the original scope and [research](docs/research/) for the technical evidence.
+
+## SQL-backed application data
+
+Azure SQL Database Standard S0, 10 DTUs, now owns current source notes, processing records, categories, human notes, and conversations. Original files remain private blobs. The reader fetches live SQL data; reprocessing no longer requires a Git commit or deployment. Earlier Git-corpus instructions below describe the retired path. See [SQL setup, local development, migration, and recovery](docs/sql.md).

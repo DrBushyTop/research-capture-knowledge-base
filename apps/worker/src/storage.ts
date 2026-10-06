@@ -14,11 +14,14 @@ export class BlobStore implements PipelineStore {
   private readonly leases = new AsyncLocalStorage<LeaseFrame>();
   constructor(account: string) {
     const credential = new DefaultAzureCredential();
-    const blobs = new BlobServiceClient(`https://${account}.blob.core.windows.net`, credential, { retryOptions: { maxTries: 1, tryTimeoutInMs: 15_000 } });
+    const blobs = process.env.AZURITE_CONNECTION_STRING ? BlobServiceClient.fromConnectionString(process.env.AZURITE_CONNECTION_STRING)
+      : new BlobServiceClient(`https://${account}.blob.core.windows.net`, credential, { retryOptions: { maxTries: 1, tryTimeoutInMs: 15_000 } });
     this.container = blobs.getContainerClient('pipeline');
     this.raw = blobs.getContainerClient('raw');
-    this.queue = new QueueServiceClient(`https://${account}.queue.core.windows.net`, credential).getQueueClient('processing');
-    this.chatQueue = new QueueServiceClient(`https://${account}.queue.core.windows.net`, credential).getQueueClient('chat');
+    const queues = process.env.AZURITE_CONNECTION_STRING ? QueueServiceClient.fromConnectionString(process.env.AZURITE_CONNECTION_STRING)
+      : new QueueServiceClient(`https://${account}.queue.core.windows.net`, credential);
+    this.queue = queues.getQueueClient('processing');
+    this.chatQueue = queues.getQueueClient('chat');
   }
   get leaseSignal(): AbortSignal | undefined {
     const signals: AbortSignal[] = [];

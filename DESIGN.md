@@ -303,3 +303,7 @@ Copy states the action and its effect. No slogans.
 - Don't apply shadows to the reader's flat rows and reading page.
 
 Not canonized: the standalone sign-in page uses system-ui for its display heading and body instead of the shared reader type system. This existing drift remains outside the recorded typography rules; this documentation pass does not repair it.
+
+## Live source data
+
+The Sources React island loads current notes from the private library endpoint. Source selection updates the reading pane and URL without a page reload. Search indexes metadata, generated analysis, human notes and available source text in the browser. Existing source links continue to work through the Sources shell.

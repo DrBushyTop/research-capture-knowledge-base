@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Popover from '@radix-ui/react-popover';
-import { ArrowUp, Check, ChartColumn, Copy, ExternalLink, FileSearch, FileText, GitCompare, History, ImagePlus, Link, Minus, NotebookPen, Plus, RotateCcw, SearchCheck, Square, SquarePen, Trash2, X } from 'lucide-react';
+import { ArrowUp, BookOpen, Check, ChartColumn, Copy, ExternalLink, Eye, FileSearch, FileText, GitCompare, History, ImagePlus, Link, MessageSquareText, Minus, NotebookPen, PenLine, Plus, RotateCcw, Search, SearchCheck, Square, SquarePen, Trash2, X } from 'lucide-react';
 import { Conversation, ConversationContent, ConversationScrollButton } from './ai-elements/conversation';
 import { Message, MessageContent, MessageResponse } from './ai-elements/message';
 import { InlineCitation, InlineCitationQuote, InlineCitationSource } from './ai-elements/inline-citation';
@@ -16,7 +16,7 @@ import '../styles/chat.css';
 
 type Result = NonNullable<ChatJob['result']>;
 type Citation = Result['citations'][number];
-type Turn = { jobId: string; question: string; images?: ChatImage[]; result?: Result; failure?: string; activities?: ChatActivity[] };
+type Turn = { jobId: string; question: string; images?: ChatImage[]; result?: Result; failure?: string; activities?: ChatActivity[]; workedMs?: number; draft?: string };
 type Active = { id: string; conversationId: string; question: string; images?: ChatImage[] };
 type Draft = { key: string; preview: string; status: 'uploading' | 'ready' | 'failed'; image?: ChatImage; error?: string };
 const endpoint = '/api/chat';
@@ -207,6 +207,58 @@ function UserImages({ images }: { images: ChatImage[] }) {
   </ImageDialog>)}</div>;
 }
 
+const stepIcon = { search_corpus: Search, read_source: BookOpen, inspect_media: Eye, commentary: MessageSquareText };
+/** Present-tense label for the live status line. Only real tool events and the model's own commentary reach here. */
+function stepLabel(step: ChatActivity) {
+  if (step.tool === 'commentary') return step.title;
+  if (step.tool === 'search_corpus') return step.title === 'All sources' ? 'Listing saved sources' : `Searching saved sources: ${step.title}`;
+  return `${step.tool === 'inspect_media' ? 'Viewing' : 'Reading'} ${step.title}`;
+}
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+function stepSummary(steps: ChatActivity[], workedMs?: number) {
+  const count = (tool: ChatActivity['tool']) => steps.filter(step => step.tool === tool).length;
+  const parts = [count('search_corpus') && plural(count('search_corpus'), 'search', 'searches'), count('read_source') && plural(count('read_source'), 'source read', 'source reads'),
+    count('inspect_media') && plural(count('inspect_media'), 'page viewed', 'pages viewed')].filter(Boolean);
+  const seconds = workedMs ? Math.max(1, Math.round(workedMs / 1000)) : 0;
+  const time = seconds ? `Worked for ${seconds >= 60 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`}` : '';
+  return [time, parts.join(', ')].filter(Boolean).join(' · ') || plural(steps.length, 'step', 'steps');
+}
+
+/** Expandable record of what the answer actually did. While running its summary is the latest step. */
+function Steps({ steps, summary, live = false }: { steps: ChatActivity[]; summary: ReactNode; live?: boolean }) {
+  return <details className={`chat-steps${live ? ' is-live' : ''}`}>
+    <summary>{summary}</summary>
+    <ol>{steps.map((step, i) => {
+      const Icon = stepIcon[step.tool] || Search;
+      return <li key={step.id || `c${i}`} className={step.tool === 'commentary' ? 'is-commentary' : undefined}>
+        <Icon size={15} aria-hidden="true" />
+        <span>{step.tool === 'commentary' ? step.title : <>{stepLabel(step)}{step.detail && <small> · {step.detail}</small>}</>}</span>
+      </li>;
+    })}</ol>
+  </details>;
+}
+
+function Working({ turn, stopping, busy, retry }: { turn: Turn; stopping: boolean; busy: boolean; retry: () => void }) {
+  const steps = turn.activities || [];
+  const latest = steps.at(-1);
+  const commentary = [...steps].reverse().find(step => step.tool === 'commentary');
+  const label = stopping ? 'Stopping…' : turn.draft ? 'Writing the answer' : latest ? stepLabel(latest) : 'Answering…';
+  const LiveIcon = turn.draft ? PenLine : latest ? stepIcon[latest.tool] : undefined;
+  return <div className="chat-working" aria-busy={!turn.failure}>
+    {!turn.failure && commentary && !turn.draft && <p className="chat-commentary">{commentary.title}</p>}
+    {turn.failure ? <p>{turn.failure}</p> : !steps.length ? <p className="chat-live"><span className="chat-pulse" aria-hidden="true" />{label}</p> : null}
+    {!!steps.length && <Steps steps={steps} live={!turn.failure} summary={turn.failure ? stepSummary(steps) : <span className="chat-live"><span className="chat-pulse" aria-hidden="true" />{LiveIcon && <LiveIcon size={15} aria-hidden="true" />}<span>{label}</span></span>} />}
+    {turn.draft && <div className={`chat-draft${turn.failure ? ' is-partial' : ''}`}>
+      {turn.failure && <p className="chat-draft-note">Partial answer, not verified. Citations are not available yet.</p>}
+      <MessageResponse className="chat-markdown" mode="static" controls={false} components={{
+        a: ({ href, children }) => safeUrl(href) ? <a href={href} target="_blank" rel="noreferrer">{children}</a> : <span>{children}</span>,
+        img: ({ alt }) => <span>{alt}</span>
+      }}>{turn.draft}</MessageResponse>
+    </div>}
+    {turn.failure && <button className="chat-retry" type="button" disabled={busy} onClick={retry}>Retry</button>}
+  </div>;
+}
+
 function Answer({ turn }: { turn: Turn & { result: Result } }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -218,6 +270,7 @@ function Answer({ turn }: { turn: Turn & { result: Result } }) {
     try { await navigator.clipboard.writeText(turn.result.answer.replace(/\s*\[e_[a-f0-9]{16}\]/g, '')); setCopied(true); timer.current = setTimeout(() => setCopied(false), 2000); } catch { /* Clipboard permission can be unavailable. */ }
   };
   return <Message from="assistant" className="chat-message chat-assistant"><MessageContent>
+    {!!turn.activities?.length && <Steps steps={turn.activities} summary={stepSummary(turn.activities, turn.workedMs)} />}
     <MessageResponse className="chat-markdown" mode="static" controls={false} components={{
       a: ({ href, children }) => {
         const ids = href?.match(/^#cite-((?:e_[a-f0-9]{16},?)+)$/)?.[1].split(',');
@@ -331,7 +384,7 @@ export default function Chat({ source, embedded = false, onClose }: Props = {}) 
     if (!active) return;
     const value = job.data;
     if (value) {
-      patchLocal(active.id, { result: value.result, activities: value.activities,
+      patchLocal(active.id, { result: value.result, activities: value.activities, draft: value.draft,
         failure: value.status === 'failed' ? value.error || 'No answer returned. Try again.' : value.status === 'cancelled' ? 'Stopped' : undefined });
       if (terminalJob(value.status)) {
         finish();
@@ -504,11 +557,7 @@ export default function Chat({ source, embedded = false, onClose }: Props = {}) 
                 {!!turn.images?.length && <UserImages images={turn.images} />}
                 {turn.question && <p>{turn.question}</p>}
               </MessageContent></Message>
-              {turn.result ? <Answer turn={turn as Turn & { result: Result }} /> : <div className="chat-working">
-                <p>{turn.failure || (stopping && turn.jobId === active?.id ? 'Stopping…' : 'Answering…')}</p>
-                {turn.failure && <button className="chat-retry" type="button" disabled={busy} onClick={() => void send(turn)}>Retry</button>}
-                {!!turn.activities?.length && <details><summary>Activity</summary><ul>{turn.activities.map((item, i) => <li key={i}>{item.tool === 'search_corpus' ? item.title : `${item.tool === 'inspect_media' ? 'Viewing' : 'Reading'}: ${item.title}`}</li>)}</ul></details>}
-              </div>}
+              {turn.result ? <Answer turn={turn as Turn & { result: Result }} /> : <Working turn={turn} stopping={stopping && turn.jobId === active?.id} busy={busy} retry={() => void send(turn)} />}
             </div>)}
           </ConversationContent>
           <ConversationScrollButton aria-label="Scroll to latest message" className="chat-scroll-button" />

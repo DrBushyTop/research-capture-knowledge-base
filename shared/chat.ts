@@ -18,7 +18,11 @@ export type ChatCorpus = z.infer<typeof chatCorpusSchema>;
 export const chatSnapshotRevision = (gitRevision: string, sources: ChatCorpus['sources'], index: unknown) => hash(JSON.stringify({ gitRevision, sources, index }));
 export interface Evidence { id: string; sourceId: string; generationId: string; title: string; label?: string; kind: 'source' | 'machine' | 'human' | 'metadata' | 'visual'; locator: string; text: string; sourceUrl?: string | null; pdf?: boolean; assetId?: string; }
 export interface ChatAsset { id: string; sourceId: string; title: string; kind: 'image' | 'pdf' | 'site'; mime: string; page: number | null; blobKey?: string; artifactHash?: string; sourceUrl?: string; originJobId?: string; }
-export interface ChatActivity { tool: string; title: string; sourceId?: string; }
+/**
+ * One real step of an answer. Tool steps are upserted by id when they start and again with their outcome.
+ * `commentary` is a short update the model wrote for the reader before a tool call, never its hidden reasoning.
+ */
+export interface ChatActivity { id?: string; tool: 'search_corpus' | 'read_source' | 'inspect_media' | 'commentary'; title: string; sourceId?: string; detail?: string; }
 export interface ChatUpload { id: string; owner: string; mime: 'image/png' | 'image/jpeg' | 'image/webp'; bytes: number; width: number; height: number; createdAt: string; }
 export type ChatImage = Pick<ChatUpload, 'id' | 'mime' | 'width' | 'height'>;
 // Short pill text for an inline citation: site, first author or shortened title.
@@ -72,6 +76,8 @@ export function validateAnswer(input: unknown, evidence: Evidence[], assets: Cha
   });
   return { ...answer, citations, attachments };
 }
-export interface ChatJob { id: string; owner: string; corpusRevision: string; conversationId?: string; request: ChatRequest; images?: ChatImage[]; createdAt: string; status: 'pending' | 'running' | 'complete' | 'failed' | 'cancelled'; attempts: number; lastQueuedAt?: string; retryAt?: string; sandboxId?: string; result?: ReturnType<typeof validateAnswer>; activities?: ChatActivity[]; error?: string; }
+export interface ChatJob { id: string; owner: string; corpusRevision: string; conversationId?: string; request: ChatRequest; images?: ChatImage[]; createdAt: string; status: 'pending' | 'running' | 'complete' | 'failed' | 'cancelled'; attempts: number; lastQueuedAt?: string; retryAt?: string; sandboxId?: string; result?: ReturnType<typeof validateAnswer>; activities?: ChatActivity[]; error?: string;
+  /** Complete Markdown blocks streamed so far by the current attempt. Unverified; the validated result replaces it. */
+  draft?: string; startedAt?: string; }
 export interface ChatSourceContext { sourceId: string; title: string; }
-export interface ChatConversation { id: string; owner: string; createdAt: string; updatedAt: string; sourceContext?: ChatSourceContext; turns: { jobId: string; question: string; images?: ChatImage[]; result: NonNullable<ChatJob['result']> }[]; }
+export interface ChatConversation { id: string; owner: string; createdAt: string; updatedAt: string; sourceContext?: ChatSourceContext; turns: { jobId: string; question: string; images?: ChatImage[]; result: NonNullable<ChatJob['result']>; activities?: ChatActivity[]; workedMs?: number }[]; }

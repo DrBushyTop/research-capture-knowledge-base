@@ -63,3 +63,20 @@ it('gives the model the starting document while allowing it to read another sour
   });
   expect(calls).toEqual([{ sourceId: other, section: 'analysis', query: '', page: null }]);
 });
+it('reports authored commentary and streamed drafts, and clears a draft whose answer fails validation', async () => {
+  const steps: unknown[] = []; const drafts: string[] = [];
+  const tools: ChatTools = { evidence: [], assets: [], execute: async () => ({ content: { total: 0, results: [] } }),
+    progress: async step => { steps.push(step); }, draft: async text => { drafts.push(text); } };
+  let rounds = 0;
+  const answer = await discuss(job, undefined, tools, undefined, async (_messages, _definitions, _signal, onText) => {
+    rounds++;
+    if (rounds === 1) return { tool_calls: [{ id: 'search', type: 'function', function: { name: 'search_corpus', arguments: JSON.stringify({ query: 'atlas', offset: 0, limit: 5 }) } }],
+      responseItems: [{ type: 'message', phase: 'commentary', content: [{ type: 'output_text', text: 'I will search for Atlas [e_0123456789abcdef].' }] }] };
+    const text = JSON.stringify({ ...result, answer: rounds === 2 ? 'First block [e_0000000000000000].\n\nSecond' : 'Verified first block.\n\nSecond' });
+    for (let end = 1; end <= text.length; end++) await onText?.(text.slice(0, end));
+    return { content: text };
+  });
+  expect(steps).toEqual([{ tool: 'commentary', title: 'I will search for Atlas.' }]);
+  expect(drafts).toEqual(['First block.', '', 'Verified first block.']);
+  expect(answer.answer.answer).toBe('Verified first block.\n\nSecond');
+});

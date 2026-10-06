@@ -207,11 +207,11 @@ it('reuses cached data, cancels fetches and stops job polling at a final state',
     const observer = new QueryObserver(observerClient, jobQuery('job9'));
     const stop = observer.subscribe(() => {});
     await vi.advanceTimersByTimeAsync(0);
-    await vi.advanceTimersByTimeAsync(4100);
+    await vi.advanceTimersByTimeAsync(2050);
     const running = calls.filter(call => call.includes('id=job9')).length;
     expect(running).toBe(3);
     status = 'complete';
-    await vi.advanceTimersByTimeAsync(2100);
+    await vi.advanceTimersByTimeAsync(1050);
     await vi.advanceTimersByTimeAsync(10_000);
     expect(calls.filter(call => call.includes('id=job9')).length).toBe(running + 1);
     stop();

@@ -34,11 +34,33 @@ export async function corpusTools(store: BlobStore, corpus: ChatCorpus, job: Cha
     if (note.extraction.artifactHash && note.extraction.method === 'pdf-text') result.push(await register({ ...base, id: 'a_' + hash(`${note.generationId}:pdf`).slice(0, 16), kind: 'pdf', mime: 'application/pdf', artifactHash: note.extraction.artifactHash }));
     return result;
   };
+  let step = 0; let current: ChatActivity | undefined;
+  const start = async (activity: ChatActivity) => { current = { id: String(++step), ...activity }; await progress(current); };
   const execute = async (name: ChatToolName, input: unknown) => {
+    current = undefined;
+    const output = await run(name, input).catch(async error => {
+      const started = current as ChatActivity | undefined;
+      if (started && !signal.aborted) await progress({ ...started, detail: 'Unavailable' });
+      throw error;
+    });
+    // run() sets current when the step actually starts.
+    const started = current as ChatActivity | undefined;
+    if (started) {
+      const content = output.content as { total?: number; results?: unknown[]; passages?: unknown[]; unavailable?: string; pageCount?: number };
+      const found = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+      const detail = content.unavailable ? 'No retained document'
+        : name === 'search_corpus' ? found(content.total || 0, 'source found', 'sources found')
+        : name === 'inspect_media' ? [started.detail, content.passages?.length ? 'viewed' : 'unavailable'].filter(Boolean).join(' ')
+        : [started.detail, found(content.passages?.length || 0, 'passage', 'passages')].filter(Boolean).join(' · ');
+      await progress({ ...started, detail });
+    }
+    return output;
+  };
+  const run = async (name: ChatToolName, input: unknown) => {
     signal.throwIfAborted();
     if (name === 'search_corpus') {
       const { query, offset, limit } = chatToolSchemas.search_corpus.parse(input);
-      await progress({ tool: name, title: query ? `Search: ${query}` : 'Sources' });
+      await start({ tool: name, title: query || 'All sources' });
       const ids = query.trim() ? rankEvidenceSources(index, query) : corpus.sources.map(source => source.note.source.id);
       const results = [];
       for (const id of ids.slice(offset, offset + limit)) {
@@ -57,7 +79,7 @@ export async function corpusTools(store: BlobStore, corpus: ChatCorpus, job: Cha
     const params = name === 'read_source' ? chatToolSchemas.read_source.parse(input) : chatToolSchemas.inspect_media.parse(input);
     const source = corpus.sources.find(source => source.note.source.id === params.sourceId);
     if (!source) throw new Error('Source unavailable');
-    await progress({ tool: name, title: source.note.source.title, sourceId: params.sourceId });
+    await start({ tool: name, title: source.note.source.title, sourceId: params.sourceId, ...(params.page ? { detail: `Page ${params.page}` } : 'section' in params && params.section !== 'source' ? { detail: { analysis: 'Generated analysis', notes: 'Human notes', metadata: 'Source facts' }[params.section] } : {}) });
     const available = await availableAssets(source);
     if (name === 'read_source' && 'section' in params && params.section !== 'source') {
       const kind = { analysis: 'machine', notes: 'human', metadata: 'metadata' }[params.section] as Evidence['kind'];
@@ -99,5 +121,5 @@ export async function corpusTools(store: BlobStore, corpus: ChatCorpus, job: Cha
     }
     return urls;
   };
-  return { execute, remember, images, evidence, assets };
+  return { execute, remember, images, progress, evidence, assets };
 }

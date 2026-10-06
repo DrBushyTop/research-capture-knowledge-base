@@ -9,7 +9,7 @@ export type LibraryEntry = { note: Note; humanHtml: string; searchText: string }
 export type SourceContext = { sourceId: string; title: string };
 export type HistoryItem = { id: string; title: string; updatedAt: string; sourceContext?: SourceContext };
 export type Conversation = ChatConversation & { sourceContext?: SourceContext };
-export type JobStatus = { status: ChatJob['status']; result?: NonNullable<ChatJob['result']>; activities?: ChatActivity[]; error?: string };
+export type JobStatus = { status: ChatJob['status']; result?: NonNullable<ChatJob['result']>; activities?: ChatActivity[]; draft?: string; error?: string };
 export type CategorySource = { id: string; title: string; category: { id: string; name: string; templateRevision: number; assignment?: string } | null; assignment?: { categoryId: string; method: string }; needsUpdate: boolean; status: string };
 export type Batch = { id: string; createdAt: string; cancelled: boolean; entries: { sourceId: string; status: string; error?: string }[] };
 export type Overview = { registry: Registry; sources: CategorySource[]; batches: Batch[] };
@@ -78,8 +78,8 @@ const finalJobError = (error: unknown) => [400, 401, 403, 404, 410].includes((er
 export const jobQuery = (jobId: string) => queryOptions({
   queryKey: keys.job(jobId),
   queryFn: ({ signal }) => getJson<JobStatus>(`${chat}?id=${id(jobId)}`, signal, 'Chat is unavailable. Try again.'),
-  // Poll every 2 s while the answer runs; back off to 5 s after a temporary failure; stop at a final state or a final error.
-  refetchInterval: query => terminalJob(query.state.data?.status) || finalJobError(query.state.error) ? false : query.state.error ? 5000 : 2000,
+  // Poll every second while the answer runs so new steps and finished paragraphs appear promptly; back off to 5 s after a temporary failure.
+  refetchInterval: query => terminalJob(query.state.data?.status) || finalJobError(query.state.error) ? false : query.state.error ? 5000 : 1000,
   refetchIntervalInBackground: true,
   retry: false,
   staleTime: 0,

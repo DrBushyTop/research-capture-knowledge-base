@@ -309,3 +309,9 @@ Not canonized: the standalone sign-in page uses system-ui for its display headin
 The Sources React island loads current notes from the private library endpoint. Source selection updates the reading pane and URL without a page reload. Search indexes metadata, generated analysis, human notes and available source text in the browser. Existing source links continue to work through the Sources shell.
 
 Chat and Sources render their full-height shells before JavaScript hydration. Astro swaps routes without browser snapshot animation. Static route documents stay in tab memory for one minute. Sources keep the last successful library response in tab memory for five minutes and show it immediately on a revisit while checking the private API again. A rejected session clears that data; logout, note saves and category mutations invalidate it. Private corpus data is not stored in browser persistent storage. Source conversations and answer Markdown load only when needed.
+
+## Chat progress
+
+During a reply, the collapsed activity summary names the latest actual tool action or answer writing. Expanding it shows tool queries, source titles and available outcomes. Short model-authored commentary remains separate from tool steps and never displays hidden reasoning. Completed turns retain their action history and elapsed time.
+
+Answers display complete Markdown blocks as the worker produces them. Tables and code fences remain buffered until complete; validated final answers replace provisional text and add citations. Stopped or failed drafts are labelled unverified and are not saved as completed conversation turns. Live indicators respect reduced motion, and progress does not force readers away from their current scroll position.

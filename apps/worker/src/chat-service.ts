@@ -76,7 +76,7 @@ export async function chatStatus(store: PipelineStore, owner: string, id: string
   if (!job || job.owner !== owner || Date.now() - Date.parse(job.createdAt) > 24 * 60 * 60_000 || (job.conversationId && await deleted(store, owner, job.conversationId))) throw new ChatAccessError(404, 'Question not found');
   const saved = job.status !== 'complete' ? await savedAnswer(store, job) : undefined;
   if (saved) return { id: job.id, conversationId: job.conversationId, status: 'complete' as const, result: saved, activities: job.activities, error: undefined };
-  return { id: job.id, conversationId: job.conversationId, status: job.status, result: job.result, activities: job.activities, error: job.error };
+  return { id: job.id, conversationId: job.conversationId, status: job.status, result: job.result, activities: job.activities, draft: job.draft, error: job.error };
 }
 const tombstone = (owner: string, id: string) => `chat/conversations/${owner}/${id}.deleted.json`;
 const deleted = async (store: PipelineStore, owner: string, id: string) => !!await store.read(tombstone(owner, id));
@@ -156,7 +156,7 @@ export async function reconcileChat(store: PipelineStore, send: (id: string) => 
     }).catch(error => { if ((error as { statusCode?: number }).statusCode !== 409) throw error; });
   }
 }
-export async function processChatJob(store: PipelineStore, id: string, answer: (corpus: ChatCorpus, job: ChatJob, recordSandbox: (id: string) => Promise<void>, conversation: ChatConversation | undefined, progress: (activity: ChatActivity) => Promise<void>, signal: AbortSignal) => Promise<{ answer: unknown; evidence: Evidence[]; assets?: ChatAsset[] }>) {
+export async function processChatJob(store: PipelineStore, id: string, answer: (corpus: ChatCorpus, job: ChatJob, recordSandbox: (id: string) => Promise<void>, conversation: ChatConversation | undefined, progress: (activity: ChatActivity) => Promise<void>, signal: AbortSignal, draft: (text: string) => Promise<void>) => Promise<{ answer: unknown; evidence: Evidence[]; assets?: ChatAsset[] }>) {
   if (!/^[a-f0-9]{32}$/.test(id)) return;
   return store.withLease(`chat-job-${id}`, async () => {
     const key = `chat/jobs/${id}.json`; let job = await store.read<ChatJob>(key);
@@ -166,7 +166,9 @@ export async function processChatJob(store: PipelineStore, id: string, answer: (
     if (['failed', 'cancelled'].includes(job.status) || (job.retryAt && Date.parse(job.retryAt) > Date.now())) return;
     if (await store.read(`chat/cancellations/${id}.json`)) { await store.write(key, { ...job, status: 'cancelled' }); return; }
     if (job.attempts >= 2 || Date.now() - Date.parse(job.createdAt) > 10 * 60_000) { await store.write(key, { ...job, status: 'failed', error: 'The question timed out. Submit it again.' }); return; }
-    job = { ...job, attempts: job.attempts + 1, status: 'running' }; await store.write(key, job);
+    // A new attempt starts a clean draft and step list so a retry never repeats earlier blocks.
+    job = { ...job, attempts: job.attempts + 1, status: 'running', activities: [], draft: undefined, startedAt: new Date().toISOString() }; await store.write(key, job);
+    let draftWrittenAt = 0;
     const controller = new AbortController();
     const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(Math.max(1, 600_000 - (Date.now() - Date.parse(job.createdAt)))), ...(store.leaseSignal ? [store.leaseSignal] : [])]);
     const cancellation = setInterval(() => { void store.read(`chat/cancellations/${id}.json`).then(found => { if (found) controller.abort(new Error('Chat cancelled')); }).catch(() => undefined); }, 5000);
@@ -178,12 +180,25 @@ export async function processChatJob(store: PipelineStore, id: string, answer: (
         if (completed) { await store.write(key, { ...job!, status: 'complete', result: completed.result, error: undefined }); return; }
         const runSignal = AbortSignal.any([signal, ...(store.leaseSignal ? [store.leaseSignal] : [])]);
         const result = await answer(corpus, job!, async sandboxId => { job = { ...job!, sandboxId }; await store.write(key, job); }, conversation,
-          async activity => { job = { ...job!, activities: [...(job!.activities || []), activity].slice(-12) }; await store.write(key, job); }, runSignal);
+          async activity => {
+            const activities = [...(job!.activities || [])];
+            const index = activity.id ? activities.findIndex(item => item.id === activity.id) : -1;
+            if (index >= 0) activities[index] = activity; else activities.push(activity);
+            job = { ...job!, activities: activities.slice(-24) }; await store.write(key, job);
+          }, runSignal,
+          async text => {
+            // Each write holds a whole new block; a short gap bounds SQL writes when blocks arrive in a burst.
+            const delay = text ? 500 - (Date.now() - draftWrittenAt) : 0;
+            if (delay > 0) await new Promise(resolve => setTimeout(resolve, delay));
+            runSignal.throwIfAborted();
+            draftWrittenAt = Date.now(); job = { ...job!, draft: text || undefined }; await store.write(key, job);
+          });
         runSignal.throwIfAborted();
         if (await store.read(`chat/cancellations/${id}.json`) || (job!.conversationId && await deleted(store, job!.owner, job!.conversationId))) throw new Error('Chat cancelled');
         const validated = validateAnswer(result.answer, result.evidence, result.assets);
-        if (conversation) await store.write(`chat/conversations/${job!.owner}/${conversation.id}.json`, { ...conversation, updatedAt: new Date().toISOString(), turns: [...conversation.turns.filter(turn => turn.jobId !== id), { jobId: id, question: job!.request.question, ...(job!.images?.length ? { images: job!.images } : {}), result: validated }].slice(-100) });
-        await store.write(key, { ...job!, status: 'complete', result: validated, error: undefined });
+        if (conversation) await store.write(`chat/conversations/${job!.owner}/${conversation.id}.json`, { ...conversation, updatedAt: new Date().toISOString(), turns: [...conversation.turns.filter(turn => turn.jobId !== id), { jobId: id, question: job!.request.question, ...(job!.images?.length ? { images: job!.images } : {}), result: validated,
+          ...(job!.activities?.length ? { activities: job!.activities } : {}), workedMs: Date.now() - Date.parse(job!.startedAt || job!.createdAt) }].slice(-100) });
+        await store.write(key, { ...job!, status: 'complete', result: validated, draft: undefined, error: undefined });
         if (job!.conversationId && await deleted(store, job!.owner, job!.conversationId)) throw new Error('Chat cancelled');
       };
       if (job.conversationId) await store.withLease(`chat-conversation-${job.owner}-${job.conversationId}`, run);

@@ -158,3 +158,44 @@ it('persists document context in history without changing it when discussion mov
   });
   expect((await getConversation(state, 'owner', first.conversationId!)).sourceContext).toEqual(context);
 });
+it('streams a draft and live steps, then saves the step history with the verified answer', async () => {
+  const state = await store();
+  const submitted = await submitChat(state, 'owner', { question: 'Show progress' }, async () => undefined);
+  await processChatJob(state, submitted.id, async (_corpus, _job, _record, _conversation, progress, _signal, draft) => {
+    await progress({ id: '1', tool: 'search_corpus', title: 'atlas' });
+    expect((await chatStatus(state, 'owner', submitted.id)).activities).toEqual([{ id: '1', tool: 'search_corpus', title: 'atlas' }]);
+    await progress({ id: '1', tool: 'search_corpus', title: 'atlas', detail: '2 sources found' });
+    await progress({ tool: 'commentary', title: 'Comparing both.' });
+    await draft('First paragraph.');
+    const live = await chatStatus(state, 'owner', submitted.id);
+    expect(live).toMatchObject({ status: 'running', draft: 'First paragraph.' });
+    expect(live.activities).toHaveLength(2);
+    return insufficient();
+  });
+  const done = await chatStatus(state, 'owner', submitted.id);
+  expect(done.status).toBe('complete'); expect(done.draft).toBeUndefined();
+  const turn = (await getConversation(state, 'owner', submitted.conversationId!)).turns[0];
+  expect(turn.activities).toEqual([{ id: '1', tool: 'search_corpus', title: 'atlas', detail: '2 sources found' }, { tool: 'commentary', title: 'Comparing both.' }]);
+  expect(turn.workedMs).toBeGreaterThanOrEqual(0);
+});
+it('keeps an interrupted draft unsaved and starts the next attempt clean', async () => {
+  const state = await store();
+  const failed = await submitChat(state, 'owner', { question: 'Fail midway' }, async () => undefined);
+  await processChatJob(state, failed.id, async (_corpus, _job, _record, _conversation, progress, _signal, draft) => {
+    await progress({ id: '1', tool: 'read_source', title: 'Paper' }); await draft('Half done.'); throw new Error('Inference failed');
+  });
+  const key = `chat/jobs/${failed.id}.json`;
+  expect(await state.read<ChatJob>(key)).toMatchObject({ status: 'pending', draft: 'Half done.' });
+  await state.write(key, { ...(await state.read<ChatJob>(key))!, retryAt: undefined });
+  await processChatJob(state, failed.id, async (_corpus, job) => {
+    expect(job.draft).toBeUndefined(); expect(job.activities).toEqual([]);
+    return insufficient();
+  });
+  expect((await getConversation(state, 'owner', failed.conversationId!)).turns[0].activities).toBeUndefined();
+  const stopped = await submitChat(state, 'owner', { question: 'Stop midway' }, async () => undefined);
+  await processChatJob(state, stopped.id, async (_corpus, _job, _record, _conversation, _progress, _signal, draft) => {
+    await draft('Partial.'); await cancelChat(state, 'owner', stopped.id); return insufficient();
+  });
+  expect(await chatStatus(state, 'owner', stopped.id)).toMatchObject({ status: 'cancelled', draft: 'Partial.' });
+  expect((await getConversation(state, 'owner', stopped.conversationId!)).turns).toEqual([]);
+});

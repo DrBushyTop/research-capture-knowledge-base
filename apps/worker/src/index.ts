@@ -118,8 +118,8 @@ app.storageQueue('answerChat', { queueName: 'chat', connection: 'AzureWebJobsSto
   const payload = typeof message === 'string' ? JSON.parse(message) : message;
   const id = (payload as { jobId: string }).jobId;
   const state = store();
-  await processChatJob(state, id, async (corpus, job, record, conversation, progress, signal) => {
-    return discuss(job, conversation, await corpusTools(state, corpus, job, record, progress, signal), signal);
+  await processChatJob(state, id, async (corpus, job, record, conversation, progress, signal, draft) => {
+    return discuss(job, conversation, { ...await corpusTools(state, corpus, job, record, progress, signal), draft }, signal);
   });
   context.log(JSON.stringify({ event: 'chat-processing-complete', jobId: /^[a-f0-9]{32}$/.test(id) ? id : 'invalid' }));
 } });

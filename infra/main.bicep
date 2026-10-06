@@ -1,5 +1,9 @@
 param location string = 'swedencentral'
+@allowed(['dev', 'prod'])
+param environment string = 'dev'
 param suffix string = '16681c6a'
+param captureEnabled bool = true
+param modelCapacity int = 1000
 param vaultName string = 'kv-research-dev-16681c6a'
 param bootstrapPrincipalId string
 param processingVersion string = '2'
@@ -10,22 +14,22 @@ param browserSandboxSnapshot string = ''
 param browserAssetHosts string = ''
 param sandboxSnapshot string = '4daeeb76-0b95-4d8b-9c36-32ea7167fcde'
 param githubSubject string = 'repo:DrBushyTop@22717844/research-capture-knowledge-base@1405750793:ref:refs/heads/master'
-var tags = { application: 'research-capture-knowledge-base', environment: 'development' }
+var tags = { application: 'research-capture-knowledge-base', environment: environment == 'prod' ? 'production' : 'development' }
 var blobOwner = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
 var blobContributor = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var queueContributor = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
 var tableContributor = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
 var secretUser = '4633458b-17de-408a-b874-0445c86b69e6'
 
-resource workerIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = { name: 'id-research-worker-dev', location: location, tags: tags }
-resource ciIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = { name: 'id-research-ci-dev', location: location, tags: tags }
+resource workerIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = { name: 'id-research-worker-${environment}', location: location, tags: tags }
+resource ciIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = { name: 'id-research-ci-${environment}', location: location, tags: tags }
 resource federation 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2023-01-31' = {
   parent: ciIdentity
-  name: 'github-master'
+  name: environment == 'prod' ? 'github-production' : 'github-master'
   properties: { issuer: 'https://token.actions.githubusercontent.com', subject: githubSubject, audiences: ['api://AzureADTokenExchange'] }
 }
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
-  name: 'stresearchdev${suffix}'
+  name: 'stresearch${environment}${suffix}'
   location: location
   tags: tags
   kind: 'StorageV2'
@@ -63,7 +67,7 @@ resource chatRetention 'Microsoft.Storage/storageAccounts/managementPolicies@202
   }
 }
 resource sandboxes 'Microsoft.App/sandboxGroups@2026-02-01-preview' = {
-  name: 'sbg-research-chat-dev'
+  name: 'sbg-research-chat-${environment}'
   location: location
   tags: tags
   properties: { allowedLocations: [location], enableDetailedMetrics: false }
@@ -105,17 +109,17 @@ resource secretRoles 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for
   properties: { principalId: workerIdentity.properties.principalId, principalType: 'ServicePrincipal', roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', secretUser) }
 }]
 resource ai 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
-  name: 'ai-research-dev-${suffix}'
+  name: 'ai-research-${environment}-${suffix}'
   location: location
   tags: tags
   kind: 'OpenAI'
   sku: { name: 'S0' }
-  properties: { customSubDomainName: 'ai-research-dev-${suffix}', disableLocalAuth: true, publicNetworkAccess: 'Enabled' }
+  properties: { customSubDomainName: 'ai-research-${environment}-${suffix}', disableLocalAuth: true, publicNetworkAccess: 'Enabled' }
 }
 resource model 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
   parent: ai
   name: 'research-sol'
-  sku: { name: 'DataZoneStandard', capacity: 1000 }
+  sku: { name: 'DataZoneStandard', capacity: modelCapacity }
   properties: { model: { format: 'OpenAI', name: 'gpt-6.1-sol', version: '2026-09-29' }, versionUpgradeOption: 'OnceCurrentVersionExpired' }
 }
 resource aiRoles 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for index in [0, 1]: {
@@ -124,13 +128,13 @@ resource aiRoles 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for ind
   properties: { principalId: index == 0 ? workerIdentity.properties.principalId : bootstrapPrincipalId, principalType: index == 1 ? 'User' : 'ServicePrincipal', roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd') }
 }]
 resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
-  name: 'log-research-dev'
+  name: 'log-research-${environment}'
   location: location
   tags: tags
   properties: { sku: { name: 'PerGB2018' }, retentionInDays: 30, workspaceCapping: { dailyQuotaGb: json('0.1') } }
 }
 resource insights 'Microsoft.Insights/components@2020-02-02' = {
-  name: 'appi-research-dev'
+  name: 'appi-research-${environment}'
   location: location
   tags: tags
   kind: 'web'
@@ -142,7 +146,7 @@ resource metricsRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   properties: { principalId: workerIdentity.properties.principalId, principalType: 'ServicePrincipal', roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '3913510d-42f4-4e42-8a64-420c390055eb') }
 }
 resource plan 'Microsoft.Web/serverfarms@2024-04-01' = {
-  name: 'plan-research-dev'
+  name: 'plan-research-${environment}'
   location: location
   tags: tags
   kind: 'functionapp'
@@ -150,7 +154,7 @@ resource plan 'Microsoft.Web/serverfarms@2024-04-01' = {
   properties: { reserved: true }
 }
 resource worker 'Microsoft.Web/sites@2024-04-01' = {
-  name: 'func-research-dev-${suffix}'
+  name: 'func-research-${environment}-${suffix}'
   location: location
   tags: tags
   kind: 'functionapp,linux'
@@ -171,6 +175,7 @@ resource settings 'Microsoft.Web/sites/config@2024-04-01' = {
   parent: worker
   name: 'appsettings'
   properties: {
+    'AzureWebJobs.discoverCaptures.Disabled': captureEnabled ? 'false' : 'true'
     AzureWebJobsStorage__accountName: storage.name
     AzureWebJobsStorage__credential: 'managedidentity'
     AzureWebJobsStorage__clientId: workerIdentity.properties.clientId
@@ -200,7 +205,7 @@ resource ciDeployRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   properties: { principalId: ciIdentity.properties.principalId, principalType: 'ServicePrincipal', roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'de139f84-1756-47ae-9be6-808fbbe84772') }
 }
 resource reader 'Microsoft.Web/staticSites@2024-04-01' = {
-  name: 'swa-research-dev'
+  name: 'swa-research-${environment}'
   location: 'westeurope'
   tags: tags
   sku: { name: 'Free', tier: 'Free' }
@@ -213,3 +218,7 @@ output ciClientId string = ciIdentity.properties.clientId
 output tenantId string = subscription().tenantId
 output foundryEndpoint string = 'https://${ai.name}.openai.azure.com'
 output foundryDeployment string = model.name
+
+output workerClientId string = workerIdentity.properties.clientId
+output keyVaultUri string = vault.properties.vaultUri
+output sandboxGroup string = sandboxes.name

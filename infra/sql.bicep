@@ -1,4 +1,6 @@
 param location string = 'swedencentral'
+@allowed(['dev', 'prod'])
+param environment string = 'dev'
 param suffix string = '16681c6a'
 param administratorId string
 param administratorLogin string
@@ -7,7 +9,7 @@ param allowedAddresses array = []
 param includeDevelopmentDatabase bool = true
 
 resource server 'Microsoft.Sql/servers@2023-08-01' = {
-  name: 'sql-research-dev-${suffix}'
+  name: 'sql-research-${environment}-${suffix}'
   location: location
   properties: {
     version: '12.0'

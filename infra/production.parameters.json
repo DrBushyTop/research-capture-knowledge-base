@@ -1,0 +1,45 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environment": {
+      "value": "prod"
+    },
+    "location": {
+      "value": "swedencentral"
+    },
+    "suffix": {
+      "value": "16681c6a"
+    },
+    "vaultName": {
+      "value": "kv-research-prod-16681c6"
+    },
+    "bootstrapPrincipalId": {
+      "value": "ea69e00a-4127-45a8-808b-e795a75dad51"
+    },
+    "sqlServer": {
+      "value": "sql-research-prod-16681c6a.database.windows.net"
+    },
+    "sqlDatabase": {
+      "value": "research"
+    },
+    "captureEnabled": {
+      "value": false
+    },
+    "modelCapacity": {
+      "value": 100
+    },
+    "sandboxSnapshot": {
+      "value": "12361c27-dce4-437f-ae8f-4b3de34e2f60"
+    },
+    "browserSandboxSnapshot": {
+      "value": "12361c27-dce4-437f-ae8f-4b3de34e2f60"
+    },
+    "browserAssetHosts": {
+      "value": ""
+    },
+    "githubSubject": {
+      "value": "repo:DrBushyTop@22717844/research-capture-knowledge-base@1405750793:environment:production"
+    }
+  }
+}

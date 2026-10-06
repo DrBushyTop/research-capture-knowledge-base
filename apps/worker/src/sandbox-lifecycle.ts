@@ -40,8 +40,9 @@ export async function denyWorkspaceEgress(id: string, signal: AbortSignal) {
 }
 // Native beta SDK polling drops abort signals on GET and hides the initial ID.
 // Record the initial response here, then poll each request with the caller's deadline.
-export async function createWorkspace(client: SandboxGroupClient, signal: AbortSignal, record: (id: string) => Promise<void>) {
-  const initial = await request('PUT', '', signal, { sourcesRef: { snapshot: { id: required('SANDBOX_SNAPSHOT') } } });
+export async function createWorkspace(client: SandboxGroupClient, signal: AbortSignal, record: (id: string) => Promise<void>, options?: { snapshot: string; hosts: string[] }) {
+  const egressPolicy = { defaultAction: 'Deny', trafficInspection: 'Full', hostRules: [], rules: options?.hosts.map(host => ({ match: { host, methods: ['GET'] }, action: { type: 'Allow' } })) || [] };
+  const initial = await request('PUT', '', signal, { sourcesRef: { snapshot: { id: options?.snapshot || required('SANDBOX_SNAPSHOT') } }, egressPolicy });
   const id = sandboxId(initial?.id);
   await record(id);
   await client.sandboxes.setLifecyclePolicy(id, { autoSuspend: { enabled: true, interval: 120, mode: 'Disk' }, autoDelete: { enabled: true, deleteIntervalSeconds: 600 } }, { abortSignal: signal });

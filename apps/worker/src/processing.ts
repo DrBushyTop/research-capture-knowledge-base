@@ -56,7 +56,7 @@ export async function processJob(store: PipelineStore, id: string, processor: Pr
         if (!assignment) {
           const routing = registry.categories.filter(category => !category.archived).map(({ id, name, description }) => ({ id, name, description }));
           const cacheKey = `categories/classifications/${hash(canonical({ fingerprint: snapshot.source.fingerprint, routing, version: processor.version, model: processor.model,
-            images: extracted.images?.map(image => hash(image.bytes)) || [] }))}.json`;
+            textHash: hash(extracted.text), images: extracted.images?.map(image => hash(image.bytes)) || [] }))}.json`;
           let classified = await store.read<{ categoryId: string; reason: string }>(cacheKey);
           if (!classified) {
             if (!processor.classify) throw new Error('Category classification is not configured');

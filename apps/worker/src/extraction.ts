@@ -6,6 +6,7 @@ import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 import { hash, type SourceSnapshot, type Note } from '../../../shared/corpus.js';
 import type { Zotero } from './zotero.js';
+import { browserCaptureNeeded, type BrowserCapture } from './browser-capture.js';
 import { sourceImage, type SourceImage } from './image-input.js';
 
 export const maxBytes = 20 * 1024 * 1024;
@@ -82,7 +83,7 @@ async function boundedResponse(response: Response) {
   } finally { await reader.cancel().catch(() => undefined); }
   return Buffer.concat(chunks);
 }
-export async function extract(snapshot: SourceSnapshot, zotero: Pick<Zotero, 'request'>, retain: (hash: string, bytes: Uint8Array, mime: string) => Promise<void>, restore?: () => Promise<RetainedArtifact | undefined>): Promise<Extracted> {
+export async function extract(snapshot: SourceSnapshot, zotero: Pick<Zotero, 'request'>, retain: (hash: string, bytes: Uint8Array, mime: string) => Promise<void>, restore?: () => Promise<RetainedArtifact | undefined>, browser?: () => Promise<BrowserCapture>): Promise<Extracted> {
   const evidence: Note['extraction'] = { status: 'metadata-only', method: 'none', reason: null, truncated: false, retrievedAt: new Date().toISOString(), artifactHash: null };
   if (!snapshot.source.active) return { text: '', evidence: { ...evidence, reason: 'Source is no longer in the observed library.' } };
   let bytes: Uint8Array; let mime: string;
@@ -143,6 +144,13 @@ export async function extract(snapshot: SourceSnapshot, zotero: Pick<Zotero, 're
     return { text: metadata.text, images: [image], evidence: { ...evidence, status: 'image', method: 'image-vision',
       reason: 'Analysis uses the retained image and any saved caption. Visual interpretation is generated, not a verified text transcription. The original page may contain material outside this image.' } };
   } else return savedMetadata(snapshot, { ...evidence, status: 'needs-review', reason: mime.startsWith('video/') ? 'Video analysis is not supported. Save a still screenshot as a PNG, JPEG or WebP attachment.' : 'Unsupported source format.' });
+  if (mime.includes('html') && browser && browserCaptureNeeded(text, Buffer.from(bytes).toString('utf8'))) {
+    try {
+      const captured = await browser();
+      if (captured.text.length >= 80 && captured.views.some(view => !browserCaptureNeeded(view.text, '') && view.text.trim().length >= 80)) return { text: `Capture coverage: ${captured.complete ? 'Agent finished bounded exploration' : 'Partial capture'} (${captured.stopReason}). ${captured.coverage}\n\n${captured.text}`.slice(0, 60_000), evidence: { ...evidence, status: 'text', method: 'browser', retrievedAt: captured.retrievedAt, truncated: !captured.complete,
+        reason: `Live browser capture, not necessarily the page as originally saved. ${captured.views.length} views captured. ${captured.complete ? 'Agent finished exploration' : 'Partial capture'} (${captured.stopReason}). ${captured.coverage}`.slice(0, 1000) } };
+    } catch { /* Keep the original artifact and honest extraction fallback if browser recovery fails. */ }
+  }
   text = text.slice(0, 60_000).trim();
   if (text.length < 80) {
     // A saved screenshot can rescue an empty HTML snapshot. Do not fetch page image URLs or external resources.

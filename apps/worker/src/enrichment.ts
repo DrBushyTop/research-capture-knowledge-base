@@ -12,7 +12,7 @@ export function inferenceSchema(input: z.ZodType = analysisSchema) {
   const clean = (value: unknown): unknown => Array.isArray(value) ? value.map(clean) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).filter(([key]) => !unsupported.has(key)).map(([key, v]) => [key, clean(v)])) : value;
   return clean(schema);
 }
-async function infer(input: unknown, instructions: string, schema: z.ZodType, endpoint: string, deployment: string, signal?: AbortSignal, images?: SourceImage[]): Promise<unknown> {
+export async function infer(input: unknown, instructions: string, schema: z.ZodType, endpoint: string, deployment: string, signal?: AbortSignal, images?: SourceImage[]): Promise<unknown> {
   const content = inferenceContent(input, images);
   const credential = new DefaultAzureCredential();
   const token = await credential.getToken('https://cognitiveservices.azure.com/.default');

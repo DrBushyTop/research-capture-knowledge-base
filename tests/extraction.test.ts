@@ -115,3 +115,25 @@ it('uses saved captions as labelled metadata without treating them as extracted 
   expect(result.evidence.status).toBe('metadata-only');
   expect(result.evidence.reason).toContain('original document or post text was unavailable');
 });
+it('recovers a language gate through bounded browser evidence without replacing the original artifact', async () => {
+  const source = normalize(snapshot)[0]; source.children[0].data.contentType = 'text/html';
+  const zotero = new Zotero('12345', 'synthetic-read-key');
+  zotero.request = async () => new Response('<html><body>Choose your language</body></html>');
+  let originals = 0;
+  const result = await extract(source, zotero, async () => { originals++; }, undefined, async () => ({
+    version: 'browser-1', sourceUrl: source.source.url!, retrievedAt: '2026-10-06T12:00:00Z', text: 'Pizza section\nMargherita: tomato, mozzarella, basil. Price 10 EUR. Some menu sections were not inspected.'.repeat(2), views: [{ url: source.source.url!, title: 'Menu', text: 'Menu dishes and prices captured. '.repeat(5), controls: [], blockedRequests: 0 }], actions: [], complete: false, stopReason: 'view-limit', coverage: 'Desserts not captured.'
+  }));
+  expect(result.evidence.method).toBe('browser');
+  expect(result.evidence.truncated).toBe(true);
+  expect(result.evidence.reason).toContain('Desserts not captured');
+  expect(result.text).toContain('Margherita');
+  expect(originals).toBe(1);
+});
+it('keeps metadata fallback when browser recovery fails, without losing the original', async () => {
+  const source = normalize(snapshot)[0]; source.children[0].data.contentType = 'text/html';
+  const zotero = new Zotero('12345', 'synthetic-read-key');
+  zotero.request = async () => new Response('<html><body>Choose language</body></html>');
+  const result = await extract(source, zotero, async () => {}, undefined, async () => { throw new Error('Browser blocked'); });
+  expect(result.evidence.method).not.toBe('browser');
+  expect(result.evidence.status).not.toBe('text');
+});

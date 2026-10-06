@@ -6,6 +6,8 @@ param processingVersion string = '2'
 param readerGithubUsers string = 'pinaatti,DrBushyTop'
 param sqlServer string = 'sql-research-dev-16681c6a.database.windows.net'
 param sqlDatabase string = 'research'
+param browserSandboxSnapshot string = ''
+param browserAssetHosts string = ''
 param sandboxSnapshot string = '4daeeb76-0b95-4d8b-9c36-32ea7167fcde'
 param githubSubject string = 'repo:DrBushyTop@22717844/research-capture-knowledge-base@1405750793:ref:refs/heads/master'
 var tags = { application: 'research-capture-knowledge-base', environment: 'development' }
@@ -188,6 +190,8 @@ resource settings 'Microsoft.Web/sites/config@2024-04-01' = {
     SANDBOX_REGION: location
     SANDBOX_GROUP: sandboxes.name
     SANDBOX_SNAPSHOT: sandboxSnapshot
+    BROWSER_SANDBOX_SNAPSHOT: browserSandboxSnapshot
+    BROWSER_ASSET_HOSTS: browserAssetHosts
   }
 }
 resource ciDeployRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {

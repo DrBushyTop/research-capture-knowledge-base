@@ -68,6 +68,15 @@ export class BlobStore implements PipelineStore {
     try { await this.container.getBlockBlobClient(key).upload(data, data.length, { conditions: { ifNoneMatch: '*' }, abortSignal: this.operationSignal(), blobHTTPHeaders: { blobContentType: mime } }); }
     catch (error) { if (![409, 412].includes((error as { statusCode: number }).statusCode)) throw error; }
   }
+  async readBinary(key: string) {
+    const blob = this.container.getBlockBlobClient(key);
+    try {
+      const properties = await blob.getProperties({ abortSignal: this.operationSignal() });
+      if (!properties.contentLength || properties.contentLength > 10 * 1024 * 1024) return undefined;
+      return await blob.downloadToBuffer(0, undefined, { conditions: { ifMatch: properties.etag }, abortSignal: this.operationSignal() });
+    } catch (error) { if (missing(error)) return undefined; throw error; }
+  }
+  async remove(key: string) { await this.verifyLease(); await this.container.getBlockBlobClient(key).deleteIfExists({ abortSignal: this.operationSignal() }); }
   async list(prefix: string) {
     const keys: string[] = [];
     for await (const blob of this.container.listBlobsFlat({ prefix, abortSignal: this.operationSignal() })) keys.push(blob.name);

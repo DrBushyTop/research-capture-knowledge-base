@@ -37,9 +37,11 @@ it('human notes are rendered without executable HTML or tracking images', async 
 it('the private hosting rules protect arbitrary search and asset paths', async () => {
   const config = JSON.parse(await readFile('apps/reader/staticwebapp.config.json', 'utf8'));
   const allowed = (pathname: string) => config.routes.find((r: {route: string}) => r.route.endsWith('*') ? pathname.startsWith(r.route.slice(0,-1)) : pathname === r.route).allowedRoles;
-  expect(allowed('/pagefind/pagefind.js')).toEqual(['reader']);
-  expect(allowed('/research/saved-note/')).toEqual(['reader']);
-  expect(allowed('/_astro/font.woff2')).toEqual(['reader']);
+  expect(allowed('/pagefind/pagefind.js')).toEqual(['library_member']);
+  expect(allowed('/research/saved-note/')).toEqual(['library_member']);
+  expect(allowed('/_astro/font.woff2')).toEqual(['library_member']);
   expect(allowed('/login.html')).toEqual(['anonymous']);
+  expect(allowed('/search-index.json')).not.toContain('reader');
+  expect(allowed('/api/categories')).toEqual(['library_member']);
   expect(config.navigationFallback).toBeUndefined();
 });

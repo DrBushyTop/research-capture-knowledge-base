@@ -3,6 +3,7 @@ param suffix string = '16681c6a'
 param vaultName string = 'kv-research-dev-16681c6a'
 param bootstrapPrincipalId string
 param processingVersion string = '2'
+param readerGithubUsers string = 'pinaatti,DrBushyTop'
 param sandboxSnapshot string = '4daeeb76-0b95-4d8b-9c36-32ea7167fcde'
 param githubSubject string = 'repo:DrBushyTop@22717844/research-capture-knowledge-base@1405750793:ref:refs/heads/master'
 var tags = { application: 'research-capture-knowledge-base', environment: 'development' }
@@ -51,7 +52,7 @@ resource chatRetention 'Microsoft.Storage/storageAccounts/managementPolicies@202
       enabled: true
       type: 'Lifecycle'
       definition: {
-        filters: { blobTypes: ['blockBlob'], prefixMatch: ['pipeline/chat/jobs/', 'pipeline/chat/users/', 'pipeline/chat/conversations/', 'pipeline/chat/assets/', 'pipeline/chat/cancellations/'] }
+        filters: { blobTypes: ['blockBlob'], prefixMatch: ['pipeline/chat/jobs/', 'pipeline/chat/users/', 'pipeline/chat/assets/', 'pipeline/chat/cancellations/'] }
         actions: { baseBlob: { delete: { daysAfterModificationGreaterThan: 1 } } }
       }
     }] }
@@ -177,6 +178,7 @@ resource settings 'Microsoft.Web/sites/config@2024-04-01' = {
     APPLICATIONINSIGHTS_CONNECTION_STRING: insights.properties.ConnectionString
     APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'ClientId=${workerIdentity.properties.clientId};Authorization=AAD'
     PROCESSING_VERSION: processingVersion
+    READER_GITHUB_USERS: readerGithubUsers
     AZURE_SUBSCRIPTION_ID: subscription().subscriptionId
     AZURE_RESOURCE_GROUP: resourceGroup().name
     SANDBOX_REGION: location

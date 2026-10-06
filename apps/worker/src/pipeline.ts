@@ -1,4 +1,5 @@
 import { canonical, hash, normalize, type LibrarySnapshot, type SourceSnapshot } from '../../../shared/corpus.js';
+import type { Registry, Template, CategoryAssignment } from '../../../shared/categories.js';
 
 export interface PipelineStore {
   readonly leaseSignal?: AbortSignal;
@@ -8,9 +9,10 @@ export interface PipelineStore {
   list(prefix: string): Promise<string[]>;
   withLease<T>(key: string, fn: () => Promise<T>): Promise<T>;
 }
-export interface Job { id: string; source: SourceSnapshot['source']; snapshotKey: string; status: 'pending' | 'staged' | 'imported' | 'failed'; attempts: number; dispatches?: number; observedAt: string; lastQueuedAt?: string; error?: string; retryAt?: string; }
+export interface CategoryPlan { registry: Registry; assignment?: CategoryAssignment; template?: Template; batchId?: string; preserveExisting?: boolean; }
+export interface Job { id: string; source: SourceSnapshot['source']; snapshotKey: string; status: 'pending' | 'staged' | 'imported' | 'failed'; attempts: number; dispatches?: number; observedAt: string; lastQueuedAt?: string; error?: string; retryAt?: string; categoryPlan?: CategoryPlan; }
 export interface SourceState { generationId: string; source: SourceSnapshot['source']; processingVersion?: string; }
-export async function discover(store: PipelineStore, library: LibrarySnapshot, version: string, collection?: string) {
+export async function discover(store: PipelineStore, library: LibrarySnapshot, version: string, collection?: string, registry?: Registry) {
   return store.withLease('poll', async () => {
     const checkpoint = await store.read<{ libraryVersion: number }>('checkpoint.json');
     if (checkpoint && library.version < checkpoint.libraryVersion) return;
@@ -24,12 +26,15 @@ export async function discover(store: PipelineStore, library: LibrarySnapshot, v
       }
     }
     for (const snapshot of snapshots) {
-      const id = hash(`${snapshot.source.id}:${snapshot.source.fingerprint}:${version}`);
       const current = await store.read<SourceState>(`sources/${snapshot.source.id}.json`);
       if (current?.source.fingerprint === snapshot.source.fingerprint && current.processingVersion === version) continue;
+      const assignment = registry ? await store.read<CategoryAssignment>(`categories/assignments/${snapshot.source.id}.json`) : undefined;
+      const manual = assignment?.method === 'manual' ? assignment : undefined;
+      const id = hash(`${snapshot.source.id}:${snapshot.source.fingerprint}:${version}:${registry ? canonical({ registry, manual }) : 'legacy'}`);
       const snapshotKey = `snapshots/${id}.json`;
       await store.create(snapshotKey, snapshot);
-      await store.create(`jobs/${id}.json`, { id, source: snapshot.source, snapshotKey, status: 'pending', attempts: 0, observedAt: new Date().toISOString() } satisfies Job);
+      await store.create(`jobs/${id}.json`, { id, source: snapshot.source, snapshotKey, status: 'pending', attempts: 0, observedAt: new Date().toISOString(),
+        ...(registry ? { categoryPlan: { registry, ...(manual ? { assignment: manual } : {}) } } : {}) } satisfies Job);
       await store.write(`sources/${snapshot.source.id}.json`, { generationId: id, source: snapshot.source, processingVersion: version } satisfies SourceState);
     }
     await store.write('checkpoint.json', { libraryVersion: library.version, processingVersion: version, observedAt: new Date().toISOString() });

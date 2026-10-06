@@ -1,16 +1,27 @@
 import { z } from 'zod';
 import { hash, noteSchema, sourceId } from './corpus.js';
 import { evidenceQuery } from './search.js';
-export const chatRequestSchema = z.strictObject({ question: z.string().trim().min(1).max(8000), conversationId: z.string().regex(/^[a-f0-9]{32}$/).optional(), sourceId: sourceId.optional(),
+import { citationLabel, maxMessageImages } from './chat-client.js';
+export { citationLabel, maxMessageImages } from './chat-client.js';
+export const uploadId = z.string().regex(/^u_[a-f0-9]{32}$/);
+// Screenshots per message. Each upload is also capped by chatUploadLimits on the server.
+export const chatRequestSchema = z.strictObject({ question: z.string().trim().max(8000), conversationId: z.string().regex(/^[a-f0-9]{32}$/).optional(), sourceId: sourceId.optional(),
   history: z.array(z.strictObject({ role: z.enum(['user', 'assistant']), content: z.string().max(3000) })).max(6).default([]),
-  visual: z.strictObject({ sourceId, page: z.number().int().min(1).max(200).default(1) }).optional() });
-export type ChatRequest = z.infer<typeof chatRequestSchema>;
+  visual: z.strictObject({ sourceId, page: z.number().int().min(1).max(200).default(1) }).optional(),
+  images: z.array(uploadId).max(maxMessageImages).default([]) })
+  .refine(request => request.question.length > 0 || request.images.length > 0, 'Write a message or attach an image')
+  .refine(request => new Set(request.images).size === request.images.length, 'Duplicate image');
+// Jobs saved before screenshot input have no images field.
+export type ChatRequest = Omit<z.infer<typeof chatRequestSchema>, 'images'> & { images?: string[] };
 export const chatCorpusSchema = z.strictObject({ revision: z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/), sources: z.array(z.strictObject({ note: noteSchema, humanMarkdown: z.string().max(100_000) })).max(10_000) });
 export type ChatCorpus = z.infer<typeof chatCorpusSchema>;
 export const chatSnapshotRevision = (gitRevision: string, sources: ChatCorpus['sources'], index: unknown) => hash(JSON.stringify({ gitRevision, sources, index }));
-export interface Evidence { id: string; sourceId: string; generationId: string; title: string; kind: 'source' | 'machine' | 'human' | 'metadata' | 'visual'; locator: string; text: string; sourceUrl?: string | null; pdf?: boolean; assetId?: string; }
+export interface Evidence { id: string; sourceId: string; generationId: string; title: string; label?: string; kind: 'source' | 'machine' | 'human' | 'metadata' | 'visual'; locator: string; text: string; sourceUrl?: string | null; pdf?: boolean; assetId?: string; }
 export interface ChatAsset { id: string; sourceId: string; title: string; kind: 'image' | 'pdf' | 'site'; mime: string; page: number | null; blobKey?: string; artifactHash?: string; sourceUrl?: string; originJobId?: string; }
 export interface ChatActivity { tool: string; title: string; sourceId?: string; }
+export interface ChatUpload { id: string; owner: string; mime: 'image/png' | 'image/jpeg' | 'image/webp'; bytes: number; width: number; height: number; createdAt: string; }
+export type ChatImage = Pick<ChatUpload, 'id' | 'mime' | 'width' | 'height'>;
+// Short pill text for an inline citation: site, first author or shortened title.
 export const evidenceChunk = (value: Omit<Evidence, 'id'>): Evidence => ({ ...value, id: 'e_' + hash(JSON.stringify(value)).slice(0, 16) });
 export function chunkText(base: Omit<Evidence, 'id' | 'text'>, text: string): Evidence[] {
   const chunks: Evidence[] = [];
@@ -19,7 +30,7 @@ export function chunkText(base: Omit<Evidence, 'id' | 'text'>, text: string): Ev
 }
 export function corpusEvidence(corpus: ChatCorpus): Evidence[] {
   return corpus.sources.flatMap(({ note, humanMarkdown }) => {
-    const base = { sourceId: note.source.id, generationId: note.generationId, title: note.source.title };
+    const base = { sourceId: note.source.id, generationId: note.generationId, title: note.source.title, label: citationLabel(note.source) };
     const facts = [note.source.title, note.source.authors.join(', '), note.source.url, note.source.doi, note.extraction.reason].filter(Boolean).join('\n');
     const human = humanMarkdown.replace(/^# Human notes\s*/, '').trim();
     return [evidenceChunk({ ...base, kind: 'metadata', locator: 'Source facts', text: facts }),
@@ -50,7 +61,7 @@ export function validateAnswer(input: unknown, evidence: Evidence[], assets: Cha
   const citations = answer.citations.map(cite => {
     const chunk = evidence.find(item => item.id === cite.evidenceId);
     if (!chunk || (cite.quote && !normalize(chunk.text).includes(normalize(cite.quote)))) throw new Error('Unsupported citation');
-    return { ...cite, sourceId: chunk.sourceId, generationId: chunk.generationId, title: chunk.title, kind: chunk.kind, locator: chunk.locator, excerpt: chunk.text.slice(0, 1400), sourceUrl: chunk.sourceUrl || null, pdf: chunk.pdf || false, assetId: chunk.assetId || null };
+    return { ...cite, sourceId: chunk.sourceId, generationId: chunk.generationId, title: chunk.title, label: chunk.label || citationLabel({ title: chunk.title, authors: [], url: chunk.sourceUrl || null }), kind: chunk.kind, locator: chunk.locator, excerpt: chunk.text.slice(0, 1400), sourceUrl: chunk.sourceUrl || null, pdf: chunk.pdf || false, assetId: chunk.assetId || null };
   });
   for (const match of answer.answer.matchAll(/\[(e_[a-f0-9]{16})\]/g)) if (!citations.some(citation => citation.evidenceId === match[1])) throw new Error('Unsupported inline citation');
   const attachments = answer.attachments.map(id => {
@@ -61,5 +72,6 @@ export function validateAnswer(input: unknown, evidence: Evidence[], assets: Cha
   });
   return { ...answer, citations, attachments };
 }
-export interface ChatJob { id: string; owner: string; corpusRevision: string; conversationId?: string; request: ChatRequest; createdAt: string; status: 'pending' | 'running' | 'complete' | 'failed' | 'cancelled'; attempts: number; lastQueuedAt?: string; retryAt?: string; sandboxId?: string; result?: ReturnType<typeof validateAnswer>; activities?: ChatActivity[]; error?: string; }
-export interface ChatConversation { id: string; owner: string; createdAt: string; updatedAt: string; turns: { jobId: string; question: string; result: NonNullable<ChatJob['result']> }[]; }
+export interface ChatJob { id: string; owner: string; corpusRevision: string; conversationId?: string; request: ChatRequest; images?: ChatImage[]; createdAt: string; status: 'pending' | 'running' | 'complete' | 'failed' | 'cancelled'; attempts: number; lastQueuedAt?: string; retryAt?: string; sandboxId?: string; result?: ReturnType<typeof validateAnswer>; activities?: ChatActivity[]; error?: string; }
+export interface ChatSourceContext { sourceId: string; title: string; }
+export interface ChatConversation { id: string; owner: string; createdAt: string; updatedAt: string; sourceContext?: ChatSourceContext; turns: { jobId: string; question: string; images?: ChatImage[]; result: NonNullable<ChatJob['result']> }[]; }

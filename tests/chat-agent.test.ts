@@ -48,3 +48,18 @@ it('does not execute arbitrary tools or invalid source paths, and bounds repeate
   expect(executions).toBe(0);
   expect(rounds).toBe(9);
 });
+it('gives the model the starting document while allowing it to read another source', async () => {
+  const conversation: ChatConversation = { id: '3'.repeat(32), owner: 'reader', createdAt: job.createdAt, updatedAt: job.createdAt,
+    sourceContext: { sourceId: 'zotero-users-12345-PBA4T3PN', title: 'Starting document' }, turns: [] };
+  const other = 'zotero-users-12345-OTHER123';
+  const calls: unknown[] = [];
+  const tools: ChatTools = { evidence: [], assets: [], execute: async (_name, input) => { calls.push(input); return { content: { sourceId: other, passages: [] } }; } };
+  let rounds = 0;
+  await discuss(job, conversation, tools, undefined, async (messages, definitions) => {
+    expect(JSON.stringify(messages)).toContain('Starting document');
+    expect(JSON.stringify(definitions)).toContain('search_corpus');
+    if (++rounds === 1) return { tool_calls: [{ id: 'other', type: 'function', function: { name: 'read_source', arguments: JSON.stringify({ sourceId: other, section: 'analysis', query: '', page: null }) } }] };
+    return { content: JSON.stringify(result) };
+  });
+  expect(calls).toEqual([{ sourceId: other, section: 'analysis', query: '', page: null }]);
+});

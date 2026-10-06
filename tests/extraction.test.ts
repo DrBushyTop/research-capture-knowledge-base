@@ -36,3 +36,17 @@ it('prefers readable text over an image attachment on the same source', async ()
   zotero.request = async path => { expect(path).toBe('items/BBBBBB11/file'); return new Response('Readable document evidence should remain available when the same capture contains an image attachment before its text file.'); };
   expect((await extract(source, zotero, async () => {})).text).toContain('Readable document evidence');
 });
+
+it('uses saved captions as labelled metadata without treating them as extracted page text', async () => {
+  const { savedMetadata } = await import('../apps/worker/src/extraction.js');
+  const { normalize } = await import('../shared/corpus.js');
+  const { snapshot } = await import('./fixtures.js');
+  const source = normalize(snapshot)[0];
+  source.root.data.abstractNote = '<p>A saved social caption about a satellite.</p><script>Never run this</script>';
+  const evidence = { status: 'needs-review' as const, method: 'html' as const, reason: 'No page text', truncated: false, retrievedAt: new Date().toISOString(), artifactHash: null };
+  const result = savedMetadata(source, evidence);
+  expect(result.text).toBe('A saved social caption about a satellite.');
+  expect(result.evidence.method).toBe('zotero-metadata');
+  expect(result.evidence.status).toBe('metadata-only');
+  expect(result.evidence.reason).toContain('original document or post text was unavailable');
+});

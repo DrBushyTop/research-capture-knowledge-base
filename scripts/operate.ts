@@ -1,6 +1,7 @@
 import { BlobStore } from '../apps/worker/src/storage.js';
 import { type Job, type SourceState } from '../apps/worker/src/pipeline.js';
-import { hash, sourceId, type SourceSnapshot } from '../shared/corpus.js';
+import { sourceId } from '../shared/corpus.js';
+import { reprocessSource } from '../apps/worker/src/reprocessing.js';
 const account = process.env.STORAGE_ACCOUNT;
 if (!account) throw new Error('STORAGE_ACCOUNT is required');
 const store = new BlobStore(account);
@@ -22,17 +23,6 @@ if (command === 'status') {
   });
   console.log(JSON.stringify({ jobId: id, replayed: true }));
 } else if (command === 'reprocess' && sourceId.safeParse(id).success) {
-  await store.withLease('poll', async () => {
-    const current = await store.read<SourceState>(`sources/${id}.json`);
-    if (!current) throw new Error('Unknown source');
-    const snapshot = await store.read<SourceSnapshot>(`snapshots/${current.generationId}.json`);
-    if (!snapshot) throw new Error('Missing source snapshot');
-    const generationId = hash(`${id}:${snapshot.source.fingerprint}:${Date.now()}:manual-reprocess`);
-    const snapshotKey = `snapshots/${generationId}.json`;
-    await store.create(snapshotKey, snapshot);
-    await store.create(`jobs/${generationId}.json`, { id: generationId, source: snapshot.source, snapshotKey, status: 'pending', attempts: 0, observedAt: new Date().toISOString() } satisfies Job);
-    await store.write(`sources/${id}.json`, { ...current, generationId, processingVersion: process.env.PROCESSING_VERSION || current.processingVersion || '1' });
-    await store.send(generationId);
-    console.log(JSON.stringify({ sourceId: id, jobId: generationId, reprocessing: true }));
-  });
+  const generationId = await reprocessSource(store, id, jobId => store.send(jobId), process.env.PROCESSING_VERSION);
+  console.log(JSON.stringify({ sourceId: id, jobId: generationId, reprocessing: true }));
 } else throw new Error('Usage: npm run operate -- status | replay <jobId> | reprocess <sourceId>');

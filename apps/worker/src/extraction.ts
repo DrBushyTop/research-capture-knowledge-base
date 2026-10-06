@@ -11,6 +11,19 @@ export const maxBytes = 20 * 1024 * 1024;
 export class MissingArtifact extends Error {}
 export interface Extracted { text: string; evidence: Note['extraction']; }
 export interface RetainedArtifact { bytes: Uint8Array; mime: string; retrievedAt: string; }
+export function savedMetadata(snapshot: SourceSnapshot, evidence: Note['extraction']): Extracted {
+  const abstract = snapshot.root.data.abstractNote;
+  if (typeof abstract !== 'string' || !abstract.trim()) return { text: '', evidence };
+  const dom = new JSDOM(abstract.slice(0, 100_000));
+  let text = '';
+  try {
+    for (const element of dom.window.document.querySelectorAll('script,style')) element.remove();
+    text = dom.window.document.body.textContent?.trim() || '';
+  } finally { dom.window.close(); }
+  if (!text) return { text: '', evidence };
+  return { text: text.slice(0, 60_000), evidence: { ...evidence, status: 'metadata-only', method: 'zotero-metadata', truncated: text.length > 60_000,
+    reason: 'Analysis uses the description or caption saved in Zotero. The original document or post text was unavailable.' } };
+}
 export function publicAddress(address: string) {
   let parsed = ipaddr.parse(address);
   if (parsed.kind() === 'ipv6' && (parsed as ipaddr.IPv6).isIPv4MappedAddress()) parsed = (parsed as ipaddr.IPv6).toIPv4Address();
@@ -91,7 +104,7 @@ export async function extract(snapshot: SourceSnapshot, zotero: Zotero, retain: 
     mime = String(attachment.data.contentType || mime);
   } else if (snapshot.source.url) {
     ({ bytes, mime } = await downloadPublic(snapshot.source.url));
-  } else return { text: '', evidence: { ...evidence, reason: 'No synced attachment or retrievable source URL.' } };
+  } else return savedMetadata(snapshot, { ...evidence, reason: 'No synced attachment or retrievable source URL.' });
   const artifactHash = hash(bytes);
   await retain(artifactHash, bytes, mime);
   evidence.artifactHash = artifactHash;
@@ -118,8 +131,8 @@ export async function extract(snapshot: SourceSnapshot, zotero: Zotero, retain: 
     evidence.method = 'html'; evidence.truncated = text.length > 60_000;
   } else if (mime.startsWith('text/') || mime === 'application/json') {
     text = Buffer.from(bytes).toString('utf8'); evidence.method = 'text'; evidence.truncated = text.length > 60_000;
-  } else return { text: '', evidence: { ...evidence, status: 'needs-review', reason: mime.startsWith('image/') ? 'Image retained privately. Use a visual chat question to inspect it; text search needs OCR.' : 'Unsupported source format.' } };
+  } else return savedMetadata(snapshot, { ...evidence, status: 'needs-review', reason: mime.startsWith('image/') ? 'Image retained privately. Use a visual chat question to inspect it; text search needs OCR.' : 'Unsupported source format.' });
   text = text.slice(0, 60_000).trim();
-  if (text.length < 80) return { text: '', evidence: { ...evidence, status: 'needs-review', reason: 'No usable text layer. A scan may need OCR or manual review.' } };
+  if (text.length < 80) return savedMetadata(snapshot, { ...evidence, status: 'needs-review', reason: evidence.method === 'html' ? 'No readable page text was extracted. The page may require sign-in or block capture.' : 'No usable text layer. A scan may need OCR or manual review.' });
   return { text, evidence: { ...evidence, status: 'text' } };
 }

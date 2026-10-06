@@ -2,9 +2,11 @@
 import '@fontsource-variable/source-sans-3';
 import '@fontsource-variable/source-serif-4';
 import '../styles/reader.css';
+import '../styles/sources.css';
+import { ClientRouter } from 'astro:transitions';
 interface Props { title: string; }
 const { title } = Astro.props;
-const privateMode = process.env.READER_MODE !== 'public';
+const path = Astro.url.pathname;
 ---
-<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>{title} · Research library</title><meta name="robots" content="noindex,nofollow" /></head>
-<body><a class="skip-link" href="#main">Skip to content</a><header class="masthead"><a href="/">Research library</a>{privateMode && <nav aria-label="Library"><a href="/" aria-current={Astro.url.pathname === '/' ? 'page' : undefined}>Sources</a><a href="/chat/" aria-current={Astro.url.pathname.startsWith('/chat') ? 'page' : undefined}>Chat</a></nav>}<span>{privateMode ? 'Private collection' : 'Approved research notes'}</span>{privateMode && <a href="/.auth/logout?post_logout_redirect_uri=/login.html">Sign out</a>}</header><slot /></body></html>
+<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>{title} · Research library</title><meta name="robots" content="noindex,nofollow" /><ClientRouter fallback="swap" /></head>
+<body transition:animate="none"><a class="skip-link" href="#main">Skip to content</a><header class="masthead"><a href="/">Research library</a><nav aria-label="Library"><a href="/" aria-current={path === '/' || path.startsWith('/chat') ? 'page' : undefined}>Chat</a><a href="/sources/" aria-current={path.startsWith('/sources') || path.startsWith('/research') ? 'page' : undefined}>Sources</a><a href="/categories/" aria-current={path.startsWith('/categories') ? 'page' : undefined}>Categories</a></nav><a class="sign-out" data-astro-reload href="/.auth/logout?post_logout_redirect_uri=/login.html">Sign out</a></header><slot /></body></html>

@@ -1,10 +1,11 @@
 import { hash } from '../../../shared/corpus.js';
-import { corpusEvidence, packEvidence, type ChatActivity, type ChatAsset, type ChatCorpus, type ChatJob, type Evidence } from '../../../shared/chat.js';
+import { citationLabel, chunkText, corpusEvidence, packEvidence, type ChatActivity, type ChatAsset, type ChatCorpus, type ChatJob, type Evidence } from '../../../shared/chat.js';
 import { loadSearchIndex, rankEvidenceSources } from '../../../shared/search.js';
 import { matchedSourceText } from '../../../shared/source-text.js';
 import type { BlobStore } from './storage.js';
 import { gatherEvidence } from './chat-sandbox.js';
 import { chatToolSchemas, type ChatToolName, type ChatTools } from './chat-agent.js';
+import { readUpload } from './chat-uploads.js';
 
 export async function corpusTools(store: BlobStore, corpus: ChatCorpus, job: ChatJob, recordSandbox: (id: string) => Promise<void>, progress: (activity: ChatActivity) => Promise<void>, signal: AbortSignal): Promise<ChatTools> {
   const stored = await store.read<{ revision: string; index: unknown }>(`chat/indexes/${corpus.revision}.json`);
@@ -15,7 +16,7 @@ export async function corpusTools(store: BlobStore, corpus: ChatCorpus, job: Cha
   const addEvidence = (chunks: Evidence[]) => {
     for (const chunk of chunks) {
       const note = corpus.sources.find(source => source.note.source.id === chunk.sourceId)?.note;
-      chunk.sourceUrl = note?.source.url || null; chunk.pdf = note?.extraction.method === 'pdf-text' && !!note.extraction.artifactHash;
+      chunk.sourceUrl = note?.source.url || null; if (note) chunk.label = citationLabel(note.source); chunk.pdf = note?.extraction.method === 'pdf-text' && !!note.extraction.artifactHash;
       if (!evidence.some(item => item.id === chunk.id)) evidence.push(chunk);
     }
     return chunks;
@@ -63,6 +64,11 @@ export async function corpusTools(store: BlobStore, corpus: ChatCorpus, job: Cha
       const passages = addEvidence(packEvidence(corpusEvidence({ ...corpus, sources: [source] }).filter(chunk => chunk.kind === kind), params.query));
       return { content: { sourceId: params.sourceId, passages, assets: available } };
     }
+    if (name === 'read_source' && source.note.extraction.method === 'zotero-metadata') {
+      const text = await store.read(`source-text/${source.note.generationId}.json`);
+      const passages = text ? addEvidence(packEvidence(chunkText({ sourceId: source.note.source.id, generationId: source.note.generationId, title: source.note.source.title, kind: 'metadata', locator: 'Description or caption saved in Zotero' }, matchedSourceText(source.note, text)), 'query' in params ? params.query : '')) : [];
+      return { content: { sourceId: params.sourceId, passages, limitation: source.note.extraction.reason, assets: available } };
+    }
     if (!source.note.extraction.artifactHash) return { content: { sourceId: params.sourceId, unavailable: source.note.extraction.reason || 'No retained document', assets: available } };
     const result = await gatherEvidence(store, corpus, job, recordSandbox, { sourceId: params.sourceId, query: 'query' in params ? params.query : '', page: params.page || undefined, visual: name === 'inspect_media', signal });
     const passages = addEvidence(result.evidence.filter(chunk => chunk.kind === 'source' || chunk.kind === 'visual'));
@@ -84,5 +90,14 @@ export async function corpusTools(store: BlobStore, corpus: ChatCorpus, job: Cha
       if (asset) await register({ ...asset, originJobId: asset.originJobId || previousJobId });
     }
   };
-  return { execute, remember, evidence, assets };
+  const images = async (ids: string[]) => {
+    const urls = [];
+    for (const id of ids) {
+      // An expired earlier screenshot is left out of replay; the current message's images are required.
+      try { const upload = await readUpload(store, job.owner, id); urls.push(`data:${upload.mime};base64,${upload.bytes.toString('base64')}`); }
+      catch (error) { if (job.request.images?.includes(id)) throw error; }
+    }
+    return urls;
+  };
+  return { execute, remember, images, evidence, assets };
 }

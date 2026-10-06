@@ -5,6 +5,8 @@ import { BlobStore } from '../apps/worker/src/storage.js';
 import { type Job, type SourceState } from '../apps/worker/src/pipeline.js';
 import { noteSchema, type Note } from '../shared/corpus.js';
 import { applyCandidate } from '../shared/importer.js';
+import { readFile, writeFile } from 'node:fs/promises';
+import { mergeReaderNotes, readerNoteSchema } from '../shared/reader-notes.js';
 
 const account = process.env.STORAGE_ACCOUNT;
 if (!account) throw new Error('STORAGE_ACCOUNT is required');
@@ -31,10 +33,20 @@ await store.withLease('poll', async () => {
     }
     acknowledge.push(job);
   }
-  if (!acknowledge.length) return;
+  let notesUpdated = 0;
+  for (const key of await store.list('reader-notes/')) {
+    const saved = readerNoteSchema.parse(await store.read(key));
+    const file = path.join(root, saved.sourceId, 'notes.md');
+    let existing: string;
+    try { existing = await readFile(file, 'utf8'); }
+    catch (error) { if ((error as { code?: string }).code === 'ENOENT') continue; throw error; }
+    const merged = mergeReaderNotes(existing, saved.markdown);
+    if (merged !== existing) { await writeFile(file, merged, 'utf8'); notesUpdated++; }
+  }
+  if (!acknowledge.length && !notesUpdated) return;
   await git('add', '--', 'content/research');
   const changes = await git('diff', '--cached', '--name-only');
-  if (changes) await git('commit', '-m', `content: import ${acknowledge.length} research capture(s) [skip worker]`);
+  if (changes) await git('commit', '-m', `content: import ${acknowledge.length} captures and ${notesUpdated} reader notes [skip worker]`);
   // Push is never forced. If it fails, no cloud acknowledgements are written.
   // A retry starts from remote HEAD; receipts recover an already-pushed commit.
   if (process.env.IMPORT_PUSH === 'true') await git('push', 'origin', 'HEAD:master');

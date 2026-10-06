@@ -12,7 +12,7 @@ Astro static reader from the implementation brief. TypeScript worker and shared 
 
 ## Users
 
-One person saves sources through Zotero on Android and desktop, then finds, reads and discusses them later on either device. One non-technical admin configures categories and templates through the app. Desktop capture still requires user acceptance testing.
+Two signed-in people, pinaatti and DrBushyTop, are the only readers and both are admins. They save sources through Zotero on Android and desktop, then find, read and discuss them on either device. Either admin configures categories and analysis templates in the app without technical knowledge. Desktop capture still requires user acceptance testing.
 
 ## Product Purpose
 
@@ -20,7 +20,7 @@ A private personal corpus for research, news, recipes, guides, social posts and 
 
 ## Operating Context
 
-Capture happens in Zotero. Processing happens asynchronously. Canonical notes are Markdown and JSON in a private GitHub repository. The signed-in reader offers search, filters and freeform chat. The planned category editor stores versioned settings privately and requires no Git or JSON editing.
+Capture happens in Zotero. Processing happens asynchronously. Canonical notes are Markdown and JSON in a private GitHub repository. The signed-in reader offers search, filters and freeform chat. The Categories page edits templates (name, when to use, ordered analysis sections shown as paragraph, bullets or numbered steps), previews a draft on one saved document, and starts separate document updates. Saving affects future captures only. Settings are versioned privately; no Git or JSON editing. The reader is private only. Public presentation is deferred and has no UI.
 
 ## Capabilities and Constraints
 

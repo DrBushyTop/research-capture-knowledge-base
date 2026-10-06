@@ -17,7 +17,8 @@ export async function readCorpus(root: string, mode: 'private' | 'public'): Prom
     const publication = publicationSchema.parse(JSON.parse(await readFile(path.join(dir, 'publication.json'), 'utf8')));
     if (!note.source.active || (mode === 'public' && !publicNoteAllowed(note, publication))) continue;
     const human = await readFile(path.join(dir, 'notes.md'), 'utf8');
-    const humanHtml = sanitizeHtml(await marked.parse(human.replace(/^# Human notes\s*/, '')), { allowedTags: sanitizeHtml.defaults.allowedTags, allowedAttributes: { a: ['href', 'title'] }, allowedSchemes: ['http', 'https', 'mailto'], allowProtocolRelative: false });
+    const commentary = human.replace(/\n<!-- reader-notes -->[\s\S]*?<!-- \/reader-notes -->\n?/g, '').replace(/^# Human notes\s*/, '');
+    const humanHtml = sanitizeHtml(await marked.parse(commentary), { allowedTags: sanitizeHtml.defaults.allowedTags, allowedAttributes: { a: ['href', 'title'] }, allowedSchemes: ['http', 'https', 'mailto'], allowProtocolRelative: false });
     result.push({ note, publication, humanHtml });
   }
   return result.sort((a, b) => b.note.source.capturedAt.localeCompare(a.note.source.capturedAt));

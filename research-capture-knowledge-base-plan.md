@@ -1,11 +1,11 @@
 # Research capture and knowledge base implementation brief
 
-**Status:** Initial MVP implemented; category and template extension planned
+**Status:** Initial MVP implemented; categories, chat and reading extensions in progress
 
 **Updated:** 2026-10-06
 **Primary goal:** Make saving and revisiting sources easy, while keeping processing, storage, search, presentation, and future publishing under our control.
 
-Sections 4 and 7 describe the planned category-aware data model. The deployed version still uses a single research-oriented analysis schema. Section 14 lists the work needed to implement the extension.
+Sections 4 and 7 define the category-aware data model and editor. Section 14 records the extension work. The app is private, with access and administration limited to the GitHub accounts `pinaatti` and `DrBushyTop`. Public publishing and public presentation are deferred.
 
 ## 1. Product idea
 
@@ -474,11 +474,11 @@ Include the category identifier, template revision, assignment revision and proc
 
 ### 7.4 Configuration storage and admin access
 
-Store live category settings and immutable revisions in the existing private Blob Storage, behind authenticated Function endpoints. The browser edits forms and the API reads and writes the configuration. Git remains the generated corpus store and is not the settings UI. A separate database is not required for these infrequent edits by one admin.
+Store live category settings and immutable revisions in the existing private Blob Storage, behind authenticated Function endpoints. The browser edits forms and the API reads and writes the configuration. Git remains the generated corpus store and is not the settings UI. A separate database is not required for these infrequent edits by two admins.
 
 Use conditional writes for concurrent tabs and retain previous revisions. If settings changed while a form was open, show the conflict and preserve the unsaved draft. Keep source assignments and bulk-job records in private durable storage alongside existing ingestion state. Configuration and template history must not inherit the short retention used for chat.
 
-Only the designated GitHub admin identity can change settings, assign categories or start re-evaluation. Check this on the server; hiding the editor link is insufficient. Existing reader access does not confer admin access.
+Only the GitHub accounts `pinaatti` and `DrBushyTop` can access the private app. Both accounts can change settings, assign categories and start re-evaluation. Check the allowlist and reader role on the server. Unlisted accounts have no reader or admin access.
 
 The static reader refreshes through the existing import and deployment workflow. Show "Processing" and "Updating reader" as separate states so completing model calls does not imply the deployed site has changed. Search and chat consume the same deployed note generations and all template sections, while preserving the distinction between source text and generated interpretation.
 
@@ -493,50 +493,11 @@ Store the model/deployment and processing-version identifiers so content can lat
 
 ---
 
-## 8. Rights, licensing, and public publishing
+## 8. Rights metadata and deferred publishing
 
-The private research archive and the public site are separate concerns.
+The current application is private only. Public builds, publishing controls and public presentation are deferred until the user decides what may be published and how it should be presented.
 
-A captured PDF or webpage snapshot being privately available does **not** imply that it can be redistributed.
-
-Use an explicit publishing status:
-
-```text
-ALLOW
-  Exact source/version has a compatible redistribution license.
-
-LINK_ONLY
-  Public metadata/summary can be shown and the lawful source linked,
-  but our stored copy is not redistributed.
-
-PRIVATE
-  Source is intentionally private/non-publishable.
-
-UNKNOWN
-  Rights cannot be established.
-  Treat the same as PRIVATE for redistribution.
-```
-
-Default to conservative behavior.
-
-The public-facing application may generally expose:
-
-- title;
-- authors;
-- citation;
-- DOI;
-- original URL;
-- our own categories/tags;
-- our own summaries/commentary;
-- links to lawful open-access copies.
-
-It should **not automatically expose**:
-
-- captured publisher PDFs;
-- complete copied article text;
-- private webpage snapshots.
-
-Licensing decisions should be based on deterministic metadata/rules where possible. AI may assist classification but must not be the final publishing gate.
+Retain source license evidence and the existing publication sidecar as dormant data. Re-evaluation preserves human decisions in the sidecar. Having a private file does not authorize publishing it. The current UI offers no publishing action, and the build rejects public mode.
 
 ---
 
@@ -567,7 +528,7 @@ Later possibilities:
 - generated visualizations;
 - topic overview pages;
 - investigation/research collections;
-- public/private content modes.
+- a separately designed public presentation, after deciding what may be published.
 
 ### Search
 
@@ -806,16 +767,9 @@ Success criterion:
 
 > The user can comfortably search for and read previously captured research on phone and desktop.
 
-### Phase 4 — publishing controls
+### Phase 4: retained rights metadata, publishing deferred
 
-1. Add rights-status fields.
-2. Add public/private filtering.
-3. Add deterministic license metadata lookup.
-4. Ensure raw copyrighted artifacts cannot be exposed accidentally.
-
-Success criterion:
-
-> A public build cannot publish restricted source artifacts merely because they exist privately.
+The initial implementation recorded rights evidence and conservative publication eligibility. Keep that data and its checks. Public builds and controls are now disabled; public presentation is outside the current scope.
 
 ### Phase 5: category-aware analysis and admin editing
 
@@ -823,12 +777,24 @@ Implement this extension in four steps. The initial MVP remains usable throughou
 
 1. Add the category registry, immutable template revisions and a versioned note schema. Keep a read adapter for existing schema-version-1 notes and retain stable source paths. Update Markdown and Astro rendering together so all categories use their own sections. Add fixtures for research, recipes and metadata-only social posts.
 2. Add classification, pinned template analysis and manual category assignment. Include settings revisions in generation identity and cached output. Preserve extraction evidence, importer conflict handling, human commentary and publication checks. Update search and chat to read every generated section.
-3. Add the admin API and phone-friendly Categories editor with presets, draft validation, preview, save conflicts and server-side identity checks. Editing settings must not require repository access. Reader accounts cannot modify them.
+3. Add the admin API and phone-friendly Categories editor with presets, draft validation, preview, save conflicts and server-side identity checks. Editing settings must not require repository access. Both allowlisted accounts are admins.
 4. Add bulk re-evaluation and optional reclassification with affected-note counts, one-document preview, progress, stopping pending work and retrying failed documents. Verify that notes stay readable during jobs, stale jobs cannot overwrite newer assignments, and successful replacements reach both search and chat after deployment.
 
 Success criterion:
 
 > The admin can add a category and edit its analysis sections through the app, save a recipe without research-study headings, and deliberately update older notes without losing human commentary or making the corpus unavailable.
+
+### Phase 6: chat-first reading and document conversations
+
+Chat is the home page. Sources is the second navigation tab and combines a compact searchable list with a prominent reading area. Use more color for selected sources, category identity, generated summaries and actions. Keep labels functional and retain every category's own analysis sections. Phone navigation must allow the reader to choose a source, read it, ask about it and return to the list without squeezing desktop columns into the viewport.
+
+A document's Ask action starts the same freeform chat engine with the source ID and title saved as conversation context. The model can search any stored source. The starting document helps resolve references such as "this article" and never limits the available tools. These conversations appear in global history and resume there.
+
+Save conversations and answers privately until the user deletes them. Temporary jobs, uploads and rendered pages retain their one-day expiry. An older conversation keeps its text even when a screenshot is no longer available, and the UI and model must state that limit honestly.
+
+The reader can load saved original text and retained PDFs or images through authenticated endpoints without starting a model call. Text must match the deployed note generation and artifact hash. Keep extraction bounds visible and never execute retained HTML. Unsupported or absent originals remain explicit.
+
+OpenCode with `github-copilot/claude-opus-5.5` owns UI implementation using Impeccable. Root owns backend support. Track the work in [chat-first reading](https://github.com/DrBushyTop/research-capture-knowledge-base/issues/21) and [document conversations](https://github.com/DrBushyTop/research-capture-knowledge-base/issues/22).
 
 ---
 
@@ -881,7 +847,8 @@ Add infrastructure only after a concrete requirement appears.
 | Analysis layout | Editable category templates with immutable revisions |
 | Template changes | Future captures by default; explicit background re-evaluation |
 | Infrastructure as code | Bicep |
-| Public publishing | Conservative, rights-aware |
+| Access | Private, `pinaatti` and `DrBushyTop` only, both admins |
+| Public publishing | Deferred |
 
 ---
 
@@ -898,9 +865,9 @@ These do not block the first prototype:
    - use Zotero as the primary private file store and copy only when needed.
 
 3. **Authentication for the reader**
-   - fully public initially,
-   - private preview,
-   - or separate private/public builds.
+   - resolved as private GitHub access for `pinaatti` and `DrBushyTop`;
+   - both accounts can edit categories and re-evaluate documents;
+   - public publishing is deferred.
 
 4. **Search implementation**
    - likely Pagefind/static index first.

@@ -2,6 +2,8 @@ import { expect, it } from 'vitest';
 import { MemoryStore } from './fixtures.js';
 import { cancelChat, chatStatus, getConversation, listConversations, processChatJob, readerIdentity, reconcileChat, submitChat } from '../apps/worker/src/chat-service.js';
 import type { ChatJob } from '../shared/chat.js';
+import { normalize, type Note } from '../shared/corpus.js';
+import { snapshot } from './fixtures.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 class LeaseStore extends MemoryStore {
   private frames = new AsyncLocalStorage<Map<string, number>>();
@@ -23,10 +25,15 @@ async function store(state = new MemoryStore()) {
 }
 const insufficient = async () => ({ answer: { answer: 'No evidence.', insufficientEvidence: true, citations: [] }, evidence: [] });
 it('requires the private reader role and prevents cross-reader job access', async () => {
-  expect(() => readerIdentity(null)).toThrow('Reader access required');
-  const principal = (roles: string[]) => Buffer.from(JSON.stringify({ identityProvider: 'github', userId: 'test-user', userRoles: roles })).toString('base64');
-  expect(() => readerIdentity(principal(['authenticated']))).toThrow();
-  const owner = readerIdentity(principal(['reader']));
+  const allowed = new Set(['pinaatti', 'drbushytop']);
+  expect(() => readerIdentity(null, allowed)).toThrow('Reader access required');
+  const principal = (roles: string[], userDetails = 'DrBushyTop', identityProvider = 'github') => Buffer.from(JSON.stringify({ identityProvider, userId: 'test-user', userDetails, userRoles: roles })).toString('base64');
+  expect(() => readerIdentity(principal(['authenticated']), allowed)).toThrow();
+  expect(() => readerIdentity(principal(['authenticated', 'reader'], 'someone-else'), allowed)).toThrow('Reader access required');
+  expect(() => readerIdentity(principal(['reader'], 'DrBushyTop', 'aad'), allowed)).toThrow('Reader access required');
+  expect(() => readerIdentity(principal(['reader']), new Set())).toThrow('Reader access required');
+  expect(readerIdentity(principal(['reader'], 'pinaatti'), allowed)).toMatch(/^[a-f0-9]{64}$/);
+  const owner = readerIdentity(principal(['reader']), allowed);
   const state = await store(); const job = await submitChat(state, owner, { question: 'What is saved?' }, async () => undefined);
   await expect(chatStatus(state, 'someone-else', job.id)).rejects.toMatchObject({ status: 404 });
   expect((await chatStatus(state, owner, job.id)).status).toBe('pending');
@@ -116,12 +123,38 @@ it('recovers a committed answer when the last attempt fails to update its job', 
   await processChatJob(state, submitted.id, async () => { calls++; return insufficient(); });
   expect(calls).toBe(1);
 });
-it('expires a conversation from creation even when its last turn is recent', async () => {
+it('resumes an old conversation after temporary jobs have expired', async () => {
   const state = await store();
   const submitted = await submitChat(state, 'owner', { question: 'Initial' }, async () => undefined);
   await processChatJob(state, submitted.id, insufficient);
   const conversation = await getConversation(state, 'owner', submitted.conversationId!);
   await state.write(`chat/conversations/owner/${conversation.id}.json`, { ...conversation, createdAt: new Date(Date.now() - 25 * 60 * 60_000).toISOString(), updatedAt: new Date().toISOString() });
-  await expect(getConversation(state, 'owner', conversation.id)).rejects.toMatchObject({ status: 404 });
-  expect(await listConversations(state, 'owner')).toEqual([]);
+  state.data.delete(`chat/jobs/${submitted.id}.json`);
+  expect((await getConversation(state, 'owner', conversation.id)).turns).toHaveLength(1);
+  expect((await listConversations(state, 'owner'))[0].id).toBe(conversation.id);
+  const next = await submitChat(state, 'owner', { question: 'Continue later', conversationId: conversation.id }, async () => {});
+  await processChatJob(state, next.id, async (_corpus, _job, _record, saved) => {
+    expect(saved?.turns[0].question).toBe('Initial'); return insufficient();
+  });
+  expect((await getConversation(state, 'owner', conversation.id)).turns).toHaveLength(2);
+});
+it('persists document context in history without changing it when discussion moves to another source', async () => {
+  const state = await store();
+  const source = normalize(snapshot)[0].source;
+  const other = { ...source, id: 'zotero-users-12345-OTHER123', title: 'Another saved document' };
+  const makeNote = (source: Note['source']): Note => ({ schemaVersion: 1, source, generationId: 'b'.repeat(64), extraction: { status: 'metadata-only', method: 'none', reason: 'No original text', truncated: false, retrievedAt: new Date().toISOString(), artifactHash: null }, analysis: null, processing: { version: '2', model: null, processedAt: new Date().toISOString() }, rightsEvidence: [] });
+  await state.write(`chat/corpora/${'a'.repeat(40)}.json`, { revision: 'a'.repeat(40), sources: [source, other].map(source => ({ note: makeNote(source), humanMarkdown: '' })) });
+  await expect(submitChat(state, 'owner', { question: 'Unknown source', sourceId: 'zotero-users-12345-MISSING1' }, async () => {})).rejects.toMatchObject({ status: 400 });
+  expect(await state.list('chat/conversations/')).toHaveLength(0);
+  const first = await submitChat(state, 'owner', { question: 'Explain this document', sourceId: source.id }, async () => {});
+  await processChatJob(state, first.id, insufficient);
+  const context = { sourceId: source.id, title: source.title };
+  expect((await listConversations(state, 'owner'))[0].sourceContext).toEqual(context);
+  const next = await submitChat(state, 'owner', { question: 'Compare another saved file too', conversationId: first.conversationId, sourceId: other.id }, async () => {});
+  await processChatJob(state, next.id, async (corpus, _job, _record, conversation) => {
+    expect(conversation?.sourceContext).toEqual(context);
+    expect(corpus.sources.map(s => s.note.source.id)).toEqual([source.id, other.id]);
+    return insufficient();
+  });
+  expect((await getConversation(state, 'owner', first.conversationId!)).sourceContext).toEqual(context);
 });

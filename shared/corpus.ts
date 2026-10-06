@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
+import { categoryId, templateAnalysisSchema } from './categories.js';
 
 export const processingVersion = '2';
 export const httpUrl = z.url().refine(value => {
@@ -31,10 +32,10 @@ export const licenseEvidenceSchema = z.strictObject({
   origin: z.enum(['crossref', 'human']), licenseUrl: httpUrl, appliesTo: z.enum(['metadata', 'artifact']),
   artifactHash: z.string().regex(/^[a-f0-9]{64}$/).nullable(), checkedAt: z.string()
 });
-export const noteSchema = z.strictObject({
+export const legacyNoteSchema = z.strictObject({
   schemaVersion: z.literal(1), generationId: z.string().regex(/^[a-f0-9]{64}$/), source: sourceSchema,
   extraction: z.strictObject({
-    status: z.enum(['text', 'metadata-only', 'needs-review']), method: z.enum(['pdf-text', 'html', 'text', 'none']),
+    status: z.enum(['text', 'metadata-only', 'needs-review']), method: z.enum(['pdf-text', 'html', 'text', 'zotero-metadata', 'none']),
     reason: z.string().max(1000).nullable(), truncated: z.boolean(), retrievedAt: z.string(),
     artifactHash: z.string().regex(/^[a-f0-9]{64}$/).nullable(), artifactMime: z.string().max(100).optional()
   }),
@@ -42,7 +43,29 @@ export const noteSchema = z.strictObject({
   processing: z.strictObject({ version: z.string(), model: z.string().nullable(), processedAt: z.string() }),
   rightsEvidence: z.array(licenseEvidenceSchema)
 });
+export const categoryNoteSchema = legacyNoteSchema.extend({
+  schemaVersion: z.literal(2), analysis: templateAnalysisSchema.nullable(),
+  category: z.strictObject({ id: categoryId, name: z.string().max(80), templateRevision: z.number().int().positive(),
+    assignmentRevision: z.number().int().positive(), assignment: z.enum(['automatic', 'manual']), reason: z.string().max(1000) })
+});
+export const noteSchema = z.union([legacyNoteSchema, categoryNoteSchema]);
 export type Note = z.infer<typeof noteSchema>;
+export function analysisSections(note: Note) {
+  const a = note.analysis;
+  if (!a) return [];
+  if ('sections' in a) return a.sections;
+  const sections: { id: string; heading: string; format: 'text' | 'bullets' | 'steps'; text: string | null; items: string[] }[] = [];
+  const bullets = (id: string, heading: string, items: string[]) => { if (items.length) sections.push({ id, heading, format: 'bullets', text: null, items }); };
+  bullets('findings', 'Key findings', a.keyFindings);
+  bullets('methods', 'Study details', [a.studyType && `Study type: ${a.studyType}`, a.population && `Population: ${a.population}`,
+    a.participantCount !== null && `Participants: ${a.participantCount}`, a.intervention && `Intervention: ${a.intervention}`, a.comparator && `Comparator: ${a.comparator}`].filter((value): value is string => typeof value === 'string' && Boolean(value)));
+  bullets('outcomes', 'Reported outcomes', a.outcomes);
+  bullets('claims', 'Claims and their evidence', a.claims.map(claim => `${claim.text}\nEvidence: ${claim.evidence}`));
+  bullets('relevance', 'Why this is relevant', a.relevance);
+  bullets('limitations', 'Limitations', a.limitations);
+  if (a.funding) sections.push({ id: 'funding', heading: 'Funding', format: 'text', text: a.funding, items: [] });
+  return sections;
+}
 export const publicationSchema = z.strictObject({
   note: z.enum(['PRIVATE', 'UNKNOWN', 'LINK_ONLY', 'ALLOW']),
   approvedFingerprint: z.string().regex(/^[a-f0-9]{64}$/).nullable(), approvedBy: z.string().max(200).nullable(),
@@ -100,8 +123,14 @@ export function renderMarkdown(note: Note): string {
   const { source, analysis: a } = note;
   const metadata = { id: source.id, title: source.title, source_type: source.itemType, source_url: source.url, doi: source.doi,
     captured_at: source.capturedAt, published_at: source.publishedAt, authors: source.authors, topics: a?.topics ?? source.tags,
+    ...(note.schemaVersion === 2 ? { category: note.category.id, template_revision: note.category.templateRevision, category_assignment: note.category.assignment } : {}),
     evidence_status: note.extraction.status, processing: note.processing, publication: { status: 'private' } };
   const frontmatter = Object.entries(metadata).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n');
   const list = (values: string[]) => values.length ? values.map(s => `- ${md(s)}`).join('\n') : 'Not reported.';
-  return `---\n${frontmatter}\n---\n\n# ${md(source.title)}\n\n## Source facts\n\n${source.authors.map(md).join(', ') || 'Authors not provided.'}\n\n${source.doi ? 'DOI: ' + md(source.doi) : ''}\n\n${source.url ? '<' + source.url + '>' : 'No source URL provided.'}\n\n## Machine interpretation\n\n${a ? md(a.summary) : 'Analysis unavailable. ' + md(note.extraction.reason || 'Source text is unavailable.')}\n\n## Key findings\n\n${list(a?.keyFindings ?? [])}\n\n## Limitations\n\n${list(a?.limitations ?? [])}\n\n## Why this is relevant\n\n${list(a?.relevance ?? [])}\n\n## Evidence status\n\n${md(note.extraction.status)}${note.extraction.reason ? ': ' + md(note.extraction.reason) : ''}\n${note.extraction.truncated ? '\nOnly a bounded portion of this source was analyzed.\n' : ''}\n\nHuman commentary belongs in notes.md and survives reprocessing.\n`;
+  if (note.schemaVersion === 2) {
+    const sections = analysisSections(note).filter(section => section.text || section.items.length).map(section =>
+      `## ${md(section.heading)}\n\n${section.format === 'text' ? md(section.text || '') : section.items.map((item, index) => `${section.format === 'steps' ? index + 1 + '.' : '-'} ${md(item)}`).join('\n')}\n`).join('\n');
+    return `---\n${frontmatter}\n---\n\n# ${md(source.title)}\n\n## Source facts\n\n${source.authors.map(md).join(', ') || 'Authors not provided.'}\n\n${source.url ? '<' + source.url + '>' : 'No source URL provided.'}${source.doi ? '\n\nDOI: ' + md(source.doi) : ''}\n\n## Summary\n\n${a ? md(a.summary) : 'Analysis unavailable. ' + md(note.extraction.reason || 'Source text is unavailable.')}\n\n${sections}\n## Evidence status\n\n${md(note.extraction.status)}${note.extraction.reason ? ': ' + md(note.extraction.reason) : ''}${note.extraction.truncated ? '\nOnly a bounded portion of this source was analyzed.\n' : ''}\n\nHuman commentary belongs in notes.md and survives reprocessing.\n`;
+  }
+  return `---\n${frontmatter}\n---\n\n# ${md(source.title)}\n\n## Source facts\n\n${source.authors.map(md).join(', ') || 'Authors not provided.'}\n\n${source.doi ? 'DOI: ' + md(source.doi) : ''}\n\n${source.url ? '<' + source.url + '>' : 'No source URL provided.'}\n\n## Machine interpretation\n\n${a ? md(a.summary) : 'Analysis unavailable. ' + md(note.extraction.reason || 'Source text is unavailable.')}\n\n## Key findings\n\n${list(a && 'keyFindings' in a ? a.keyFindings : [])}\n\n## Limitations\n\n${list(a && 'limitations' in a ? a.limitations : [])}\n\n## Why this is relevant\n\n${list(a && 'relevance' in a ? a.relevance : [])}\n\n## Evidence status\n\n${md(note.extraction.status)}${note.extraction.reason ? ': ' + md(note.extraction.reason) : ''}\n${note.extraction.truncated ? '\nOnly a bounded portion of this source was analyzed.\n' : ''}\n\nHuman commentary belongs in notes.md and survives reprocessing.\n`;
 }

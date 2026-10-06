@@ -1,22 +1,50 @@
 ---
 import { getCollection } from 'astro:content';
 import Layout from '../../components/Layout.astro';
-import { sourceTypeLabel } from '../../lib/labels';
+import SourceList from '../../components/SourceList.astro';
+import SourceAsk from '../../components/SourceAsk';
+import OriginalText from '../../components/OriginalText';
+import ReaderNotes from '../../components/ReaderNotes';
+import { categoryTone, sourceTypeLabel } from '../../lib/labels';
+import { analysisSections } from '../../../../../shared/corpus';
 export async function getStaticPaths() {
   return (await getCollection('research')).map(entry => ({ params: { id: entry.id }, props: { entry } }));
 }
 const { entry } = Astro.props;
-const { note, humanHtml, publication } = entry.data;
+const { note, humanHtml } = entry.data;
 const { source, analysis } = note;
 const topics = analysis?.topics || source.tags;
 const limited = note.extraction.status !== 'text';
+const category = note.schemaVersion === 2 ? note.category : null;
+const sections = analysisSections(note).filter(section => section.text || section.items.length);
+const method = { 'pdf-text': 'PDF text', html: 'Webpage text', text: 'Document text', 'zotero-metadata': 'Zotero description only', none: 'Metadata only' }[note.extraction.method];
+const date = (value: string) => new Date(value).toLocaleDateString('en-GB', { timeZone: 'UTC', day: 'numeric', month: 'short', year: 'numeric' });
 ---
-<Layout title={source.title}><div class="note-layout"><aside class="note-margin"><a class="back-link" href="/">Back to saved sources</a><p class="margin-label">In this note</p><nav aria-label="Note sections"><a href="#source">Source facts</a><a href="#analysis">Machine interpretation</a><a href="#limitations">Limitations</a><a href="#human">Human notes</a></nav><p class="margin-help">{publication.note === 'PRIVATE' ? 'This note is private.' : 'Publication status: ' + publication.note}<br />Retained source files are kept private.</p></aside>
-<main id="main" class="reading-surface" data-pagefind-body><article class="research-note"><h1 data-pagefind-meta="title">{source.title}</h1><p class="citation">{source.authors.join(', ') || 'Authors not provided'}{source.publishedAt && ' · ' + source.publishedAt}</p><div class="review-line"><span class:list={['status', { attention: limited }]}>{limited ? 'Needs review · limited evidence' : 'Machine interpretation · not reviewed'}</span><span>{note.extraction.method === 'pdf-text' ? 'PDF text' : note.extraction.method === 'html' ? 'Webpage text' : note.extraction.method === 'text' ? 'Document text' : 'Metadata only'}</span></div><div class="topic-line"><p>{topics.slice(0, 3).join(' / ') || 'No topics assigned'}</p>{topics.length > 3 && <details><summary>All {topics.length} topics</summary><p>{topics.join(' / ')}</p></details>}</div>
-{note.extraction.reason && <p class="evidence-notice">{note.extraction.reason}</p>}
-{note.extraction.truncated && <p class="evidence-notice">Only a bounded portion of this source was analyzed. Conclusions may miss material elsewhere in it.</p>}
-<section id="source"><h2>Source facts</h2><dl class="facts"><div><dt>Source type</dt><dd>{sourceTypeLabel(source.itemType)}</dd></div><div><dt>Captured</dt><dd>{new Date(source.capturedAt).toLocaleDateString('en-GB', { timeZone: 'UTC' })}</dd></div>{source.doi && <div><dt>DOI</dt><dd><a href={`https://doi.org/${encodeURIComponent(source.doi)}`} rel="noreferrer">{source.doi}</a></dd></div>}{source.url && <div><dt>Original source</dt><dd><a href={source.url} rel="noreferrer">Open source website</a></dd></div>}</dl></section>
-<section id="analysis" class="machine-section"><h2>Machine interpretation</h2><p>{analysis?.summary || note.extraction.reason || 'Analysis is unavailable. Source metadata is saved.'}</p>{analysis && <><h3>Key findings</h3>{analysis.keyFindings.length ? <ul>{analysis.keyFindings.map(f => <li>{f}</li>)}</ul> : <p>No findings identified.</p>}{analysis.studyType && <p><strong>Study type:</strong> {analysis.studyType}</p>}{analysis.population && <p><strong>Population:</strong> {analysis.population}</p>}{analysis.participantCount !== null && <p><strong>Participants:</strong> {analysis.participantCount}</p>}{analysis.intervention && <p><strong>Intervention:</strong> {analysis.intervention}</p>}{analysis.comparator && <p><strong>Comparator:</strong> {analysis.comparator}</p>}{analysis.outcomes.length > 0 && <><h3>Reported outcomes</h3><ul>{analysis.outcomes.map(o => <li>{o}</li>)}</ul></>}{analysis.claims.length > 0 && <details><summary>Claims and their evidence</summary>{analysis.claims.map(c => <div class="claim"><p>{c.text}</p><p class="evidence-quote">{c.evidence}</p></div>)}</details>}{analysis.relevance.length > 0 && <><h3>Why this is relevant</h3><ul>{analysis.relevance.map(r => <li>{r}</li>)}</ul></>}{analysis.funding && <p><strong>Funding reported in the source:</strong> {analysis.funding}</p>}</>}</section>
-<section id="limitations" class="limitations-section"><h2>Limitations and open questions</h2>{analysis?.limitations.length ? <ul>{analysis.limitations.map(l => <li>{l}</li>)}</ul> : <p>Limitations have not been assessed from usable source text.</p>}</section>
-<section id="human" class="human-section"><h2>Human notes</h2><div class="human-prose" set:html={humanHtml} /><p class="note-help">Personal commentary is preserved when the machine analysis changes.</p></section>
-<footer class="source-footer"><p>Analysis prepared {new Date(note.processing.processedAt).toLocaleDateString('en-GB', { timeZone: 'UTC' })}{note.processing.model && ' · ' + note.processing.model}. Source facts and interpretation remain separate.</p></footer></article></main></div></Layout>
+<Layout title={source.title}><div class="sources-shell is-reading">
+<SourceList current={source.id} />
+<main id="main" class="reading-pane" data-pagefind-body data-tone={categoryTone(category?.id)}>
+<article class="research-note">
+  <nav class="reading-back" aria-label="Breadcrumb"><a href="/sources/">Sources</a></nav>
+  <header class="note-head">
+    <p class="note-kind">{category ? <a class="category-chip" href={`/categories/?source=${source.id}`} title="Change category">{category.name}</a> : <a class="category-chip is-unset" href={`/categories/?source=${source.id}`}>Set category</a>}<span>{sourceTypeLabel(source.itemType)}</span>{source.publishedAt && <span>{source.publishedAt}</span>}</p>
+    <h1 data-pagefind-meta="title">{source.title}</h1>
+    <p class="citation">{source.authors.join(', ') || 'Authors not provided'}</p>
+    <div class="note-actions">
+      <button type="button" class="ask-button" data-ask-open aria-controls="source-ask" aria-expanded="false">Ask about this source</button>
+      {source.url && <a href={source.url} rel="noreferrer" target="_blank">Original</a>}
+      {source.doi && <a href={`https://doi.org/${encodeURIComponent(source.doi)}`} rel="noreferrer" target="_blank">DOI</a>}
+    </div>
+  </header>
+  <nav class="note-tabs" aria-label="Note sections"><a href="#analysis">Summary</a>{sections.map(section => <a href={`#section-${section.id}`}>{section.heading}</a>)}<a href="#human">Notes</a><a href="#original">Original text</a><a href="#source">Details</a></nav>
+  {(limited || note.extraction.reason || note.extraction.truncated) && <div class="evidence-notice"><strong>{limited ? 'Needs review' : 'Partial analysis'}</strong>{note.extraction.reason && <p>{note.extraction.reason}</p>}{note.extraction.truncated && <p>Only a bounded portion of this source was analysed.</p>}</div>}
+  <section id="analysis" class="summary-section"><h2>Summary <span class="origin-tag">Generated</span></h2><p>{analysis?.summary || note.extraction.reason || 'Analysis is unavailable. Source metadata is saved.'}</p>
+    {topics.length > 0 && <ul class="topic-list" aria-label="Topics">{topics.map(topic => <li>{topic}</li>)}</ul>}</section>
+  {sections.map(section => <section id={`section-${section.id}`} class="analysis-section"><h2>{section.heading}</h2>{section.format === 'text' ? <p>{section.text}</p> : section.format === 'steps' ? <ol class="steps">{section.items.map(item => <li>{item}</li>)}</ol> : <ul>{section.items.map(item => <li>{item}</li>)}</ul>}</section>)}
+  <section id="human" class="human-section"><h2>Notes <span class="origin-tag is-human">Human</span></h2>{humanHtml && <div class="human-prose" set:html={humanHtml} />}<ReaderNotes client:load sourceId={source.id} /></section>
+  <section id="original" class="original-section"><h2>Original text <span class="origin-tag is-source">Source</span></h2><OriginalText client:visible sourceId={source.id} artifactMime={note.extraction.artifactMime} sourceUrl={source.url} /><noscript><p class="original-missing">Original text needs JavaScript.</p></noscript></section>
+  <section id="source" class="details-section"><h2>Details</h2><dl class="facts"><div><dt>Source type</dt><dd>{sourceTypeLabel(source.itemType)}</dd></div><div><dt>Captured</dt><dd>{date(source.capturedAt)}</dd></div><div><dt>Text</dt><dd>{method}</dd></div><div><dt>Status</dt><dd>{limited ? 'Needs review' : 'Generated analysis, not reviewed'}</dd></div>{category && <div><dt>Category</dt><dd>{category.name}, template {category.templateRevision} · {category.assignment === 'manual' ? 'set by you' : 'automatic'}</dd></div>}{source.doi && <div><dt>DOI</dt><dd><a href={`https://doi.org/${encodeURIComponent(source.doi)}`} rel="noreferrer">{source.doi}</a></dd></div>}{source.url && <div><dt>Original source</dt><dd><a href={source.url} rel="noreferrer">{new URL(source.url).hostname.replace(/^www\./, '')}</a></dd></div>}<div><dt>Analysis prepared</dt><dd>{date(note.processing.processedAt)}{note.processing.model && ' · ' + note.processing.model}</dd></div></dl></section>
+</article>
+<button type="button" class="ask-fab" data-ask-open aria-controls="source-ask" aria-expanded="false">Ask</button>
+</main>
+<SourceAsk client:load sourceId={source.id} title={source.title} />
+</div></Layout>

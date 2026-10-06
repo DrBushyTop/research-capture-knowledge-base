@@ -8,15 +8,14 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run check:reader && npm test && npm run build:reader && npm run check:public",
+    "check": "npm run typecheck && npm run check:reader && npm test && npm run build:reader",
     "build:worker": "node scripts/build-worker.mjs",
     "build:reader": "astro build --root apps/reader && tsx scripts/build-search.ts && pagefind --site apps/reader/dist",
     "dev": "tsx scripts/build-search.ts --dev && astro dev --root apps/reader --host 0.0.0.0",
     "import": "tsx scripts/import-corpus.ts",
     "operate": "tsx scripts/operate.ts",
     "check:reader": "astro check --root apps/reader",
-    "preview": "astro preview --root apps/reader --host 0.0.0.0",
-    "check:public": "READER_MODE=public npm run build:reader && tsx scripts/verify-public-artifacts.ts"
+    "preview": "astro preview --root apps/reader --host 0.0.0.0"
   },
   "dependencies": {
     "@astrojs/react": "^7.0.0",

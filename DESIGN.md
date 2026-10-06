@@ -3,6 +3,7 @@ name: Research library
 description: A private research notebook with a library margin and readable evidence sections.
 colors:
   ink: "#202d3d"
+  navy: "#14213a"
   muted: "#546476"
   paper: "#fff"
   ground: "#edf1f5"
@@ -210,7 +211,9 @@ Chat uses the full viewport width below the masthead. A 240px history margin sit
 
 At the same mobile breakpoint, chat history moves into a drawer. Messages keep 1rem side padding and the composer keeps 0.75rem side padding. Evidence opens in a bottom sheet; image viewing fills the phone width. The composer and dialogs include safe-area padding. The phone masthead hides access-state text and keeps Sources, Chat, and sign-out available.
 
-**The Reading Width Rule.** Keep research articles within the 72ch reading column, including long titles, citations, and source URLs.
+**The reading width rule.** On source detail pages, the article fills the space beside the source list with responsive side padding. Titles, section navigation, summaries, original text, and details share that width. The separate legacy note layout retains its 72ch cap. Long titles and source URLs wrap within their pane.
+
+Source pages offer Add notes and Edit notes inline, with a labeled textarea, explicit Save and Cancel, retained local drafts, and conflict recovery that keeps the draft beside the latest saved text. Both readers share the saved notes. Internal links use Astro's client router without animated page transitions. Search initializes after each route swap and retains its loaded index for the session.
 
 ## Elevation & Depth
 
@@ -265,6 +268,20 @@ Numbered inline citation buttons expose the evidence title, origin, locator, exc
 Returned images use the discussion width, with a 560px height cap, and open an image dialog with zoom, pan, reset, and an original-image link. Desktop images fit their viewer; phone images fill its width before zooming. Pinch, double tap or double click, drag, plus and minus buttons, and keyboard controls share the same bounded 100% to 600% zoom state. PDF and site attachments use bordered file links. Images come from returned private-corpus assets; Markdown image URLs do not create additional images.
 
 The phone evidence sheet enters over 0.18s only when reduced motion is not requested. History and image dialogs have no entrance animation. The surface brief records route behavior and review evidence.
+
+### Masthead
+
+Navy (`navy`) bar on every page. White wordmark, pale nav links, the current section as a white pill. On phones the three sections (Sources, Chat, Categories) sit in a full-width segmented row under the wordmark. No public or publication controls anywhere.
+
+### Categories admin
+
+Operate surface at `/categories/`. Three tabs (Templates, Documents, Updates; arrow keys move between them) under a page title with a 2px ink rule. Badges show documents on an older template and running updates.
+
+- Templates: category rail on desktop (current item filled navy), native select plus New on narrow screens. The editor is one white panel: serif name field, "When to use this category", numbered section blocks (heading, "Show as" pill radios Paragraph / Bullets / Numbered steps, "What to include", move up/down/remove icons), dashed Add section, "Try this template" preview (marked "Preview only · not saved"), Archive/Restore, then a save bar that turns sticky only while there are unsaved changes. Conflicts (409) keep the draft and offer "Reload latest categories". Switching category with unsaved changes asks inline.
+- Documents: title search, Show filter with counts, checkbox rows with category tag, "Chosen by admin", "Older template" and status. Selecting opens a sticky navy action bar: Update analysis (keep category or Move to) or Check categories. The confirmation names the count and model-call cost before Start update. `/categories/?source=<id>` opens here with that document selected and Move to preset.
+- Updates: one card per batch with progress bar (blue done, rust failed), failures sorted first with Retry, "Stop N queued".
+
+Copy states the action and its effect. No slogans.
 
 ## Do's and Don'ts
 

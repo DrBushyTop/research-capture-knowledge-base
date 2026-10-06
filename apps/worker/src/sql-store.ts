@@ -148,7 +148,7 @@ export class SqlStore extends BlobStore {
   async sourceInputs() {
     const result = await (await this.request()).query(`SELECT s.source_id,t.document AS source_text,n.document AS reader_note
       FROM dbo.Sources s
-      LEFT JOIN dbo.Records t ON t.record_key=N'source-text/'+s.generation_id+N'.json'
+      LEFT JOIN dbo.Records t ON t.record_key=(N'source-text/'+s.generation_id+N'.json') COLLATE Latin1_General_100_BIN2
       LEFT JOIN dbo.Records n ON n.record_key=N'reader-notes/'+s.source_id+N'.json'
       WHERE s.active=1;`);
     return new Map<string, { text?: unknown; readerNote?: { markdown: string } }>(result.recordset.map(row => [

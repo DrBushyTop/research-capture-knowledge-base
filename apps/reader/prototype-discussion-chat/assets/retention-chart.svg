@@ -6,7 +6,7 @@
     <text x="32" y="37" font-size="19" font-weight="600">Retention by study week</text>
     <text x="32" y="60" font-size="12" fill="#546476">Synthetic study data</text>
   </g>
-  <g stroke="#d6dee7" stroke-width="1"><path d="M70 108H580 M70 164H580 M70 220H580"/><path d="M70 92V244H580" stroke="#a8b5c5"/></g>
+  <g stroke="#d6dee7" stroke-width="1" fill="none"><path d="M70 108H580 M70 164H580 M70 220H580"/><path d="M70 92V244H580" stroke="#a8b5c5"/></g>
   <g fill="#546476" font-family="Source Sans 3,Arial,sans-serif" font-size="13">
     <text x="45" y="112">80</text><text x="45" y="168">75</text><text x="45" y="224">70</text>
     <text x="149" y="270">Week 12</text><text x="459" y="270">Week 24</text>
@@ -15,5 +15,5 @@
   <path d="M175 220L485 220" fill="none" stroke="#6b7b8f" stroke-width="3"/>
   <g fill="#2356a5"><circle cx="175" cy="175" r="5"/><circle cx="485" cy="119" r="5"/></g>
   <g fill="#6b7b8f"><circle cx="175" cy="220" r="5"/><circle cx="485" cy="220" r="5"/></g>
-  <g font-family="Source Sans 3,Arial,sans-serif" font-size="12"><path d="M174 302h25" stroke="#2356a5" stroke-width="3"/><text x="207" y="306" fill="#202d3d">Reading task</text><path d="M352 302h25" stroke="#6b7b8f" stroke-width="3"/><text x="385" y="306" fill="#202d3d">Comparison</text></g>
+  <g font-family="Source Sans 3,Arial,sans-serif" font-size="12"><path d="M174 302h25" fill="none" stroke="#2356a5" stroke-width="3"/><text x="207" y="306" fill="#202d3d">Reading task</text><path d="M352 302h25" fill="none" stroke="#6b7b8f" stroke-width="3"/><text x="385" y="306" fill="#202d3d">Comparison</text></g>
 </svg>

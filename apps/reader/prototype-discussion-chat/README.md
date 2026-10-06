@@ -32,7 +32,9 @@ Place compact citation pills beside the supported passage. Hover previews on des
 
 Search and document choices belong to the agent. Tool activity starts at Searching and collapses to a short result disclosure. Do not ask the reader to choose a source, PDF or page before sending.
 
-Returned images belong within the answer. Tap an image to expand it, with its source and download action. Avoid an always-visible source rail on phones. C is useful as an optional desktop review mode, but it takes away reading width and should not be the default.
+Returned images belong within the answer. Tap an image to open a full-screen phone viewer with the initial image spanning the phone width. Pinch or double-tap to zoom, then drag to pan. Visible zoom in, zoom out and Reset controls have 44px targets. The viewer retains its source and download actions. Desktop users can also zoom with the wheel or plus and minus keys, pan with arrow keys, and reset with zero. The chart's axes and legend paths explicitly use no fill so open stroke paths cannot form black triangles.
+
+Avoid an always-visible source rail on phones. C is useful as an optional desktop review mode, but it takes away reading width and should not be the default.
 
 ## Validation scope
 

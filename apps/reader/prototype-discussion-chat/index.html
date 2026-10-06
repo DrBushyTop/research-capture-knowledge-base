@@ -55,8 +55,13 @@
   <section id="evidence" class="evidence-popover" popover="auto" role="dialog" aria-label="Source evidence" tabindex="-1"></section>
   <dialog class="image-dialog" id="image-dialog" aria-label="Image">
     <div class="image-dialog-header"><h2>Retention by study week</h2><button type="button" class="icon-button" data-action="close-image" aria-label="Close image"><span data-icon="close"></span></button></div>
-    <img src="assets/retention-chart.svg" alt="Synthetic chart. The reading-task group scores 74 at week 12 and 79 at week 24; the comparison group scores 70 at both weeks.">
-    <div class="image-actions"><button type="button" class="text-button" data-source="2025">Reading task study · 2025</button><a href="assets/retention-chart.svg" download>Download image</a></div>
+    <div class="image-stage" id="image-stage" tabindex="0" aria-label="Image. Use plus and minus to zoom, arrow keys to pan, and zero to reset.">
+      <img id="viewer-image" src="assets/retention-chart.svg" draggable="false" alt="Synthetic chart. The reading-task group scores 74 at week 12 and 79 at week 24; the comparison group scores 70 at both weeks.">
+    </div>
+    <div class="image-footer">
+      <div class="image-zoom-controls" aria-label="Image zoom"><button type="button" class="zoom-button" data-action="zoom-out" aria-label="Zoom out"><span data-icon="minus"></span></button><button type="button" class="zoom-reset" data-action="zoom-reset">Reset</button><output id="image-zoom" aria-live="polite">100%</output><button type="button" class="zoom-button" data-action="zoom-in" aria-label="Zoom in"><span data-icon="plus"></span></button></div>
+      <div class="image-actions"><button type="button" class="text-button" data-source="2025">Reading task study · 2025</button><a href="assets/retention-chart.svg" download>Download image</a></div>
+    </div>
   </dialog>
   <dialog id="sources-dialog" aria-label="Sources">
     <div class="image-dialog-header"><h2>Sources</h2><button type="button" class="icon-button" data-action="close-library" aria-label="Close sources"><span data-icon="close"></span></button></div>

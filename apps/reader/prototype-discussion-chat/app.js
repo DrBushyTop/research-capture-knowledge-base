@@ -2,6 +2,7 @@
 const icons = {
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  minus: '<path d="M5 12h14"/>',
   close: '<path d="m6 6 12 12M18 6 6 18"/>',
   file: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 14h8M8 17h6"/>',
   'arrow-up': '<path d="M12 19V5m-6 6 6-6 6 6"/>',
@@ -48,9 +49,116 @@ const messageInput = document.getElementById('message');
 const sendButton = document.getElementById('send');
 const popover = document.getElementById('evidence');
 const scroll = document.getElementById('conversation');
+const imageDialog = document.getElementById('image-dialog');
+const imageStage = document.getElementById('image-stage');
+const viewerImage = document.getElementById('viewer-image');
+const imageView = {scale:1,x:0,y:0,width:0,height:0};
+const imagePointers = new Map();
+let imageGesture = null;
+let lastImageTap = null;
 const isPhone = () => window.matchMedia('(max-width:720px)').matches;
 const activeChat = () => chats.find(chat=>chat.id===currentChat);
 const stampIcons = root => root.querySelectorAll('[data-icon]').forEach(element=>{element.innerHTML=svg(element.dataset.icon);});
+
+function clampImagePosition() {
+  const width=imageView.width*imageView.scale;
+  const height=imageView.height*imageView.scale;
+  imageView.x=width<=imageStage.clientWidth?(imageStage.clientWidth-width)/2:Math.min(0,Math.max(imageStage.clientWidth-width,imageView.x));
+  imageView.y=height<=imageStage.clientHeight?(imageStage.clientHeight-height)/2:Math.min(0,Math.max(imageStage.clientHeight-height,imageView.y));
+}
+function renderImageView() {
+  clampImagePosition();
+  viewerImage.style.width=`${imageView.width}px`;
+  viewerImage.style.transform=`translate(${imageView.x}px,${imageView.y}px) scale(${imageView.scale})`;
+  document.getElementById('image-zoom').textContent=`${Math.round(imageView.scale*100)}%`;
+  imageDialog.querySelector('[data-action="zoom-out"]').disabled=imageView.scale<=1;
+  imageDialog.querySelector('[data-action="zoom-in"]').disabled=imageView.scale>=6;
+}
+function resetImageView() {
+  imageView.scale=1;
+  imageView.width=imageStage.clientWidth;
+  imageView.height=imageView.width*(viewerImage.naturalHeight||330)/(viewerImage.naturalWidth||620);
+  imageView.x=0;
+  imageView.y=0;
+  imagePointers.clear();
+  imageGesture=null;
+  renderImageView();
+}
+function zoomImage(nextScale,point={x:imageStage.clientWidth/2,y:imageStage.clientHeight/2}) {
+  const scale=Math.min(6,Math.max(1,nextScale));
+  const factor=scale/imageView.scale;
+  imageView.x=point.x-(point.x-imageView.x)*factor;
+  imageView.y=point.y-(point.y-imageView.y)*factor;
+  imageView.scale=scale;
+  renderImageView();
+}
+function imagePoint(event) {
+  const bounds=imageStage.getBoundingClientRect();
+  return {x:event.clientX-bounds.left,y:event.clientY-bounds.top};
+}
+function beginImageGesture() {
+  const points=[...imagePointers.values()];
+  if(points.length>=2) {
+    const [a,b]=points;
+    imageGesture={scale:imageView.scale,x:imageView.x,y:imageView.y,center:{x:(a.x+b.x)/2,y:(a.y+b.y)/2},distance:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y))};
+    imagePointers.forEach(point=>point.moved=true);
+  } else if(points.length===1) imageGesture={x:imageView.x,y:imageView.y,point:{x:points[0].x,y:points[0].y}};
+  else imageGesture=null;
+}
+imageStage.addEventListener('pointerdown',event=>{
+  if(event.pointerType==='mouse'&&event.button!==0) return;
+  event.preventDefault();
+  imageStage.setPointerCapture(event.pointerId);
+  const point=imagePoint(event);
+  imagePointers.set(event.pointerId,{...point,start:{...point},time:Date.now(),moved:false});
+  beginImageGesture();
+});
+imageStage.addEventListener('pointermove',event=>{
+  const point=imagePointers.get(event.pointerId);
+  if(!point||!imageGesture) return;
+  const next=imagePoint(event);
+  point.x=next.x;point.y=next.y;
+  if(Math.hypot(point.x-point.start.x,point.y-point.start.y)>8) point.moved=true;
+  const points=[...imagePointers.values()];
+  if(points.length>=2&&imageGesture.center) {
+    const [a,b]=points;
+    const center={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+    imageView.scale=Math.min(6,Math.max(1,imageGesture.scale*Math.hypot(a.x-b.x,a.y-b.y)/imageGesture.distance));
+    imageView.x=center.x-(imageGesture.center.x-imageGesture.x)*imageView.scale/imageGesture.scale;
+    imageView.y=center.y-(imageGesture.center.y-imageGesture.y)*imageView.scale/imageGesture.scale;
+  } else if(points.length===1&&imageGesture.point) {
+    imageView.x=imageGesture.x+point.x-imageGesture.point.x;
+    imageView.y=imageGesture.y+point.y-imageGesture.point.y;
+  }
+  renderImageView();
+});
+function releaseImagePointer(event) {
+  const point=imagePointers.get(event.pointerId);
+  imagePointers.delete(event.pointerId);
+  if(point&&!point.moved&&event.type==='pointerup'&&Date.now()-point.time<300) {
+    if(lastImageTap&&Date.now()-lastImageTap.time<320&&Math.hypot(point.x-lastImageTap.x,point.y-lastImageTap.y)<28) {
+      zoomImage(imageView.scale>1?1:2,point);
+      lastImageTap=null;
+    } else lastImageTap={x:point.x,y:point.y,time:Date.now()};
+  }
+  beginImageGesture();
+}
+imageStage.addEventListener('pointerup',releaseImagePointer);
+imageStage.addEventListener('pointercancel',releaseImagePointer);
+imageStage.addEventListener('wheel',event=>{event.preventDefault();zoomImage(imageView.scale*(event.deltaY<0?1.15:1/1.15),imagePoint(event));},{passive:false});
+imageStage.addEventListener('keydown',event=>{
+  if(['+','=','-','0','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key)) {event.preventDefault();event.stopPropagation();}
+  if(event.key==='+'||event.key==='=') zoomImage(imageView.scale*1.5);
+  if(event.key==='-') zoomImage(imageView.scale/1.5);
+  if(event.key==='0') resetImageView();
+  if(event.key==='ArrowLeft') imageView.x+=40;
+  if(event.key==='ArrowRight') imageView.x-=40;
+  if(event.key==='ArrowUp') imageView.y+=40;
+  if(event.key==='ArrowDown') imageView.y-=40;
+  renderImageView();
+});
+viewerImage.addEventListener('load',()=>{if(imageDialog.open)resetImageView();});
+imageDialog.addEventListener('close',()=>{imagePointers.clear();imageGesture=null;lastImageTap=null;});
 
 function renderState() {
   const total = activeChat()?.messages.length || 0;
@@ -185,8 +293,11 @@ document.addEventListener('click',event=>{
   if(action==='history') {const history=document.getElementById('history');const open=!history.classList.contains('is-open');history.classList.toggle('is-open',open);document.querySelector('.drawer-backdrop').hidden=!open;button.setAttribute('aria-expanded',String(open));if(open)history.querySelector('button').focus();}
   if(action==='close-history') closeHistory();
   if(action==='close-evidence') {closeEvidence();sourceAnchor?.focus({preventScroll:true});}
-  if(action==='image') {document.getElementById('image-dialog').showModal();}
-  if(action==='close-image') document.getElementById('image-dialog').close();
+  if(action==='image') {imageDialog.showModal();resetImageView();}
+  if(action==='close-image') imageDialog.close();
+  if(action==='zoom-in') zoomImage(imageView.scale*1.5);
+  if(action==='zoom-out') zoomImage(imageView.scale/1.5);
+  if(action==='zoom-reset') resetImageView();
   if(action==='sources') document.getElementById('sources-dialog').showModal();
   if(action==='close-library') document.getElementById('sources-dialog').close();
   if(action==='source-rail') {
@@ -218,6 +329,7 @@ document.addEventListener('keydown',event=>{
 function resizeViewport() {
   if(window.visualViewport?.scale===1) document.documentElement.style.setProperty('--viewport-height',`${window.visualViewport.height}px`);
   if(sourceId&&sourceAnchor) showEvidence(sourceId,sourceAnchor);
+  if(imageDialog.open) resetImageView();
   renderState();
 }
 window.addEventListener('resize',resizeViewport);

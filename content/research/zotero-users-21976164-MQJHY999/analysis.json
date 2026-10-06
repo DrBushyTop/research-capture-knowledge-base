@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "generationId": "eb3134f556c59b1e17f4d2acfbed02e0d4222cf71381fd17588489c02709ef99",
+  "source": {
+    "id": "zotero-users-21976164-MQJHY999",
+    "libraryType": "users",
+    "libraryId": "21976164",
+    "key": "MQJHY999",
+    "fingerprint": "8c6fc8d4c5bceda0d007f45cc308d84d9c79dc0634d9012fba0eb7b5279520de",
+    "title": "Yosemite Valley Day Hikes",
+    "itemType": "webpage",
+    "authors": [
+      "National Park Service"
+    ],
+    "url": "https://www.nps.gov/yose/planyourvisit/valleyhikes.htm",
+    "doi": null,
+    "publishedAt": null,
+    "capturedAt": "2026-10-06T12:40:40Z",
+    "tags": [
+      "agent-test-data",
+      "agent-test-data-2026-10-06",
+      "travel-hiking"
+    ],
+    "active": true
+  },
+  "extraction": {
+    "status": "text",
+    "method": "html",
+    "reason": null,
+    "truncated": false,
+    "retrievedAt": "2026-10-06T12:45:15.608Z",
+    "artifactHash": "e2d005bc4ba3e9fdc08ab55719ca0062e526729a6b67bf8d28a1e83feb4a6f4b",
+    "artifactMime": "text/html"
+  },
+  "analysis": {
+    "summary": "An informational webpage listing ten Yosemite Valley day-hike trails or trail groups, with difficulty ratings, distances, and elevation gains. It also describes a free year-round valley shuttle and lists ranger hiking videos. The source was last updated November 25, 2024; it is not a research study, and current trail or shuttle conditions are not established by the saved text.",
+    "topics": [
+      "Yosemite Valley",
+      "Day hiking",
+      "Trail distances and elevation gains",
+      "Hiking difficulty",
+      "Trailhead transportation",
+      "Hiking information videos"
+    ],
+    "sourceCategory": "webpage",
+    "studyType": null,
+    "keyFindings": [
+      "Bridalveil Fall Trail, Lower Yosemite Fall Trail, and Cook's Meadow Loop are rated easy, with listed distances of 0.5 to 1 mile.",
+      "Mirror Lake has a 2-mile lake-and-back option and a 5-mile full loop, rated easy to moderate.",
+      "The Valley Loop Trail is rated moderate and mostly flat, with a 6.5-mile half loop and a 13-mile full loop.",
+      "Vernal Fall and Nevada Fall Trails and Yosemite Falls Trail offer routes rated moderate to strenuous, with differing distances and elevation gains.",
+      "Snow Creek, Four Mile, and Half Dome trails are rated strenuous. Half Dome has the greatest listed elevation gain, at 4,800 feet.",
+      "The page states that the free Yosemite Valley shuttle operates year-round and accesses trailheads throughout the valley."
+    ],
+    "limitations": [
+      "No research methods, empirical evaluation, or supporting references are provided in the saved text.",
+      "Difficulty ratings are descriptive; their criteria and applicability to individual hikers are not explained.",
+      "Distances use different conventions, including round trip, entire loop, and one way, so direct comparisons require care.",
+      "The listed Yosemite Falls elevation conversion of 1,000 feet to 328 meters appears inconsistent; the source values have not been independently verified.",
+      "Current closures, trail conditions, shuttle schedules, and permit requirements are not provided.",
+      "Safety guidance and videos are referenced, but their substantive contents are not included.",
+      "The last-updated date does not establish that the information remains current."
+    ],
+    "claims": [
+      {
+        "text": "Bridalveil Fall Trail is an easy 0.5-mile round trip with 80 feet of elevation gain.",
+        "evidence": "The trail table lists Easy, 0.5 mi / 0.8 km (round trip), and 80 ft / 24 m."
+      },
+      {
+        "text": "Cook's Meadow Loop is an easy, flat, 1-mile loop.",
+        "evidence": "The table lists Easy, 1 mi / 1.6 km (entire loop), and Flat."
+      },
+      {
+        "text": "Four Mile Trail is strenuous and measures 4.8 miles one way, with 3,200 feet of elevation gain.",
+        "evidence": "The table lists Strenuous, 4.8 mi / 7.7 km (one way), and 3200 ft / 975 m."
+      },
+      {
+        "text": "Half Dome Trail is strenuous, with a 14–16.4-mile round trip and 4,800 feet of elevation gain.",
+        "evidence": "The table lists Strenuous, 14 mi–16.4 mi / 22.4 km–26.2 km (round trip), and 4800 ft / 1475 m."
+      },
+      {
+        "text": "A free Yosemite Valley shuttle operates year-round and accesses valley trailheads.",
+        "evidence": "The Valley Shuttles section explicitly states this; no timetable or current service confirmation is included."
+      }
+    ],
+    "relevance": [
+      "Useful as a reference for comparing listed Yosemite Valley hikes by route length, elevation gain, and difficulty.",
+      "Provides context for distinguishing short, low-elevation routes from longer, steeper routes.",
+      "Identifies transportation information and supplemental hiking videos, without supplying their full details."
+    ],
+    "population": null,
+    "participantCount": null,
+    "intervention": null,
+    "comparator": null,
+    "outcomes": [],
+    "funding": null,
+    "suggestedRelationships": [
+      "Related to Yosemite Valley trail maps and route profiles.",
+      "Related to current Yosemite trail conditions and closure notices.",
+      "Related to Yosemite Valley shuttle schedules and service updates.",
+      "Related to Half Dome route descriptions and permit information.",
+      "Related to ranger-produced hiking and safety resources."
+    ]
+  },
+  "processing": {
+    "version": "2",
+    "model": "research-sol",
+    "processedAt": "2026-10-06T12:45:28.324Z"
+  },
+  "rightsEvidence": []
+}

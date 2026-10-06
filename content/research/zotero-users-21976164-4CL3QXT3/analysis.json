@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "generationId": "bc9425b89361e6ee13e44566a2e2657f6c237773ce83da027e370b33570e1549",
+  "source": {
+    "id": "zotero-users-21976164-4CL3QXT3",
+    "libraryType": "users",
+    "libraryId": "21976164",
+    "key": "4CL3QXT3",
+    "fingerprint": "361510f1e14624cc823816a5f206be66ea51ee372b4d6d2e02e12c66dce8ddd1",
+    "title": "Chickpea Curry",
+    "itemType": "webpage",
+    "authors": [
+      "Beth Moncel"
+    ],
+    "url": "https://www.budgetbytes.com/coconut-curry-chickpeas/",
+    "doi": null,
+    "publishedAt": "2026-01-12T08:30:00+00:00",
+    "capturedAt": "2026-10-06T12:40:39Z",
+    "tags": [
+      "agent-test-data",
+      "agent-test-data-2026-10-06",
+      "recipe-dinner"
+    ],
+    "active": true
+  },
+  "extraction": {
+    "status": "text",
+    "method": "html",
+    "reason": null,
+    "truncated": false,
+    "retrievedAt": "2026-10-06T12:45:14.820Z",
+    "artifactHash": "1131e05c9fe78206619c5cd09edaea3591d69cb32b2128ba1a1797b9ccddf5ad",
+    "artifactMime": "text/html"
+  },
+  "analysis": {
+    "summary": "A recipe webpage attributed to Beth Moncel describes a vegan chickpea curry made with kale, full-fat coconut milk, tomato sauce, and spices. It reports ingredient costs, automatically calculated nutrition, preparation steps, and storage suggestions. This is culinary content rather than research evidence; its nutrition, affordability, and quality claims are not independently validated in the supplied text.",
+    "topics": [
+      "Chickpea curry",
+      "Plant-based cooking",
+      "Budget meals",
+      "Recipe nutrition estimates",
+      "Meal preparation",
+      "Culinary use of spices"
+    ],
+    "sourceCategory": "webpage",
+    "studyType": null,
+    "keyFindings": [
+      "The recipe combines two 15-ounce cans of chickpeas, 4 ounces of kale, an 8-ounce can of tomato sauce, and a 13.5-ounce can of full-fat coconut milk with aromatics and spices.",
+      "The listed cost is $8.66 per recipe and $2.17 per serving.",
+      "For a listed 1.5-cup serving, the page reports 484 kcal, 40 g carbohydrate, 15 g protein, 33 g fat, 891 mg sodium, and 13 g fiber.",
+      "The page displays a rating of 4.81 from 77 votes and states that recipes are tested in its Nashville Test Kitchen.",
+      "The source states that the recipe was originally published August 2, 2023, and updated and republished January 12, 2026."
+    ],
+    "limitations": [
+      "No research study, participant sample, comparator, or measured health outcomes are presented.",
+      "Nutrition values are automatically calculated rather than reported as laboratory measurements; the source says optional ingredients are included in the calculation.",
+      "Ingredient brands, added salt, substitutions, and serving size may affect the reported nutrition values.",
+      "Cost estimates are not accompanied in the supplied text by a pricing location, pricing date, or calculation methodology, limiting their generalizability.",
+      "The test-kitchen statement provides no testing protocol or results, and reader ratings and the quoted testimonial are subjective rather than controlled evidence.",
+      "Storage durations and culinary explanations are provided without supporting references or validation data."
+    ],
+    "claims": [
+      {
+        "text": "The curry is vegan and dairy-free.",
+        "evidence": "The listed curry ingredients contain no explicitly identified animal-derived ingredients. Suggested accompaniments are separate and would require their own ingredient review."
+      },
+      {
+        "text": "The recipe is budget-friendly.",
+        "evidence": "The page lists individual ingredient costs and totals of $8.66 per recipe and $2.17 per serving. These estimates do not establish affordability across locations or times."
+      },
+      {
+        "text": "The curry provides 15 g protein and 13 g fiber per 1.5-cup serving.",
+        "evidence": "These values appear in the recipe's automatically calculated nutrition panel; no independent nutritional analysis is supplied."
+      },
+      {
+        "text": "All recipes are rigorously tested to ensure they are easy, affordable, and delicious.",
+        "evidence": "This is an assertion by the webpage about its Nashville Test Kitchen. No protocol, number of tests, or objective assessment criteria are provided."
+      },
+      {
+        "text": "Toasting spices releases essential oils and produces deeper, more complex flavors.",
+        "evidence": "The step-by-step instructions offer this culinary explanation, but provide no cited research or comparative testing."
+      },
+      {
+        "text": "The curry is suitable for meal preparation and freezes well.",
+        "evidence": "The author gives storage and reheating suggestions and describes favorable freezing performance; no systematic storage or quality testing is reported."
+      }
+    ],
+    "relevance": [
+      "Useful as a practical example of a legume-based vegan meal with greens.",
+      "Provides source-reported cost and nutrient estimates for a personal recipe library.",
+      "Relevant to culinary meal-preparation planning, but not evidence of clinical benefits or dietary treatment effects."
+    ],
+    "population": null,
+    "participantCount": null,
+    "intervention": null,
+    "comparator": null,
+    "outcomes": [],
+    "funding": null,
+    "suggestedRelationships": [
+      "Other budget-oriented chickpea and legume recipes",
+      "Vegan curries using coconut milk and leafy greens",
+      "Resources on recipe nutrition calculation and its limitations",
+      "Sources evaluating food costs across locations and time",
+      "Research on culinary spice preparation and flavor development"
+    ]
+  },
+  "processing": {
+    "version": "2",
+    "model": "research-sol",
+    "processedAt": "2026-10-06T12:45:29.581Z"
+  },
+  "rightsEvidence": []
+}

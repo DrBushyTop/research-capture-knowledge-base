@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "generationId": "b31389b34066f416a6dec2b89fe16428dd6dca944f8af0fba26d261b453f788a",
+  "source": {
+    "id": "zotero-users-21976164-BXZXKECA",
+    "libraryType": "users",
+    "libraryId": "21976164",
+    "key": "BXZXKECA",
+    "fingerprint": "948244ade01a35cda1c5ac012821b46b0ec5385ef7130a9fc0e12f75c99bbbea",
+    "title": "Arts and Crafts: an introduction",
+    "itemType": "webpage",
+    "authors": [
+      "Victoria and Albert Museum"
+    ],
+    "url": "https://www.vam.ac.uk/articles/arts-and-crafts-an-introduction",
+    "doi": null,
+    "publishedAt": null,
+    "capturedAt": "2026-10-06T12:40:40Z",
+    "tags": [
+      "agent-test-data",
+      "agent-test-data-2026-10-06",
+      "design-history"
+    ],
+    "active": true
+  },
+  "extraction": {
+    "status": "text",
+    "method": "html",
+    "reason": null,
+    "truncated": false,
+    "retrievedAt": "2026-10-06T12:45:14.735Z",
+    "artifactHash": "5f0c282dac04699472b90e0417f3a64bc04702c072add93e717cb4b72394a1d7",
+    "artifactMime": "text/html"
+  },
+  "analysis": {
+    "summary": "This museum-style historical overview describes the British Arts and Crafts movement as a response to industrialisation, fragmented labour and the low status of decorative arts. It traces the influence of Ruskin, Pugin and Morris; the role of exhibitions, guilds, schools and retailers; and the movement’s contributions to interiors, architecture and rural craft production. It presents Arts and Crafts primarily as a set of social and manufacturing ideals rather than a unified visual style. Its broad historical interpretations are illustrated with museum objects but are not supported by a documented research method or comprehensive citations in the supplied text.",
+    "topics": [
+      "British Arts and Crafts movement",
+      "Design reform and industrialisation",
+      "Decorative arts and craftsmanship",
+      "William Morris, John Ruskin and Augustus Pugin",
+      "Exhibition societies and craft guilds",
+      "Architecture and integrated interiors",
+      "Rural workshops and craft economies",
+      "Women and amateur participation in design",
+      "Arts and Crafts and Modernism"
+    ],
+    "sourceCategory": "webpage",
+    "studyType": null,
+    "keyFindings": [
+      "The source characterises Arts and Crafts as an ideals-led movement seeking well-made everyday objects and less dehumanising production, rather than a prescriptive style.",
+      "It dates the founding of the Arts and Crafts Exhibition Society to 1887 and its first exhibition to 1888, identifying exhibitions as important platforms for decorative artists.",
+      "It distinguishes Morris’s criticism of the division of labour from outright opposition to machinery.",
+      "It describes schools, guilds, manufacturers and retailers as mechanisms for spreading craft skills and reaching wider audiences.",
+      "It connects architects’ involvement with integrated interior design and work across multiple craft disciplines.",
+      "It describes an urban-origin movement that developed rural workshops, revived local skills and persisted longer in the countryside.",
+      "It portrays declining British momentum after the First World War alongside influence on European Modernism and continued institutional activity."
+    ],
+    "limitations": [
+      "The supplied text is a historical overview, not an empirical study; it provides no research methods, sampling strategy or systematic analysis.",
+      "Most historical and causal assertions lack explicit supporting citations in the excerpt, although it includes a Ruskin quotation and museum object captions.",
+      "Claims about economic impact, improved working lives and wider participation are not quantified or independently demonstrated in the supplied text.",
+      "The account concentrates on Britain and prominent figures and institutions, offering limited detail on workers’ experiences, affordability or differences within the movement.",
+      "The broad statement about women’s participation is not supported by comparative historical evidence and should not be read as establishing that women had no earlier role in design.",
+      "The statement that the Society of Designer Craftsmen remains active is reported by the webpage and has not been independently verified."
+    ],
+    "claims": [
+      {
+        "text": "The movement emerged in response to industrial production’s perceived social harms and poor product quality, as well as the low status of decorative arts.",
+        "evidence": "The opening historical narrative identifies these motivations and places growing concern around 1840, with reform approaches gaining prominence in the 1860s and 1870s. No systematic evidence is presented to establish their relative importance."
+      },
+      {
+        "text": "The Arts and Crafts Exhibition Society helped raise the public standing of decorative arts.",
+        "evidence": "The source describes its founding in 1887, first exhibition in 1888 and displays of ceramics, textiles, metalwork and furniture. Its broader impact on public attitudes is asserted rather than measured."
+      },
+      {
+        "text": "Morris advocated connected, craft-based production and criticised fragmented labour without rejecting all machinery.",
+        "evidence": "The narrative explicitly distinguishes his views on machinery from his opposition to the division of labour and describes his preference for small-scale workshops. Direct supporting passages from Morris are not supplied."
+      },
+      {
+        "text": "More than one hundred organisations and guilds centred on Arts and Crafts principles were created in Britain between 1895 and 1905.",
+        "evidence": "This numerical claim appears explicitly in the article, but no organisational list, counting method or citation accompanies it."
+      },
+      {
+        "text": "Rural Arts and Crafts workshops revived skills, created local employment and had a greater impact on rural than urban economies.",
+        "evidence": "The article names several rural regions and describes craft traditions and rail access as enabling conditions. It provides no employment figures or comparative economic data."
+      },
+      {
+        "text": "British Arts and Crafts lost progressive momentum after the First World War, while its principles helped catalyse European Modernism.",
+        "evidence": "The concluding narrative attributes British decline partly to retreat from industry toward handmade purism. No comparative case analysis is supplied to substantiate this interpretation."
+      },
+      {
+        "text": "The Arts and Crafts Exhibition Society merged with the Cambridgeshire Guild of Craftsmen in 1960 to form the Society of Designer Craftsmen.",
+        "evidence": "The merger and date are explicitly stated in the source; supporting institutional records are not included."
+      }
+    ],
+    "relevance": [
+      "Provides an introductory chronology and conceptual framework for research on British design reform.",
+      "Helps distinguish craft-centred social ideals from stylistic definitions of Arts and Crafts.",
+      "Identifies institutions, makers and distribution networks for further historical investigation.",
+      "Offers leads for research into integrated interiors, rural craft economies and participation by women and amateurs."
+    ],
+    "population": null,
+    "participantCount": null,
+    "intervention": null,
+    "comparator": null,
+    "outcomes": [],
+    "funding": null,
+    "suggestedRelationships": [
+      "Historical context for William Morris’s views on labour and craft production",
+      "Intellectual connections with John Ruskin, Augustus Pugin and Gothic Revival design reform",
+      "Institutional development through exhibition societies, guilds and art schools",
+      "Commercial dissemination through Morris & Co., Heal’s and Liberty",
+      "Connections between Arts and Crafts architecture and integrated domestic interiors",
+      "Comparative context for international Arts and Crafts movements and European Modernism",
+      "Related themes in enamelling, home furnishings, fashion and jewellery"
+    ]
+  },
+  "processing": {
+    "version": "2",
+    "model": "research-sol",
+    "processedAt": "2026-10-06T12:45:34.977Z"
+  },
+  "rightsEvidence": []
+}

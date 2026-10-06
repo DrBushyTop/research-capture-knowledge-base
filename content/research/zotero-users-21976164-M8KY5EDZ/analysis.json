@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "generationId": "87cc610edd26d50e93c7e3a515c5639db8584195ea680c0661ac21520479312a",
+  "source": {
+    "id": "zotero-users-21976164-M8KY5EDZ",
+    "libraryType": "users",
+    "libraryId": "21976164",
+    "key": "M8KY5EDZ",
+    "fingerprint": "f545dbc072db5551885f6bac8e297931c035f1194220cd002a17d19b5269569c",
+    "title": "Wildlife",
+    "itemType": "webpage",
+    "authors": [
+      "National Park Service"
+    ],
+    "url": "https://www.nps.gov/yell/learn/nature/wildlife.htm",
+    "doi": null,
+    "publishedAt": null,
+    "capturedAt": "2026-10-06T12:40:39Z",
+    "tags": [
+      "agent-test-data",
+      "agent-test-data-2026-10-06",
+      "nature-wildlife"
+    ],
+    "active": true
+  },
+  "extraction": {
+    "status": "text",
+    "method": "html",
+    "reason": null,
+    "truncated": false,
+    "retrievedAt": "2026-10-06T12:45:14.531Z",
+    "artifactHash": "c7ab64c2972acdf60dfa5578901189e440ca815270db9dc125739c390ede4815",
+    "artifactMime": "text/html"
+  },
+  "analysis": {
+    "summary": "This informational webpage describes Yellowstone’s wildlife diversity, seasonal migration, ecological roles, and wildlife-viewing safety rules. It reports species counts and broad ecological claims but does not provide research methods or supporting citations in the supplied text. The page was last updated April 30, 2025.",
+    "topics": [
+      "Yellowstone wildlife",
+      "Biodiversity",
+      "Animal migration",
+      "Native fish and food webs",
+      "Amphibians as ecological indicators",
+      "Wildlife viewing and visitor safety"
+    ],
+    "sourceCategory": "webpage",
+    "studyType": null,
+    "keyFindings": [
+      "The source reports nearly 300 bird species, 16 fish species, five amphibian species, six reptile species, and 67 mammal species in Yellowstone.",
+      "The reported mammal diversity includes seven native ungulate species and two bear species.",
+      "The source states that all of the park’s hoofed mammals migrate across the park to find favorable plant growth.",
+      "Spring migration is described as bringing many birds back to the park.",
+      "Native fish are described as supporting natural food webs and having substantial local economic significance.",
+      "Amphibians are described as indicators of stressors such as disease and climate change.",
+      "The source describes minimum wildlife-approach distances and restrictions on disturbing or displacing animals."
+    ],
+    "limitations": [
+      "The supplied text is an informational overview, not a reported empirical study.",
+      "No citations, survey methods, sampling dates, or uncertainty estimates accompany the species counts.",
+      "Migration and ecological-role claims are not supported by detailed observations or analyses in the excerpt.",
+      "The economic significance of native fish and frequency of wildlife-related visitor injuries are not quantified.",
+      "The page’s author, publisher, and URL are unavailable in the supplied text.",
+      "The update date does not establish when the underlying wildlife information was collected."
+    ],
+    "claims": [
+      {
+        "text": "Yellowstone contains nearly 300 bird species, 16 fish species, five amphibian species, six reptile species, and 67 mammal species.",
+        "evidence": "These counts are explicitly stated in the source; no inventories, methods, or citations are supplied."
+      },
+      {
+        "text": "All of the park’s hoofed mammals migrate to find the best plant growth.",
+        "evidence": "The source makes this general statement without species-specific migration data or supporting references."
+      },
+      {
+        "text": "Spring migration brings many birds back to Yellowstone.",
+        "evidence": "The source describes this seasonal pattern but provides no counts or monitoring results."
+      },
+      {
+        "text": "Native fish underpin natural food webs and have great local economic significance.",
+        "evidence": "The source asserts both roles without food-web analyses or economic estimates."
+      },
+      {
+        "text": "Amphibians are valuable indicators of disease, climate change, and other stressors.",
+        "evidence": "The source presents this ecological claim without describing indicator measures or specific findings."
+      },
+      {
+        "text": "Visitors are injured by wildlife each year when approaching too closely.",
+        "evidence": "The source states that injuries occur annually but supplies no incident counts or records."
+      },
+      {
+        "text": "Approaching on foot within 100 yards of bears or wolves, or within 25 yards of other wildlife, is prohibited; disturbing or displacing wildlife is prohibited regardless of distance.",
+        "evidence": "These restrictions are explicitly described in the source; the excerpt does not include legal citations."
+      }
+    ],
+    "relevance": [
+      "Provides a broad background overview for research on Yellowstone biodiversity.",
+      "Identifies migration, aquatic food webs, and amphibian indicators as topics for further investigation.",
+      "Documents public-facing wildlife-viewing guidance and stated approach restrictions."
+    ],
+    "population": "Wildlife in Yellowstone National Park; park visitors are also discussed in relation to wildlife encounters.",
+    "participantCount": null,
+    "intervention": null,
+    "comparator": null,
+    "outcomes": [],
+    "funding": null,
+    "suggestedRelationships": [
+      "Yellowstone species inventories and biodiversity monitoring",
+      "Ungulate migration and seasonal vegetation growth",
+      "Native fish conservation and aquatic food webs",
+      "Amphibian monitoring under disease and climate stress",
+      "Wildlife tourism, visitor safety, and disturbance management"
+    ]
+  },
+  "processing": {
+    "version": "2",
+    "model": "research-sol",
+    "processedAt": "2026-10-06T12:45:26.368Z"
+  },
+  "rightsEvidence": []
+}

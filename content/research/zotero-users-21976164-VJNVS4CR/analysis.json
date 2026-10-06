@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "generationId": "b46ab2dbe826eedf4737a12338a2dc79c7335bad37e149bfd991b72a0befafff",
+  "source": {
+    "id": "zotero-users-21976164-VJNVS4CR",
+    "libraryType": "users",
+    "libraryId": "21976164",
+    "key": "VJNVS4CR",
+    "fingerprint": "932ef259b8510abe5cb2b1eab06bc3b71f97fbc88dfa3443f01616c22abf0e0d",
+    "title": "Focal Plant Observations as a Standardised Method for Pollinator Monitoring: Opportunities and Limitations for Mass Participation Citizen Science",
+    "itemType": "journalArticle",
+    "authors": [
+      "Helen E. Roy",
+      "Elizabeth Baxter",
+      "Aoine Saunders",
+      "Michael J. O. Pocock"
+    ],
+    "url": "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0150794",
+    "doi": "10.1371/journal.pone.0150794",
+    "publishedAt": "2016 Mar 17",
+    "capturedAt": "2026-10-06T12:40:39Z",
+    "tags": [
+      "agent-test-data",
+      "agent-test-data-2026-10-06",
+      "research-science"
+    ],
+    "active": true
+  },
+  "extraction": {
+    "status": "text",
+    "method": "pdf-text",
+    "reason": null,
+    "truncated": false,
+    "retrievedAt": "2026-10-06T12:45:14.760Z",
+    "artifactHash": "526efc7eb3a5d83ee188a532be61be45632513bb444193a7c900d4ac5c27a90b",
+    "artifactMime": "application/pdf"
+  },
+  "analysis": {
+    "summary": "This 2016 research article evaluates the Big Bumblebee Discovery, a UK citizen-science project using timed observations of lavender during June–August 2014. An estimated 13,024 primary-school children contributed 3,948 reports containing 26,868 reported bumblebees. Reported visitation rates were lower when lavender was more than 5 m from other flowers and higher in sunny conditions; wider landscape category was not significantly associated with reported abundance. Substantial identification errors prevented analysis of bumblebee colour-group richness. The study demonstrates the reach of a simple monitoring protocol but highlights the need to assess data accuracy rather than assume it.",
+    "topics": [
+      "Citizen science",
+      "Pollinator monitoring",
+      "Bumblebees",
+      "Focal-plant observations",
+      "Local floral resources",
+      "Landscape ecology",
+      "Species identification accuracy",
+      "Volunteer training and record verification",
+      "School-based scientific participation"
+    ],
+    "sourceCategory": "research-paper",
+    "studyType": "Single-season observational citizen-science study with photographic record verification and a separate identification quiz",
+    "keyFindings": [
+      "The project received 3,948 reports from 1,561 unique 100 m grid-square locations; 3,556 reports were valid for analysis.",
+      "Lavender more than 5 m from other flowers had an approximately halved reported bumblebee visitation rate relative to lavender next to other flowers (P < 0.001).",
+      "Reported visitation was approximately twice as high in full sun as in no sun (P < 0.001).",
+      "Wider landscape category (P = 0.157), wind (P = 0.131), and lavender species (P = 0.945) were not significantly associated with reported visitation.",
+      "In the submitted photographic subset, approximately 75% of insects reported as bumblebees were actually bumblebees. Colour-group identification precision was approximately 43–44%, compared with 57% in a separate photo quiz.",
+      "Identification uncertainty led the authors to analyse total reported individuals rather than colour-group richness."
+    ],
+    "limitations": [
+      "The observational design supports associations, not causal conclusions about floral proximity or weather.",
+      "Only 83 photographs were uploaded. This small, self-selected verification subset may not represent identification accuracy across all reports.",
+      "Analysis of reported abundance assumed that bumblebee misidentification rates were randomly distributed across observations; this assumption was not established.",
+      "Colour groups are proxies rather than species-level identifications, and errors prevented testing the intended richness hypothesis.",
+      "Prior participant knowledge and use of educational resources were not measured. No additional or face-to-face training was provided.",
+      "The separate identification quiz involved only 27 adults and children and did not reproduce all field-observation conditions.",
+      "Participation was estimated rather than directly counted: the authors give a potential range of 4,646–30,077 participants.",
+      "The source contains inconsistent school counts: the abstract says over 4,000 schools, whereas the results document 400 unique school codes and estimate participation from at least 400 schools.",
+      "Sampling density varied geographically, with fewer reports in areas of low human population density. A single field season cannot establish long-term pollinator trends.",
+      "There were too few combinations of explanatory factors to robustly model their interactions. Lavender species was added as a post hoc hypothesis.",
+      "Non-significant results do not establish that landscape, wind, or lavender species have no ecological effect."
+    ],
+    "claims": [
+      {
+        "text": "Nearby floral resources are associated with higher reported bumblebee visitation to focal lavender plants.",
+        "evidence": "The mixed-model analysis found a significant association with flower proximity (P < 0.001), with approximately half the reported visitation rate when other flowers were more than 5 m away. Identification errors and the observational design limit interpretation as a true abundance or causal effect."
+      },
+      {
+        "text": "The study did not detect an association between broad landscape category and reported bumblebee abundance.",
+        "evidence": "The comparison of urban, suburban, green-space, and countryside categories yielded P = 0.157. These broad categories and imperfect records may limit sensitivity to landscape effects."
+      },
+      {
+        "text": "Untrained participants had substantial difficulty identifying bumblebee colour groups.",
+        "evidence": "Colour-group precision was approximately 43–44% in submitted photographs and 57% in the 27-person quiz, with marked differences between groups. Field verification covered only a small subset of records."
+      },
+      {
+        "text": "Timed focal-plant counts can engage large numbers of people in standardised monitoring.",
+        "evidence": "The project generated 3,948 reports across 1,561 locations using a simple lavender-observation protocol, with an estimated 13,024 participating children. This demonstrates participation and data collection, not that all records were accurate or suitable for every monitoring objective."
+      },
+      {
+        "text": "Training and supporting photographic evidence could improve the usefulness of citizen-science records.",
+        "evidence": "The authors recommend these measures in response to observed identification errors. The study did not experimentally test whether additional training or mandatory photographs improved accuracy."
+      }
+    ],
+    "relevance": [
+      "Useful for designing mass-participation pollinator surveys and choosing identification tasks appropriate to volunteer experience.",
+      "Provides a cautionary example of how taxonomic errors can invalidate diversity outcomes even when a monitoring protocol is simple.",
+      "Relevant to research on local floral context and flower visitation, while distinguishing visitation counts from population abundance.",
+      "Illustrates the value and limitations of photographic verification and independent identification assessments.",
+      "Relevant to school-based citizen science, hypothesis-led engagement, and evaluation of participant recruitment."
+    ],
+    "population": "UK flower-visiting insects reported as bumblebees on focal lavender plants, observed primarily by schoolchildren aged 7–11. Estimated child participation was 13,024; a separate identification quiz involved 27 adults and children.",
+    "participantCount": 13024,
+    "intervention": "Monitoring protocol rather than a controlled intervention: participants counted visitors to focal lavender for at least 5 minutes, assigned bumblebees to six colour groups, and recorded location, weather, observation duration, patch size, lavender type, and proximity to other flowers.",
+    "comparator": "Observational comparisons across four broad landscape categories, four flower-proximity categories, weather conditions, and English versus French lavender; no randomised control group.",
+    "outcomes": [
+      "Reported bumblebee visitation rate standardised to 5 minutes and an average-sized lavender patch of 37 cm diameter",
+      "Associations of reported visitation with flower proximity, landscape category, sunshine, wind, and lavender species",
+      "Precision and miss rates for bumblebee and colour-group identification",
+      "Participation, report volume, and geographic coverage",
+      "Reported colour-group richness, assessed for plausibility but excluded from formal ecological hypothesis testing"
+    ],
+    "funding": "EDF Energy funded the British Science Association, which subcontracted the Centre for Ecology & Hydrology. The Centre led study design, data collection and analysis, publication decisions, and manuscript preparation. EDF Energy and the British Science Association supported recruitment and educational resources. Two authors also received support through the Biological Records Centre from the Joint Nature Conservation Committee and the Natural Environment Research Council. The authors acknowledged commercial funding but declared no competing interests; EDF Energy was not involved in manuscript production or the decision to submit.",
+    "suggestedRelationships": [
+      "Methodological comparison with studies validating volunteer pollinator identifications after face-to-face training",
+      "Related evidence on local floral resources, habitat isolation, and flower-visitation rates",
+      "Contrast with studies of urban pollinator biodiversity using more detailed habitat or species measurements",
+      "Related approaches using photographs and participant feedback to verify biodiversity records",
+      "Case study for hypothesis-led citizen science and school-based ecological monitoring"
+    ]
+  },
+  "processing": {
+    "version": "2",
+    "model": "research-sol",
+    "processedAt": "2026-10-06T12:45:41.002Z"
+  },
+  "rightsEvidence": [
+    {
+      "origin": "crossref",
+      "licenseUrl": "http://creativecommons.org/licenses/by/4.0/",
+      "appliesTo": "metadata",
+      "artifactHash": null,
+      "checkedAt": "2026-10-06T12:45:41.376Z"
+    }
+  ]
+}

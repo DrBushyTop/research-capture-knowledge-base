@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "generationId": "c0c7d53fdbfe2bd9636109095ea11aeb92d477725174d2898e27090f4bbc56d7",
+  "source": {
+    "id": "zotero-users-21976164-IVRJ58AG",
+    "libraryType": "users",
+    "libraryId": "21976164",
+    "key": "IVRJ58AG",
+    "fingerprint": "bcbc2b40c802995259a49ad0c8f93293755a1af4eb7d1e161fa07391344ee83f",
+    "title": "Smithsonian (@smithsonian) • Instagram photo",
+    "itemType": "webpage",
+    "authors": [
+      "Smithsonian"
+    ],
+    "url": "https://www.instagram.com/p/BJtQ4S3B1c2/",
+    "doi": null,
+    "publishedAt": "2016-08-29",
+    "capturedAt": "2026-10-06T12:40:40Z",
+    "tags": [
+      "agent-test-data",
+      "agent-test-data-2026-10-06",
+      "metadata-only-social",
+      "social-culture"
+    ],
+    "active": true
+  },
+  "extraction": {
+    "status": "needs-review",
+    "method": "html",
+    "reason": "No usable text layer. A scan may need OCR or manual review.",
+    "truncated": false,
+    "retrievedAt": "2026-10-06T12:45:14.919Z",
+    "artifactHash": "c51dbed2cc0d84db4ea1cd5f99cb037635f90cad6581ba840f7761939a9b322d",
+    "artifactMime": "text/html"
+  },
+  "analysis": null,
+  "processing": {
+    "version": "2",
+    "model": null,
+    "processedAt": "2026-10-06T12:45:16.487Z"
+  },
+  "rightsEvidence": []
+}

@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "generationId": "bec3552e0f1349597c719a4ffb97c7756052f6334a6d0d432ae59021ef59f4f4",
+  "source": {
+    "id": "zotero-users-21976164-FB75CUEK",
+    "libraryType": "users",
+    "libraryId": "21976164",
+    "key": "FB75CUEK",
+    "fingerprint": "4ee21f35ebab4176eaba70da0cebf62d65bdd00af79c5c36fef482b8e2bf3689",
+    "title": "Using the Fetch API",
+    "itemType": "webpage",
+    "authors": [
+      "MDN contributors"
+    ],
+    "url": "https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch",
+    "doi": null,
+    "publishedAt": null,
+    "capturedAt": "2026-10-06T12:40:39Z",
+    "tags": [
+      "agent-test-data",
+      "agent-test-data-2026-10-06",
+      "tutorial-web"
+    ],
+    "active": true
+  },
+  "extraction": {
+    "status": "text",
+    "method": "html",
+    "reason": null,
+    "truncated": false,
+    "retrievedAt": "2026-10-06T12:45:14.913Z",
+    "artifactHash": "ed1afa9ced01ed7c62880f9c4d623b4788aadc18b1059327c641f02075e3aeec",
+    "artifactMime": "text/html"
+  },
+  "analysis": {
+    "summary": "A technical documentation excerpt explaining JavaScript Fetch API request configuration, cross-origin access and credentials, cancellation, response handling, streaming, and cloning. It provides illustrative code rather than empirical research. Its descriptions of behavior and efficiency are not independently tested in the supplied source.",
+    "topics": [
+      "JavaScript Fetch API",
+      "HTTP requests and responses",
+      "CORS and cross-origin credentials",
+      "Request and response headers",
+      "AbortController",
+      "ReadableStream and incremental processing",
+      "Service worker caching"
+    ],
+    "sourceCategory": "webpage",
+    "studyType": null,
+    "keyFindings": [
+      "The source describes fetch() as accepting a URL-like resource or Request object, with optional configuration for methods, bodies, headers, credentials, and cancellation.",
+      "It distinguishes network failures, which can reject fetch(), from HTTP error statuses such as 404, which return a Response requiring explicit status checks.",
+      "It explains that CORS modes and credential settings constrain cross-origin requests and JavaScript access to responses; no-cors responses are opaque.",
+      "It demonstrates incremental response processing using ReadableStream and TextDecoderStream.",
+      "It describes request and response bodies as single-use streams and demonstrates cloning before consumption when two consumers need the body."
+    ],
+    "limitations": [
+      "This is instructional documentation, not a study; no empirical methods, participants, measurements, or statistical results are reported.",
+      "The supplied excerpt does not identify its author, publisher, publication date, version, or browser compatibility scope.",
+      "Code examples are illustrative; execution results and cross-browser testing are not supplied.",
+      "The claimed memory-efficiency benefit of streaming is not quantified or benchmarked.",
+      "Some descriptions are simplified: the excerpt says CORS responses include only safelisted headers without discussing explicitly exposed additional headers.",
+      "The line-by-line processing example explicitly assumes UTF-8 and omits fetch error handling."
+    ],
+    "claims": [
+      {
+        "text": "fetch() defaults to GET, and Fetch API GET requests cannot include a request body.",
+        "evidence": "Explicit statements in the method and body sections, accompanied by POST examples; no execution evidence is provided."
+      },
+      {
+        "text": "HTTP error statuses such as 404 do not by themselves cause fetch() to reject.",
+        "evidence": "The response-status section states this distinction and demonstrates checking Response.ok before processing the response."
+      },
+      {
+        "text": "Cross-origin credentialed responses require server agreement through Access-Control-Allow-Credentials and an explicit allowed origin rather than a wildcard.",
+        "evidence": "The credentials section describes these requirements and distinguishes simple requests from preflighted requests; no server traces are included."
+      },
+      {
+        "text": "Using no-cors restricts methods and headers and produces an opaque response unavailable for body or header inspection by JavaScript.",
+        "evidence": "The cross-origin and response-type sections explicitly describe these restrictions."
+      },
+      {
+        "text": "AbortController can cancel a fetch request, and aborting before body consumption finishes can cause body-reading operations to reject with AbortError.",
+        "evidence": "The cancellation section provides examples for cancellation during a request and after receipt of the Response."
+      },
+      {
+        "text": "Streaming permits incremental processing, whereas Response.text() requires the complete body before returning its text.",
+        "evidence": "Contrasting examples use Response.text() and asynchronous iteration over a TextDecoderStream; performance and memory benefits are asserted but not measured."
+      },
+      {
+        "text": "A consumed request or response body cannot be read again; cloning before consumption permits separate uses.",
+        "evidence": "Examples show repeated fetch(request) and response.json() calls failing, followed by Request.clone() and Response.clone() alternatives."
+      }
+    ],
+    "relevance": [
+      "Useful as a reference for understanding browser-side HTTP request construction and response processing.",
+      "Relevant to research on web security boundaries, particularly CORS, credential handling, and CSRF risk.",
+      "Provides implementation examples for incremental text processing and service worker caching, but not evidence of comparative performance."
+    ],
+    "population": null,
+    "participantCount": null,
+    "intervention": null,
+    "comparator": null,
+    "outcomes": [],
+    "funding": null,
+    "suggestedRelationships": [
+      "Related documentation on CORS preflight behavior and exposed response headers",
+      "Related sources on cookie SameSite policies and CSRF",
+      "Related documentation on Streams API locking, consumption, and cloning",
+      "Related examples of service worker offline caching",
+      "Potential comparison with empirical benchmarks of buffered versus streamed response processing"
+    ]
+  },
+  "processing": {
+    "version": "2",
+    "model": "research-sol",
+    "processedAt": "2026-10-06T12:45:28.291Z"
+  },
+  "rightsEvidence": []
+}

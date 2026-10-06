@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "generationId": "788ac870b27b970749597b9c2eec80c5e8b5f80888b49d65be99ba7a77bb9d36",
+  "source": {
+    "id": "zotero-users-21976164-HG48HQP9",
+    "libraryType": "users",
+    "libraryId": "21976164",
+    "key": "HG48HQP9",
+    "fingerprint": "6a6aba1930d04ca3aaee2d79b12f20a08e703bcdabcfc9d6e343848d59feddb0",
+    "title": "South Korean author Han Kang wins the 2024 Nobel prize in literature",
+    "itemType": "newspaperArticle",
+    "authors": [
+      "Ella Creamer"
+    ],
+    "url": "https://www.theguardian.com/books/2024/oct/10/south-korean-author-han-kang-wins-the-2024-nobel-prize-in-literature",
+    "doi": null,
+    "publishedAt": "2024-10-10T11:05:59.000Z",
+    "capturedAt": "2026-10-06T12:40:39Z",
+    "tags": [
+      "agent-test-data",
+      "agent-test-data-2026-10-06",
+      "news-literature"
+    ],
+    "active": true
+  },
+  "extraction": {
+    "status": "text",
+    "method": "html",
+    "reason": null,
+    "truncated": false,
+    "retrievedAt": "2026-10-06T12:45:14.380Z",
+    "artifactHash": "3b478d0d24c929d56d8edec9533c1f0652e9c525f5cbbdff2e486602129c269c",
+    "artifactMime": "text/html"
+  },
+  "analysis": {
+    "summary": "This news-style article reports that South Korean author Han Kang won the 2024 Nobel prize in literature for prose addressing historical trauma and the fragility of human life. It outlines her literary career, major works, translation history and earlier awards, and presents reactions from literary figures and Korean officials. Its discussion of her literary significance consists primarily of attributed commentary rather than systematic analysis.",
+    "topics": [
+      "Han Kang",
+      "2024 Nobel prize in literature",
+      "South Korean literature",
+      "Historical trauma in fiction",
+      "Women writers",
+      "Literary translation",
+      "Gwangju massacre",
+      "Jeju uprising",
+      "International Booker prize"
+    ],
+    "sourceCategory": "webpage",
+    "studyType": null,
+    "keyFindings": [
+      "The article reports that Han Kang received the 2024 Nobel prize in literature and was the first South Korean author and the 18th woman to receive it.",
+      "The Nobel citation praises her “intense poetic prose that confronts historical traumas and exposes the fragility of human life”.",
+      "The Vegetarian, published in Korean in 2007 and translated into English by Deborah Smith in 2015, won the International Booker prize in 2016.",
+      "The article describes Human Acts as exploring the enduring effects of the May 1980 Gwangju massacre through six people directly or indirectly affected.",
+      "At the time of reporting, an English translation of We Do Not Part was scheduled for 2025; the article states that its French translation won the prix Médicis Étranger in 2023."
+    ],
+    "limitations": [
+      "The supplied text does not include a headline, byline, publication date or source URL.",
+      "This is journalistic reporting, not an empirical study or a systematic literary analysis.",
+      "Assessments of Han's literary quality and influence are largely quotations from committee members, writers, her agent and her publisher; some speakers have professional ties to her work.",
+      "Reports of bookstore outages and paused government hearings are attributed broadly to Korean news reports without specific references.",
+      "The article notes criticism of The Vegetarian's English translation but does not explain the criticism or provide evidence for evaluating it.",
+      "The planned 2025 English publication is a time-specific statement, not confirmation that publication subsequently occurred.",
+      "The closing bookshop promotion indicates a commercial element; funding and sponsorship details are not provided."
+    ],
+    "claims": [
+      {
+        "text": "Han Kang won the 2024 Nobel prize in literature.",
+        "evidence": "The article reports the award announcement, quotes Swedish Academy permanent secretary Mats Malm and includes Han's response from an Academy-shared phone interview. No independently checked primary record is supplied."
+      },
+      {
+        "text": "Han was the first South Korean author and the 18th woman to win the prize.",
+        "evidence": "Explicitly stated in the article; supporting award-history records are not included."
+      },
+      {
+        "text": "Her writing explores historical trauma, patriarchy, violence, grief and humanity.",
+        "evidence": "Supported by the article's thematic descriptions, the quoted Nobel citation and commentary about Human Acts and We Do Not Part. The text does not provide close readings or excerpts from the books."
+      },
+      {
+        "text": "The Vegetarian won the 2016 International Booker prize following its English translation.",
+        "evidence": "The article gives the translation and award dates and quotes the 2016 judging-panel chair, Boyd Tonkin."
+      },
+      {
+        "text": "The Nobel announcement generated substantial public interest in South Korea.",
+        "evidence": "The article cites unspecified Korean news reports of bookstore website outages and interrupted government hearings, alongside a congratulatory statement attributed to President Yoon Suk Yeol. The extent of public interest is not quantified."
+      },
+      {
+        "text": "The award will broaden Han's international readership.",
+        "evidence": "Her literary agent and other quoted literary figures predict wider readership. This is an expectation, not a measured outcome."
+      }
+    ],
+    "relevance": [
+      "Provides an overview of Han Kang's career and the reception of her Nobel award.",
+      "Offers starting points for research on historical violence and memory in contemporary Korean fiction.",
+      "Highlights the role of translation and international literary prizes in the global reception of Korean literature.",
+      "Preserves attributed reactions useful for studying literary reputation and award discourse."
+    ],
+    "population": null,
+    "participantCount": null,
+    "intervention": null,
+    "comparator": null,
+    "outcomes": [
+      "Reported receipt of the 2024 Nobel prize in literature",
+      "Reported earlier international literary awards",
+      "Reported public and literary-community reactions to the Nobel announcement"
+    ],
+    "funding": null,
+    "suggestedRelationships": [
+      "Biographical sources on Han Kang",
+      "Official Nobel citation and award announcement for Han Kang",
+      "Translation debates surrounding The Vegetarian",
+      "Literary studies of Human Acts and the Gwangju massacre",
+      "Literary studies of We Do Not Part and the Jeju uprising",
+      "Research on international recognition of Korean literature"
+    ]
+  },
+  "processing": {
+    "version": "2",
+    "model": "research-sol",
+    "processedAt": "2026-10-06T12:45:30.403Z"
+  },
+  "rightsEvidence": []
+}

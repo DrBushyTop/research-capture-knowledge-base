@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "generationId": "c27833f400765c931c7d01eeb4e4c513eab34a5bb159c2bd6c18136e1d97b949",
+  "source": {
+    "id": "zotero-users-21976164-89K4SINM",
+    "libraryType": "users",
+    "libraryId": "21976164",
+    "key": "89K4SINM",
+    "fingerprint": "00ae50c7f863e01250f40013fd85c49326a7084b0bf5b35061cb6656b1dc1a5d",
+    "title": "NASA’s Bennu Asteroid Sample Contains Carbon, Water",
+    "itemType": "webpage",
+    "authors": [
+      "NASA"
+    ],
+    "url": "https://www.nasa.gov/news-release/nasas-bennu-asteroid-sample-contains-carbon-water/",
+    "doi": null,
+    "publishedAt": "2023-10-11",
+    "capturedAt": "2026-10-06T12:40:39Z",
+    "tags": [
+      "agent-test-data",
+      "agent-test-data-2026-10-06",
+      "news-space"
+    ],
+    "active": true
+  },
+  "extraction": {
+    "status": "text",
+    "method": "html",
+    "reason": null,
+    "truncated": false,
+    "retrievedAt": "2026-10-06T12:45:14.927Z",
+    "artifactHash": "b2d88ee66614b52121a9319e99e8739d71cd684b7db80331460d74da0d8cad77",
+    "artifactMime": "text/html"
+  },
+  "analysis": {
+    "summary": "A NASA news release reports preliminary analyses of asteroid Bennu material returned by OSIRIS-REx. Initial microscopy, spectroscopy, diffraction, elemental analysis, and computed tomography provided evidence of abundant carbon and water-bearing clay minerals. These observations may inform research on early solar-system chemistry and precursors to life, but do not establish the presence of life or demonstrate that Bennu-like material supplied life's precursors to Earth. Detailed sample characterization remains ongoing.",
+    "topics": [
+      "Asteroid Bennu",
+      "OSIRIS-REx",
+      "Asteroid sample return",
+      "Carbon-rich extraterrestrial material",
+      "Water-bearing clay minerals",
+      "Solar-system origins",
+      "Prebiotic chemistry",
+      "Sample curation"
+    ],
+    "sourceCategory": "webpage",
+    "studyType": "Preliminary descriptive laboratory characterization of returned asteroid material, reported in a NASA news release",
+    "keyFindings": [
+      "NASA reports evidence of abundant carbon and water in the initially examined Bennu material.",
+      "The principal investigator specifically describes water-bearing clay minerals; the source does not report liquid water.",
+      "Early characterization used scanning electron microscopy, infrared measurements, X-ray diffraction, chemical element analysis, and X-ray computed tomography.",
+      "Additional asteroid material was found outside the collector head and on the canister lid and base, delaying access to the primary sample.",
+      "NASA plans to preserve at least 70% of the sample for future research."
+    ],
+    "limitations": [
+      "The source is a news release rather than a peer-reviewed research paper and provides no underlying datasets or detailed analytical protocols.",
+      "Findings are preliminary and based on quick-look analyses of initial material; representativeness of the full returned sample is not established.",
+      "No quantitative carbon or water concentrations, uncertainty estimates, or analytical detection limits are provided.",
+      "The nature of the carbon compounds remains unresolved in the report.",
+      "The source does not demonstrate the presence of life or establish how precursors to life reached Earth.",
+      "The 60-gram figure is a collection goal, not a reported measured mass of the returned sample.",
+      "The number of particles or analytical specimens examined is not stated."
+    ],
+    "claims": [
+      {
+        "text": "The initial Bennu material contains abundant carbon and water-bearing minerals.",
+        "evidence": "NASA attributes this finding to preliminary quick-look analyses using microscopy, infrared measurements, X-ray diffraction, and elemental analysis. The principal investigator identifies water-bearing clay minerals, but quantitative results are not supplied."
+      },
+      {
+        "text": "The sample may contain materials relevant to the origins of life on Earth.",
+        "evidence": "The release interprets carbon and water-bearing material as potentially relevant to life's building blocks. This is a research hypothesis, not evidence of life or a demonstrated origin-of-life pathway."
+      },
+      {
+        "text": "OSIRIS-REx delivered the largest carbon-rich asteroid sample ever returned to Earth.",
+        "evidence": "This is stated by the NASA administrator; the release does not provide a measured total sample mass or comparative sample-return data."
+      },
+      {
+        "text": "Computed tomography revealed a particle's diverse interior.",
+        "evidence": "The release reports production of a three-dimensional model of one particle using X-ray computed tomography, without detailed results or images in the supplied text."
+      },
+      {
+        "text": "At least 70% of the sample will be preserved for future research.",
+        "evidence": "The release states NASA's curation plan; this is a planned allocation rather than a completed research outcome."
+      }
+    ],
+    "relevance": [
+      "Provides an early record of reported carbon and hydrated-mineral findings in returned Bennu material.",
+      "Offers context for research on primitive asteroid composition and early solar-system chemistry.",
+      "Helps distinguish observed sample properties from speculative implications for life's origins.",
+      "Documents analytical methods and long-term sample preservation plans."
+    ],
+    "population": "Initially accessible rocks and dust from the OSIRIS-REx Bennu sample return, including material outside the collector head and on the canister lid and base",
+    "participantCount": null,
+    "intervention": null,
+    "comparator": null,
+    "outcomes": [
+      "Qualitative evidence of abundant carbon",
+      "Evidence of water-bearing clay minerals",
+      "Three-dimensional characterization of one particle's interior",
+      "Identification of additional material outside the primary sample collector"
+    ],
+    "funding": "The source identifies OSIRIS-REx as a NASA New Frontiers Program mission under the Science Mission Directorate; specific funding amounts or analytical-study grants are not reported.",
+    "suggestedRelationships": [
+      "Later detailed compositional analyses of OSIRIS-REx Bennu samples",
+      "Research on hydrated minerals in primitive asteroids",
+      "Studies of extraterrestrial carbon compounds and prebiotic chemistry",
+      "Comparative studies of returned asteroid samples and carbonaceous meteorites",
+      "Research on extraterrestrial delivery of life's precursor materials"
+    ]
+  },
+  "processing": {
+    "version": "2",
+    "model": "research-sol",
+    "processedAt": "2026-10-06T12:45:32.219Z"
+  },
+  "rightsEvidence": []
+}

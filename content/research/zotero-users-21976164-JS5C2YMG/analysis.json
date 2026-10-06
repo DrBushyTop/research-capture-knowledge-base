@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "generationId": "5bcf9d33a811bc1528b4f6abfd309684ae87f4da271edc94f47a71e0450fe966",
+  "source": {
+    "id": "zotero-users-21976164-JS5C2YMG",
+    "libraryType": "users",
+    "libraryId": "21976164",
+    "key": "JS5C2YMG",
+    "fingerprint": "d2a01b0490f3530aaf90e27a44b85ac4f1b7c3a0b8b5a9843e4bc05fa28fc1b3",
+    "title": "Scikit-learn: Machine Learning in Python",
+    "itemType": "journalArticle",
+    "authors": [
+      "Fabian Pedregosa",
+      "Gaël Varoquaux",
+      "Alexandre Gramfort",
+      "Vincent Michel",
+      "Bertrand Thirion",
+      "Olivier Grisel",
+      "Mathieu Blondel",
+      "Peter Prettenhofer",
+      "Ron Weiss",
+      "Vincent Dubourg",
+      "Jake Vanderplas",
+      "Alexandre Passos",
+      "David Cournapeau",
+      "Matthieu Brucher",
+      "Matthieu Perrot",
+      "Édouard Duchesnay"
+    ],
+    "url": "https://www.jmlr.org/papers/v12/pedregosa11a.html",
+    "doi": null,
+    "publishedAt": "2011",
+    "capturedAt": "2026-10-06T12:40:38Z",
+    "tags": [
+      "agent-test-data",
+      "agent-test-data-2026-10-06",
+      "research-computing"
+    ],
+    "active": true
+  },
+  "extraction": {
+    "status": "text",
+    "method": "pdf-text",
+    "reason": null,
+    "truncated": false,
+    "retrievedAt": "2026-10-06T12:45:14.335Z",
+    "artifactHash": "1c338a6b3c6c1dcafda3990a8098b8b50dd6c77616361396fb75f6822c6e0778",
+    "artifactMime": "application/pdf"
+  },
+  "analysis": {
+    "summary": "This 2011 JMLR paper describes scikit-learn as a BSD-licensed Python library for medium-scale supervised and unsupervised machine learning. It presents the library’s consistent estimator interface, model-selection tools, scientific Python integration, and development practices. Runtime comparisons on the Madelon dataset show competitive performance for several algorithms, but do not establish predictive superiority or performance across datasets. The description reflects the software at publication, not necessarily current capabilities.",
+    "topics": [
+      "Scientific Python",
+      "Machine learning software",
+      "Supervised and unsupervised learning",
+      "Estimator API design",
+      "Cross-validation and hyperparameter selection",
+      "Computational benchmarking",
+      "Open-source software"
+    ],
+    "sourceCategory": "research-paper",
+    "studyType": "Software description with comparative computational benchmarks",
+    "keyFindings": [
+      "The library uses a consistent interface centered on fit, predict, transform, and score methods, with NumPy arrays as data containers.",
+      "GridSearchCV supports cross-validated parameter selection, while Pipeline combines preprocessing and estimation within the same interface.",
+      "On Madelon, scikit-learn recorded the lowest reported runtimes among compared implementations for support vector classification (5.2 seconds), Lasso using LARS (1.17 seconds), Elastic Net (0.52 seconds), and PCA with nine components (0.18 seconds).",
+      "Scikit-learn was not fastest for every task: k-nearest neighbors took 0.57 seconds versus 0.56 seconds for PyMVPA, and k-means took 1.34 seconds versus 0.79 seconds for MLPy and 0.68 seconds for Shogun.",
+      "The authors report 81% test coverage for release 0.8 and approximately 300 pages of documentation with more than 60 examples."
+    ],
+    "limitations": [
+      "Runtime comparisons use one dataset with 4,400 instances and 500 attributes, limiting generalization to other workloads.",
+      "The supplied text does not specify benchmark hardware, complete software versions, detailed parameter settings, repeated measurements, or runtime variability.",
+      "The benchmark table reports computational time rather than predictive accuracy or equivalent solution quality; differences in implementations may affect comparisons.",
+      "Some comparator algorithms were unavailable, and PyBrain k-means reportedly did not converge within one hour.",
+      "The authors acknowledge limitations for very large Elastic Net problems and performance constraints in the then-current pure-Python k-means implementation.",
+      "Ease of use and accessibility to non-specialists are stated design goals, not outcomes established by a user study.",
+      "The paper describes the authors’ own software, and its 2011 implementation details should not be assumed to describe current releases."
+    ],
+    "claims": [
+      {
+        "text": "Scikit-learn provides a consistent, task-oriented interface for supervised and unsupervised learning.",
+        "evidence": "Sections 4 and 6 describe estimator conventions, cross-validation iterators, GridSearchCV, and Pipeline. These support the architectural claim, but no formal usability evaluation is reported."
+      },
+      {
+        "text": "Scikit-learn offers competitive computational performance against other Python-accessible machine learning libraries.",
+        "evidence": "Table 1 reports runtimes for six tasks on Madelon. Scikit-learn is fastest among the reported implementations for four tasks, but not for k-nearest neighbors or k-means; broader performance remains uncertain."
+      },
+      {
+        "text": "Optimized LibSVM bindings reduce overhead by up to 40% relative to the original Python bindings.",
+        "evidence": "Section 5 attributes gains to avoiding memory copies and patching LibSVM. The supplied text does not provide a separate detailed experiment or uncertainty estimates for the 40% figure."
+      },
+      {
+        "text": "The LARS implementation achieves performance gains of two to ten times over the reference R implementation.",
+        "evidence": "Section 5 attributes this gain to iterative residual refinement. Detailed conditions for the stated range are not provided."
+      },
+      {
+        "text": "The project emphasizes code quality, documentation, minimal dependencies, and permissive licensing.",
+        "evidence": "Sections 1–3 report NumPy and SciPy dependencies, simplified BSD licensing, unit tests with 81% coverage in release 0.8, static analysis tools, and extensive documentation. These are author-reported project characteristics."
+      }
+    ],
+    "relevance": [
+      "Useful as a foundational citation for scikit-learn and its original software architecture.",
+      "Provides historical context for consistent machine learning interfaces, pipelines, and cross-validated model selection.",
+      "Offers an early computational comparison of Python machine learning libraries, with limited applicability to present-day performance.",
+      "Relevant to research on scientific software engineering and permissively licensed research infrastructure."
+    ],
+    "population": "Computational benchmark dataset: Madelon, comprising 4,400 instances with 500 attributes; no human participant study is described.",
+    "participantCount": null,
+    "intervention": "Scikit-learn implementations of support vector classification, Lasso using LARS, Elastic Net, k-nearest neighbors, PCA, and k-means evaluated on Madelon.",
+    "comparator": "Available implementations in MLPy, PyBrain, PyMVPA, MDP, and Shogun; additional narrative comparisons with reference R LARS, glmnet, and original LibSVM Python bindings.",
+    "outcomes": [
+      "Runtime in seconds for six machine learning tasks",
+      "Algorithm availability and k-means convergence within one hour",
+      "Author-reported implementation overhead and speed improvements",
+      "Reported test coverage and documentation extent"
+    ],
+    "funding": null,
+    "suggestedRelationships": [
+      "Scientific Python infrastructure built on NumPy and SciPy",
+      "Compiled-library integration using Cython, LibSVM, and LibLinear",
+      "Comparative machine learning software benchmarking",
+      "Cross-validation, regularization paths, and hyperparameter selection",
+      "Randomized methods for principal component analysis",
+      "Machine learning software applications in neuroimaging"
+    ]
+  },
+  "processing": {
+    "version": "2",
+    "model": "research-sol",
+    "processedAt": "2026-10-06T12:45:32.373Z"
+  },
+  "rightsEvidence": []
+}

@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "generationId": "954d026203b2a4d18258d9df11fea0ae3d1e7a0912ef404af81969a0a974c38d",
+  "source": {
+    "id": "zotero-users-21976164-J8ABSDUX",
+    "libraryType": "users",
+    "libraryId": "21976164",
+    "key": "J8ABSDUX",
+    "fingerprint": "498fbe70dd61ea31482e2a46ee9a38d40cc2d30a51650bc49665c026943272fb",
+    "title": "Simply Perfect Pancakes",
+    "itemType": "webpage",
+    "authors": [
+      "King Arthur Baking"
+    ],
+    "url": "https://www.kingarthurbaking.com/recipes/simply-perfect-pancakes-recipe",
+    "doi": null,
+    "publishedAt": "December 31, 2009 at 7:00pm",
+    "capturedAt": "2026-10-06T12:40:39Z",
+    "tags": [
+      "agent-test-data",
+      "agent-test-data-2026-10-06",
+      "recipe-breakfast"
+    ],
+    "active": true
+  },
+  "extraction": {
+    "status": "text",
+    "method": "html",
+    "reason": null,
+    "truncated": false,
+    "retrievedAt": "2026-10-06T12:45:14.532Z",
+    "artifactHash": "6bf91e9d9388455595fb5ead3942f35226abcc23b24777502674e2c440b4e2e8",
+    "artifactMime": "text/html"
+  },
+  "analysis": {
+    "summary": "A recipe webpage excerpt describes pancake preparation and offers variations for blueberries, waffles, ground oats, and grated apple. It contains practical baking claims but no research data or evidence supporting nutritional or health effects.",
+    "topics": [
+      "Pancake preparation",
+      "Batter mixing and resting",
+      "Blueberry pancakes",
+      "Waffle adaptations",
+      "Ground oats substitution",
+      "Moisture retention in pancakes",
+      "Ancient grains in baking"
+    ],
+    "sourceCategory": "webpage",
+    "studyType": null,
+    "keyFindings": [
+      "The source recommends resting pancake batter for at least 15 minutes and states that it will thicken slightly.",
+      "The source states that mixing frozen blueberries into batter before portioning can make it blue and streaky.",
+      "Suggested variations include replacing some milk with fat for waffles, replacing some all-purpose flour with ground oats, and adding grated apple for moisture retention."
+    ],
+    "limitations": [
+      "This is instructional recipe content, not a scientific study.",
+      "No ingredient list with complete quantities, recipe yield, author, publication date, or source URL is included.",
+      "No controlled comparisons, measurements, citations, or uncertainty estimates support the practical baking claims.",
+      "No nutritional analysis or health outcomes are reported.",
+      "The referenced ancient-grains guide is not included in the excerpt."
+    ],
+    "claims": [
+      {
+        "text": "Resting the batter for at least 15 minutes allows it to thicken slightly.",
+        "evidence": "Stated in the recipe instructions; no measurements or comparative testing are provided."
+      },
+      {
+        "text": "Mixing frozen blueberries into the batter before scooping will turn it blue and streaky.",
+        "evidence": "Presented as a practical baking observation; no supporting test results are included."
+      },
+      {
+        "text": "Grated apple added to the batter keeps pancakes moist longer when prepared ahead.",
+        "evidence": "Stated in the baker tips; the excerpt provides no quantity, retention time, or measured comparison."
+      },
+      {
+        "text": "Replacing 1/2 cup of all-purpose flour with 1/2 cup of ground oats creates a whole-grain breakfast variation.",
+        "evidence": "Suggested in the baker tips; no nutritional composition or outcome data are provided."
+      }
+    ],
+    "relevance": [
+      "Useful as a practical reference for pancake preparation and recipe adaptations.",
+      "May inform research questions about batter resting, ingredient substitutions, color changes, and moisture retention, but cannot establish their effects scientifically.",
+      "Does not provide evidence for medical or nutritional benefits."
+    ],
+    "population": null,
+    "participantCount": null,
+    "intervention": null,
+    "comparator": null,
+    "outcomes": [],
+    "funding": null,
+    "suggestedRelationships": [
+      "Recipe resources discussing pancake batter resting and texture",
+      "Food-science studies on fruit additions and moisture retention in baked products",
+      "Baking references on oat substitutions and ancient grains",
+      "Resources comparing pancake and waffle formulations"
+    ]
+  },
+  "processing": {
+    "version": "2",
+    "model": "research-sol",
+    "processedAt": "2026-10-06T12:45:24.654Z"
+  },
+  "rightsEvidence": []
+}

@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "generationId": "c44df7dd7e8db381fc9f416bd032e66fe497532972873ed5baea7f68a2a391de",
+  "source": {
+    "id": "zotero-users-21976164-UX4VPD26",
+    "libraryType": "users",
+    "libraryId": "21976164",
+    "key": "UX4VPD26",
+    "fingerprint": "0a2307ed8612e5d3dddc6e61b430daa6252a71ab06be49086d9b151d7b33e57f",
+    "title": "Relationship between food waste, diet quality, and environmental sustainability",
+    "itemType": "journalArticle",
+    "authors": [
+      "Zach Conrad",
+      "Meredith T. Niles",
+      "Deborah A. Neher",
+      "Eric D. Roy",
+      "Nicole E. Tichenor",
+      "Lisa Jahns"
+    ],
+    "url": "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0195405",
+    "doi": "10.1371/journal.pone.0195405",
+    "publishedAt": "2018 Apr 18",
+    "capturedAt": "2026-10-06T12:40:39Z",
+    "tags": [
+      "agent-test-data",
+      "agent-test-data-2026-10-06",
+      "research-environment"
+    ],
+    "active": true
+  },
+  "extraction": {
+    "status": "text",
+    "method": "pdf-text",
+    "reason": null,
+    "truncated": true,
+    "retrievedAt": "2026-10-06T12:45:15.024Z",
+    "artifactHash": "18fc0c881178f01b0eaaf84ec245faa7a89af55cce70750ead11ac7037aa40e5",
+    "artifactMime": "application/pdf"
+  },
+  "analysis": {
+    "summary": "This 2018 research article combines US dietary survey data, national food-loss estimates, and biophysical modeling to examine consumer-level food waste and its relationship with diet quality and agricultural resource use. Estimated daily waste was 422 g per person, with approximately 30 million acres of cropland used annually to produce uneaten food. Higher Healthy Eating Index-2015 scores were associated with more estimated food waste and greater embodied irrigation-water and pesticide use, but less embodied cropland use. These are observational, model-dependent associations rather than direct measurements of individual waste or evidence that improving diet quality causes increased waste.",
+    "topics": [
+      "Consumer food waste",
+      "Diet quality",
+      "Healthy Eating Index-2015",
+      "Sustainable food systems",
+      "Agricultural land use",
+      "Irrigation water",
+      "Pesticides and fertilizers",
+      "Nutrient waste",
+      "US dietary patterns"
+    ],
+    "sourceCategory": "research-paper",
+    "studyType": "Cross-sectional observational secondary-data analysis with biophysical simulation modeling",
+    "keyFindings": [
+      "Estimated daily consumer food waste was 421.5 g per person (95% CI: 409.1–433.9), approximately 26% of food available by weight.",
+      "Fruits, vegetables, and their mixed dishes accounted for 38.9% of estimated waste by weight, followed by dairy (17.1%), meat and mixed meat dishes (13.5%), and grains and mixed grain dishes (12.1%).",
+      "Estimated wasted energy was approximately 817 kcal per person daily, with a reported interval of 795–840 kcal, or about 29% of available daily energy.",
+      "Producing wasted food required an estimated 30.02 million acres of cropland annually (95% CI: 29.29–30.76 million), equivalent to 7.7% of US harvested cropland.",
+      "Estimated food waste increased from 295 g/day in the lowest diet-quality quintile to 535 g/day in the highest quintile; the trend was statistically significant (P < 0.001).",
+      "Higher diet quality was associated with less embodied cropland use (P = 0.029), but greater embodied irrigation-water and pesticide use (both P < 0.001). The authors reported no corresponding association with fertilizer waste.",
+      "Annual resources embodied in wasted food included approximately 4.2 trillion gallons of irrigation water, 780 million pounds of pesticides, and 5.6 billion pounds of nitrogen, phosphorus, and potash fertilizers combined."
+    ],
+    "limitations": [
+      "Food waste was inferred from reported consumption and national food-specific loss proportions, not directly measured for participants. Actual waste rates may vary across individuals and diet-quality groups in ways the analysis cannot capture.",
+      "The cross-sectional design and modeled associations do not establish causality. Applying food-specific waste proportions to dietary composition also makes estimated waste partly dependent on the foods used to characterize diet quality.",
+      "Waste estimates included cooking losses, such as fats and oils remaining in a pan; these may not fit all definitions of avoidable food waste.",
+      "Dietary intake relied on one self-reported 24-hour recall per participant. Recall and social-desirability errors could affect both diet-quality scores and waste estimates; the authors note possible overestimation from over-reporting fruits and vegetables.",
+      "The model assumed a closed US food system with all food domestically produced, excluding the actual geography and production conditions of imported foods. The authors suggest this could underestimate cropland requirements.",
+      "Only 92% of Food Commodity Intake Database foods were matched to food-loss data; unmatched foods were excluded.",
+      "Datasets covered different years, and chemical-use estimates for hay and pasture relied on communications with agricultural extension agents because survey data were unavailable.",
+      "Reported uncertainty reflects variation in dietary intake through modeling and does not necessarily encompass all uncertainty in loss rates, recipe matching, or agricultural assumptions.",
+      "Resource-use estimates are not direct measurements of environmental damage. The analysis did not comprehensively assess greenhouse gas emissions, biodiversity, soil erosion, or regional differences in environmental impact.",
+      "Proposed consumer education and waste-reduction approaches were not tested for effectiveness in this study."
+    ],
+    "claims": [
+      {
+        "text": "US consumers wasted nearly one pound of food per person daily during 2007–2014.",
+        "evidence": "Linked dietary and food-loss datasets yielded 421.5 g/day (95% CI: 409.1–433.9; n = 35,507). This is an estimated population average, not directly observed household waste."
+      },
+      {
+        "text": "Higher-quality diets were associated with greater food waste.",
+        "evidence": "Estimated waste was 295 g/day (95% CI: 282–308) in HEI-2015 quintile 1 and 535 g/day (501–568) in quintile 5, with P < 0.001 for trend. Individual waste behavior and causal effects were not measured."
+      },
+      {
+        "text": "Higher diet quality had different relationships with different sustainability indicators.",
+        "evidence": "Regression trends indicated lower embodied cropland use (P = 0.029), higher irrigation-water and pesticide use (both P < 0.001), and no reported fertilizer association. These outcomes were derived from modeled cropland and agricultural application rates."
+      },
+      {
+        "text": "Fruits and vegetables largely explain the tradeoff between lower cropland requirements and higher waste-associated water and pesticide use.",
+        "evidence": "Fruits, vegetables, and mixed dishes contributed 38.9% of estimated waste by weight. The authors attribute the pattern to greater inclusion in higher-quality diets, relatively high assigned waste rates, lower land requirements, and higher agricultural inputs per unit area."
+      },
+      {
+        "text": "Food waste embodies substantial agricultural resource use.",
+        "evidence": "The modified US Foodprint Model estimated approximately 30 million acres of annual cropland use; combining modeled land areas with agricultural application rates yielded approximately 4.2 trillion gallons of irrigation water and 780 million pounds of pesticides."
+      },
+      {
+        "text": "Diet-quality improvement and food-waste reduction should be considered together.",
+        "evidence": "This is the authors' interpretation of the modeled resource tradeoffs. Their proposed education, storage, labeling, and institutional approaches were not evaluated experimentally."
+      }
+    ],
+    "relevance": [
+      "Useful for research on tradeoffs between nutritional quality and environmental sustainability rather than treating sustainability as a single outcome.",
+      "Provides a method for integrating dietary recalls, ingredient-level recipes, food-loss proportions, and agricultural resource modeling.",
+      "Highlights the importance of distinguishing waste by weight, calories, nutrients, land use, and agricultural inputs.",
+      "Offers historical US baseline estimates, but does not establish current waste levels or the effectiveness of particular waste-reduction interventions."
+    ],
+    "population": "US individuals aged 2 years and older participating in the dietary component of NHANES, What We Eat In America, across the 2007–2008, 2009–2010, 2011–2012, and 2013–2014 survey waves.",
+    "participantCount": 35507,
+    "intervention": null,
+    "comparator": "Observational comparisons across HEI-2015 diet-quality quintiles, from lowest to highest quality; no assigned control group.",
+    "outcomes": [
+      "Estimated daily food waste by weight and food category",
+      "Estimated proportion of food wasted",
+      "Calories and nutrients embodied in food waste",
+      "Annual cropland used to produce wasted food",
+      "Irrigation water applied to produce wasted food",
+      "Pesticides applied to produce wasted food",
+      "Nitrogen, phosphorus, and potash fertilizers applied to produce wasted food",
+      "Associations between HEI-2015 quintiles and estimated waste or embodied resources"
+    ],
+    "funding": "United States Department of Agriculture, Agricultural Research Service, project 3062-51000-051-00D. The authors report no additional external funding.",
+    "suggestedRelationships": [
+      "Studies of dietary quality and environmental sustainability using multiple indicators",
+      "Research on nutrients lost through consumer food waste",
+      "US dietary foodprint and agricultural carrying-capacity modeling",
+      "Comparisons of consumer-only waste with retail and broader supply-chain losses",
+      "Evaluations of household food-waste education and food-date labeling",
+      "Research on fruit and vegetable perishability and embodied agricultural inputs"
+    ]
+  },
+  "processing": {
+    "version": "2",
+    "model": "research-sol",
+    "processedAt": "2026-10-06T12:45:41.611Z"
+  },
+  "rightsEvidence": [
+    {
+      "origin": "crossref",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "appliesTo": "metadata",
+      "artifactHash": null,
+      "checkedAt": "2026-10-06T12:45:42.026Z"
+    }
+  ]
+}

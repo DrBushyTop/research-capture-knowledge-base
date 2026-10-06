@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "generationId": "56c074a3aea849a9a281d14c86bbbbbf387abf3291b846aa02f65aff40762701",
+  "source": {
+    "id": "zotero-users-21976164-QEBUDVX2",
+    "libraryType": "users",
+    "libraryId": "21976164",
+    "key": "QEBUDVX2",
+    "fingerprint": "aabd3e897c1abe90433f864d08daaad9e724382df78bd86f864f28a6d043a30a",
+    "title": "The Best Hummus",
+    "itemType": "webpage",
+    "authors": [
+      "Kathryne Taylor"
+    ],
+    "url": "https://cookieandkate.com/best-hummus-recipe/",
+    "doi": null,
+    "publishedAt": "2018-05-23T19:50:14+00:00",
+    "capturedAt": "2026-10-06T12:40:39Z",
+    "tags": [
+      "agent-test-data",
+      "agent-test-data-2026-10-06",
+      "recipe-dip"
+    ],
+    "active": true
+  },
+  "extraction": {
+    "status": "text",
+    "method": "html",
+    "reason": null,
+    "truncated": false,
+    "retrievedAt": "2026-10-06T12:45:14.220Z",
+    "artifactHash": "99528133f33b89be169f78b89449776995d272fa5e70894a647cb484edda1b12",
+    "artifactMime": "text/html"
+  },
+  "analysis": {
+    "summary": "A recipe webpage describing techniques for creamy homemade hummus, based on the author's reported ten preparation attempts and adaptations of recipes from established chefs. Its main technique is boiling cooked chickpeas with baking soda until very soft before blending with tahini, lemon juice, garlic, ice water, cumin and olive oil. Texture and flavor claims are primarily subjective culinary observations, not findings from a controlled study.",
+    "topics": [
+      "Hummus preparation",
+      "Chickpea softening",
+      "Baking soda in cooking",
+      "Tahini",
+      "Texture and flavor",
+      "Plant-based recipes"
+    ],
+    "sourceCategory": "webpage",
+    "studyType": null,
+    "keyFindings": [
+      "The author reports that boiling canned or previously cooked chickpeas with baking soda for about 20 minutes produces softer chickpeas and smoother hummus without individually peeling the skins.",
+      "The author identifies tahini quality and a ratio of ½ cup tahini to one 15-ounce can of chickpeas as important to the desired flavor and richness.",
+      "Ice water is reported to make the tahini mixture paler and the hummus lighter and fluffier; the author explicitly states that a scientific explanation was not found.",
+      "Finely processing garlic with lemon juice and allowing it to rest is reported to reduce harsh garlic flavor.",
+      "The recipe yields approximately 2 cups of hummus."
+    ],
+    "limitations": [
+      "No controlled experiment, standardized sensory testing, participant sample or statistical analysis is reported.",
+      "The reported ten recipe attempts are not described in enough detail to isolate the effects of individual ingredients or techniques.",
+      "Texture and taste assessments reflect the author's preferences and may not generalize to other ingredients, equipment or tasters.",
+      "Explanations attributed to Bon Appetit and Serious Eats are referenced but their supporting evidence is not reproduced in the supplied text.",
+      "The webpage discloses affiliate commissions and includes commercial product recommendations, which may introduce promotional bias.",
+      "No numerical nutrition information is supplied; the page states that its nutrition information is estimated using an online calculator.",
+      "The statement that refrigerated leftovers keep for up to one week is not supported by food-safety testing in the supplied text."
+    ],
+    "claims": [
+      {
+        "text": "Cooking chickpeas with baking soda helps produce an ultra-smooth purée by softening the chickpeas and breaking down their skins.",
+        "evidence": "The author reports softer, more visibly split chickpeas after cooking with baking soda and quotes Bon Appetit attributing the effect to increased water pH. No quantitative measurements or controlled comparisons are provided."
+      },
+      {
+        "text": "Ice-cold water helps make hummus light and fluffy and makes the tahini mixture paler.",
+        "evidence": "An informal observation reported by the author, who explicitly acknowledges lacking a scientific explanation; no comparison with warmer water is documented."
+      },
+      {
+        "text": "Resting finely chopped garlic in lemon juice reduces its harsh raw flavor.",
+        "evidence": "The author reports a before-and-after taste comparison and references a Serious Eats explanation, but provides no blinded testing or underlying scientific data."
+      },
+      {
+        "text": "Tahini quality and quantity substantially influence hummus flavor and richness.",
+        "evidence": "Supported by the author's subjective experiences with different brands and a preferred recipe ratio, rather than standardized product testing."
+      },
+      {
+        "text": "Blending in one tablespoon of olive oil makes the hummus taste more luxurious and creamy.",
+        "evidence": "Presented explicitly as the author's preference; no objective texture measurement or systematic comparison is reported."
+      },
+      {
+        "text": "Covered leftover hummus keeps well in the refrigerator for up to one week.",
+        "evidence": "A recipe storage statement without supporting temperature specifications, microbiological testing or other validation in the supplied source."
+      }
+    ],
+    "relevance": [
+      "Useful as a practical culinary reference for chickpea-based dips and ingredient-processing techniques.",
+      "Provides hypotheses about how cooking, acidity and water temperature affect hummus texture and flavor.",
+      "Not evidence for clinical benefits, nutritional efficacy or health outcomes."
+    ],
+    "population": null,
+    "participantCount": null,
+    "intervention": null,
+    "comparator": null,
+    "outcomes": [
+      "Reported hummus smoothness and creaminess",
+      "Reported lightness and fluffiness",
+      "Observed chickpea softness and skin breakdown",
+      "Reported garlic harshness",
+      "Reported flavor and richness",
+      "Observed tahini mixture color"
+    ],
+    "funding": null,
+    "suggestedRelationships": [
+      "Recipes using alkaline cooking to soften legumes",
+      "Food-science sources on chickpea cell-wall and skin breakdown",
+      "Sources examining acidity and garlic flavor development",
+      "Recipes adapted from Michael Solomonov and Yotam Ottolenghi",
+      "Comparative evaluations of tahini flavor and hummus texture"
+    ]
+  },
+  "processing": {
+    "version": "2",
+    "model": "research-sol",
+    "processedAt": "2026-10-06T12:45:29.986Z"
+  },
+  "rightsEvidence": []
+}

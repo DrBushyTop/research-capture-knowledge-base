@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "generationId": "e0216ad1b6dd7c0e3fbabc654f53b18a72e643c3cf17b9385b66dde25d9035e1",
+  "source": {
+    "id": "zotero-users-21976164-SF7I9F2X",
+    "libraryType": "users",
+    "libraryId": "21976164",
+    "key": "SF7I9F2X",
+    "fingerprint": "94e2bac109ba73f857c887c65816c0e4217bd7f77f1cdb51125f3b120c7ef135",
+    "title": "WHO recommends R21/Matrix-M vaccine for malaria prevention in updated advice on immunization",
+    "itemType": "webpage",
+    "authors": [
+      "World Health Organization"
+    ],
+    "url": "https://www.who.int/news/item/02-10-2023-who-recommends-r21-matrix-m-vaccine-for-malaria-prevention-in-updated-advice-on-immunization",
+    "doi": null,
+    "publishedAt": "2023-10-02",
+    "capturedAt": "2026-10-06T12:40:39Z",
+    "tags": [
+      "agent-test-data",
+      "agent-test-data-2026-10-06",
+      "news-public-health"
+    ],
+    "active": true
+  },
+  "extraction": {
+    "status": "needs-review",
+    "method": "html",
+    "reason": "Machine analysis unavailable or invalid; source retained privately for reprocessing.",
+    "truncated": false,
+    "retrievedAt": "2026-10-06T12:45:15.062Z",
+    "artifactHash": "e5d78e60d6cbdae9442a6346391f3db882f11252c59c2b42e8f3a4f5e0b5ff59",
+    "artifactMime": "text/html"
+  },
+  "analysis": null,
+  "processing": {
+    "version": "2",
+    "model": "research-sol",
+    "processedAt": "2026-10-06T12:45:40.653Z"
+  },
+  "rightsEvidence": []
+}

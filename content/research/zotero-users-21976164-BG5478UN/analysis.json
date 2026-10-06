@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "generationId": "15b4134b2b9b477a548e9e21d56f83302344346a88a34a523ba52800add27fe2",
+  "source": {
+    "id": "zotero-users-21976164-BG5478UN",
+    "libraryType": "users",
+    "libraryId": "21976164",
+    "key": "BG5478UN",
+    "fingerprint": "651e57f868c9d702bedebae8f4f55a4092424b674cf3d6d9d994238b00ee38d2",
+    "title": "NASA (@nasa) • Instagram photo",
+    "itemType": "webpage",
+    "authors": [
+      "NASA"
+    ],
+    "url": "https://www.instagram.com/p/BwFQEn0j7v1/",
+    "doi": null,
+    "publishedAt": "2019-04-10",
+    "capturedAt": "2026-10-06T12:40:40Z",
+    "tags": [
+      "agent-test-data",
+      "agent-test-data-2026-10-06",
+      "metadata-only-social",
+      "social-space"
+    ],
+    "active": true
+  },
+  "extraction": {
+    "status": "needs-review",
+    "method": "html",
+    "reason": "No usable text layer. A scan may need OCR or manual review.",
+    "truncated": false,
+    "retrievedAt": "2026-10-06T12:45:14.075Z",
+    "artifactHash": "2bb001c9444696514ed4d77c2ecd347f1bf14fed271d0296d25a9f7118a2d3ca",
+    "artifactMime": "text/html"
+  },
+  "analysis": null,
+  "processing": {
+    "version": "2",
+    "model": null,
+    "processedAt": "2026-10-06T12:45:15.873Z"
+  },
+  "rightsEvidence": []
+}

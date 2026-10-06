@@ -134,7 +134,7 @@ app.storageQueue('processCapture', {
       if (id.startsWith('b_')) { await dispatchBatch(state, id, next => state.send(next)); return; }
       if (id.startsWith('p_')) { await processPreview(state, id, analyzeTemplate); return; }
       await processJob(state, id, { version: process.env.PROCESSING_VERSION || processingVersion, model: required('FOUNDRY_DEPLOYMENT'),
-        extract: async snapshot => extract(snapshot, await zotero(), (hash, bytes, mime) => state.retainSource(snapshot.source.fingerprint, hash, bytes, mime), () => state.restoreSource(snapshot.source.fingerprint)),
+        extract: async snapshot => extract(snapshot, { request: async (...args) => (await zotero()).request(...args) }, (hash, bytes, mime) => state.retainSource(snapshot.source.fingerprint, hash, bytes, mime), () => state.restoreSource(snapshot.source.fingerprint)),
         enrich: (text, signal, images) => enrich(text, required('FOUNDRY_ENDPOINT'), required('FOUNDRY_DEPLOYMENT'), signal, images),
         classify: (source, text, registry, signal, images) => classifySource(source, text, registry, required('FOUNDRY_ENDPOINT'), required('FOUNDRY_DEPLOYMENT'), signal, images),
         analyzeTemplate, rights: licenseEvidence });

@@ -9,7 +9,7 @@ await copyFile('apps/worker/sql/001-initial.sql','.function-package/001-initial.
 const values: Record<string,string>={AzureWebJobsStorage:process.env.AZURITE_CONNECTION_STRING!,FUNCTIONS_WORKER_RUNTIME:'node',
  STORAGE_ACCOUNT:'researchdev',AZURITE_CONNECTION_STRING:process.env.AZURITE_CONNECTION_STRING!,SQL_SERVER:process.env.SQL_SERVER||'',SQL_DATABASE:process.env.SQL_DATABASE||'',SQL_CONNECTION_STRING:process.env.SQL_CONNECTION_STRING||'',
  READER_GITHUB_USERS:'pinaatti,DrBushyTop','AzureWebJobs.discoverCaptures.Disabled':'true','AzureWebJobs.recoverChats.Disabled':'true'};
-for(const name of ['FOUNDRY_ENDPOINT','FOUNDRY_DEPLOYMENT','AZURE_SUBSCRIPTION_ID','AZURE_RESOURCE_GROUP','SANDBOX_REGION','SANDBOX_GROUP','SANDBOX_SNAPSHOT'])if(process.env[name])values[name]=process.env[name]!;
+for(const name of ['KEY_VAULT_URI','FOUNDRY_ENDPOINT','FOUNDRY_DEPLOYMENT','AZURE_SUBSCRIPTION_ID','AZURE_RESOURCE_GROUP','SANDBOX_REGION','SANDBOX_GROUP','SANDBOX_SNAPSHOT'])if(process.env[name])values[name]=process.env[name]!;
 if(!values.FOUNDRY_ENDPOINT||!values.FOUNDRY_DEPLOYMENT)throw new Error('Set FOUNDRY_ENDPOINT and FOUNDRY_DEPLOYMENT for real model work');
 await writeFile('.function-package/local.settings.json',JSON.stringify({IsEncrypted:false,Values:values}),{mode:0o600});
 const child=spawn('func',['start','--port','7071'],{cwd:'.function-package',stdio:'inherit',env:process.env});

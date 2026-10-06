@@ -40,7 +40,19 @@ try {
   if (!(await store.sources()).length) {
     for (const entry of await readCorpus('content/research', 'private')) {
       const human = await readFile(`content/research/${entry.note.source.id}/notes.md`, 'utf8');
-      await store.withLease('seed', () => store.publishNote(entry.note, human, entry.publication));
+      await store.withLease('seed', async () => {
+        await store.publishNote(entry.note, human, entry.publication);
+        await store.create(`snapshots/${entry.note.generationId}.json`, {
+          source: entry.note.source,
+          root: { key: entry.note.source.key, version: 1, data: { itemType: entry.note.source.itemType, title: entry.note.source.title, url: entry.note.source.url } },
+          children: []
+        });
+        await store.write(`sources/${entry.note.source.id}.json`, { generationId: entry.note.generationId, source: entry.note.source, processingVersion: entry.note.processing.version });
+        try {
+          const text = JSON.parse(await readFile(`.local/search-source-text/${entry.note.generationId}.json`, 'utf8'));
+          await store.create(`source-text/${entry.note.generationId}.json`, text);
+        } catch (error) { if ((error as { code?: string }).code !== 'ENOENT') throw error; }
+      });
     }
   }
 } finally { await closeSql(); }

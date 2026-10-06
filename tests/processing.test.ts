@@ -15,6 +15,17 @@ it('stages a validated note once despite duplicate delivery', async () => {
   expect((await store.read<{ text: string }>(`source-text/${job.id}.json`))?.text).toBe('Available source evidence.');
   expect((await store.read<Job>(key))?.status).toBe('staged');
 });
+it('publishes SQL-backed notes immediately and marks the job imported without a Git round trip', async () => {
+  const store = new MemoryStore();
+  let published: Note | undefined;
+  const sqlStore = Object.assign(store, { publishNote: async (note: Note) => { published = note; } });
+  await discover(sqlStore, snapshot, 'v1');
+  const key = (await sqlStore.list('jobs/'))[0];
+  const job = (await sqlStore.read<Job>(key))!;
+  await processJob(sqlStore, job.id, processor);
+  expect(published?.analysis?.summary).toBe(analysis.summary);
+  expect((await sqlStore.read<Job>(key))?.status).toBe('imported');
+});
 it('a failed model produces an honest review note without invented analysis', async () => {
   const store = new MemoryStore(); await discover(store, snapshot, 'v1');
   const job = (await store.read<Job>((await store.list('jobs/'))[0]))!;

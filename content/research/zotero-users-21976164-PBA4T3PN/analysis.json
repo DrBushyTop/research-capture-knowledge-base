@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generationId": "2dcb591838ec6b6163d3caeed569b93557b2f5a7b4d5a2f95d38e12e5774d2e6",
+  "generationId": "09ec46924928bd5046996ef808c325699d19b37e280488834e8a216207897245",
   "source": {
     "id": "zotero-users-21976164-PBA4T3PN",
     "libraryType": "users",
@@ -22,19 +22,106 @@
     "active": true
   },
   "extraction": {
-    "status": "needs-review",
+    "status": "text",
     "method": "pdf-text",
-    "reason": "Machine analysis unavailable or invalid; source retained privately for reprocessing.",
+    "reason": null,
     "truncated": false,
-    "retrievedAt": "2026-10-05T17:45:04.471Z",
+    "retrievedAt": "2026-10-05T17:45:05.562Z",
     "artifactHash": "61f5db704d9c35d07cf7c765bc4d3d624a68ccc9ec4aa8c32423a4d0e41b65b1",
     "artifactMime": "application/pdf"
   },
-  "analysis": null,
+  "analysis": {
+    "summary": "This 2004 JAMA clinical review by Goldenberg, Burckhardt, and Crofford synthesizes fibromyalgia treatment evidence from 505 reviewed articles. The authors rated evidence strongest for low-dose tricyclic agents, cardiovascular exercise, cognitive behavioral therapy, patient education, and multidisciplinary interventions. Medication benefits were generally modest and short-term, while some nonpharmacological treatment gains persisted during follow-up. The review proposes a stepwise management framework, but its conclusions reflect evidence available through 2004 rather than current guidance.",
+    "topics": [
+      "Fibromyalgia syndrome",
+      "Chronic widespread pain",
+      "Pharmacological treatment evidence",
+      "Aerobic exercise",
+      "Cognitive behavioral therapy",
+      "Patient education",
+      "Multidisciplinary pain management",
+      "Clinical trial methodology"
+    ],
+    "sourceCategory": "research-paper",
+    "studyType": "Evidence-based clinical review and guideline synthesis using randomized trials, meta-analyses, and additional lower-level evidence; not an original clinical trial or new quantitative meta-analysis.",
+    "keyFindings": [
+      "The authors classified evidence as strong for amitriptyline and cyclobenzaprine, although overall medication efficacy was modest and most trials lasted only 6–12 weeks.",
+      "The review reports that antidepressant meta-analyses found improvements in sleep, pain, fatigue, and well-being; tender-point pain did not consistently improve.",
+      "Cardiovascular exercise was associated with improvements in fitness, pain, and tender-point pressure thresholds, with benefits dependent on continued exercise.",
+      "Patient education, cognitive behavioral therapy, and multidisciplinary programs improved selected symptom, functional, and self-efficacy outcomes; some gains persisted for months or longer.",
+      "Evidence for tramadol, fluoxetine, newer serotonin-norepinephrine reuptake inhibitors, and pregabalin was rated moderate, with some findings based on single trials or incompletely published results.",
+      "Many commonly used treatments lacked adequate evaluation. Absence of trial evidence for a therapy was not equivalent to demonstrated ineffectiveness."
+    ],
+    "limitations": [
+      "The literature search extends only through 2004; treatment rankings, diagnostic criteria, and regulatory statements are historical.",
+      "Many medication trials were small, short, inadequately blinded, or used nonstandardized outcome measures, limiting confidence in sustained benefit.",
+      "Exercise, education, and cognitive behavioral therapy trials were not adequately blinded and often used wait-list, education, or flexibility comparators.",
+      "The review provides broad database coverage and evidence-ranking rules but does not report a reproducible full search strategy, study-selection flow, or detailed study-level risk-of-bias assessment.",
+      "Some emerging medication findings were available only as abstracts or incomplete trial reports.",
+      "The authors report that treatment trials did not include patients with concurrent rheumatic diseases such as rheumatoid arthritis or systemic lupus erythematosus, limiting generalizability.",
+      "Fibromyalgia heterogeneity and limited evaluation of combined medication and nonpharmacological treatment complicate comparisons and individualized treatment conclusions.",
+      "Evidence labels are not entirely consistent: massage is described as weak evidence in the treatment box but moderate evidence in the conclusions."
+    ],
+    "claims": [
+      {
+        "text": "Low-dose tricyclic agents had the strongest medication evidence available to the reviewers.",
+        "evidence": "Multiple randomized trials and two antidepressant meta-analyses favored these agents over placebo, particularly for sleep. The review reports significant clinical response in 25%–37% of patients, but a 208-patient trial lost initial improvements by 26 weeks."
+      },
+      {
+        "text": "Cardiovascular exercise improved several fibromyalgia outcomes.",
+        "evidence": "A cited systematic review included 16 trials and 724 participants. The clinical review reports greater improvement with exercise than controls in aerobic performance, tender-point pressure threshold, and pain; lack of blinding and varied interventions limit interpretation."
+      },
+      {
+        "text": "Cognitive behavioral therapy and multidisciplinary programs could produce sustained improvements.",
+        "evidence": "The review describes controlled trials and systematic reviews reporting improvements in pain, fatigue, mood, function, or self-efficacy, with follow-up extending months to years in some studies. Many comparisons used wait-list or education controls, and some supporting studies were uncontrolled."
+      },
+      {
+        "text": "Pregabalin and newer serotonin-norepinephrine reuptake inhibitors showed promising efficacy but had limited evidence at publication.",
+        "evidence": "The review cites individual trials of pregabalin in 529 participants, milnacipran in 125, and duloxetine in 207. Some results were abstract-only, and long-term efficacy was not established."
+      },
+      {
+        "text": "Several commonly used therapies lacked adequate evidence rather than having uniformly demonstrated lack of benefit.",
+        "evidence": "No randomized trials of opioids or trigger-point injections were reported, and several supplements were inadequately evaluated. In contrast, the cited controlled prednisone and guaifenesin studies did not show efficacy."
+      },
+      {
+        "text": "No medication was specifically FDA-approved for fibromyalgia when the review was published.",
+        "evidence": "The article explicitly reports this regulatory status in 2004; it does not establish present-day approval status."
+      }
+    ],
+    "relevance": [
+      "Provides a historical overview of fibromyalgia treatment evidence and the rationale for multimodal management.",
+      "Useful for comparing older evidence rankings with subsequent trials, systematic reviews, diagnostic frameworks, and guidelines.",
+      "Highlights research gaps in long-term outcomes, standardized measurement, subgroup responses, and combined interventions."
+    ],
+    "population": "People with fibromyalgia represented in the reviewed human treatment studies, including several studies restricted to women. The review does not provide an aggregate demographic profile and reports exclusion of concurrent rheumatic disease from treatment trials.",
+    "participantCount": null,
+    "intervention": "Multiple pharmacological and nonpharmacological interventions, including tricyclic agents, other antidepressants, tramadol, pregabalin, aerobic and strength exercise, cognitive behavioral therapy, education, and multidisciplinary programs.",
+    "comparator": "Varied across studies: placebo, wait-list or untreated controls, education or attention controls, flexibility training, sham procedures, and other active treatments.",
+    "outcomes": [
+      "Pain intensity and pain relief",
+      "Tender-point tenderness and pressure pain thresholds",
+      "Sleep quality",
+      "Fatigue and morning tiredness",
+      "Physical function and Fibromyalgia Impact Questionnaire scores",
+      "Global well-being and health-related quality of life",
+      "Depression and anxiety",
+      "Self-efficacy",
+      "Aerobic fitness, walking performance, and strength",
+      "Treatment discontinuation and durability of benefit"
+    ],
+    "funding": "Sponsored by the American Pain Society. The article states that the sponsor did not participate in study design or conduct, data collection, analysis or interpretation, or manuscript preparation, review, or approval. The methods also describe an APS-selected expert panel and APS-commissioned literature review.",
+    "suggestedRelationships": [
+      "Historical context for later fibromyalgia treatment guidelines and regulatory developments.",
+      "Related evidence on antidepressants and cyclobenzaprine for fibromyalgia.",
+      "Related systematic reviews of exercise, cognitive behavioral therapy, and multidisciplinary pain rehabilitation.",
+      "Related research on altered pain processing and fibromyalgia patient subgroups.",
+      "Related methodological work on standardized fibromyalgia trial outcomes and long-term follow-up."
+    ]
+  },
   "processing": {
     "version": "2",
     "model": "research-sol",
-    "processedAt": "2026-10-05T17:45:32.475Z"
+    "processedAt": "2026-10-06T07:13:43.329Z"
   },
   "rightsEvidence": []
 }

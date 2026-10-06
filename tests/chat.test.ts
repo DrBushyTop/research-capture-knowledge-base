@@ -1,19 +1,19 @@
 import { expect, it } from 'vitest';
 import { chatRequestSchema, chatSnapshotRevision, evidenceChunk, packEvidence, validateAnswer } from '../shared/chat.js';
 it('bounds questions and rejects invented citations and unsupported quoted evidence', () => {
-  expect(chatRequestSchema.safeParse({ question: 'x'.repeat(2001) }).success).toBe(false);
+  expect(chatRequestSchema.safeParse({ question: 'x'.repeat(8001) }).success).toBe(false);
   const chunk = evidenceChunk({ sourceId: 'zotero-users-12345-PBA4T3PN', generationId: 'a'.repeat(64), title: 'Paper', kind: 'source', locator: 'PDF page 2', text: 'The paper reports uncertain evidence.' });
   const answer = { answer: 'Evidence is uncertain.', insufficientEvidence: false, citations: [{ evidenceId: chunk.id, quote: 'uncertain evidence' }] };
   expect(validateAnswer(answer, [chunk]).citations[0].locator).toBe('PDF page 2');
   expect(() => validateAnswer({ ...answer, citations: [{ evidenceId: 'e_' + '0'.repeat(16), quote: null }] }, [chunk])).toThrow();
   expect(() => validateAnswer({ ...answer, citations: [{ evidenceId: chunk.id, quote: 'proved effective' }] }, [chunk])).toThrow();
-  expect(() => validateAnswer({ ...answer, citations: [] }, [chunk])).toThrow();
   expect(() => validateAnswer({ ...answer, answer: 'Claim [e_0000000000000000]' }, [chunk])).toThrow('Unsupported inline citation');
 });
-it('replaces uncited insufficient-evidence claims with a fixed server response', () => {
-  const answer = validateAnswer({ answer: 'A fabricated trial proved a treatment effective.', insufficientEvidence: true, citations: [] }, []);
-  expect(answer.answer).toBe('The stored evidence does not answer this question. Try selecting a source or a specific page.');
+it('allows freeform discussion without corpus citations and rejects invented attachments', () => {
+  const answer = validateAnswer({ answer: 'We can compare the study designs next.', insufficientEvidence: false, citations: [] }, []);
+  expect(answer.answer).toBe('We can compare the study designs next.');
   expect(answer.citations).toEqual([]);
+  expect(() => validateAnswer({ ...answer, attachments: ['a_' + '0'.repeat(16)] }, [])).toThrow('Unsupported attachment');
 });
 it('pins a new chat snapshot when original document text is backfilled at the same Git commit', () => {
   const gitRevision = 'a'.repeat(40);

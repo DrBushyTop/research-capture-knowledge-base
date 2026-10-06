@@ -10,8 +10,9 @@ const required = (key: string) => { const value = process.env[key]; if (!value) 
 export function sandboxClient() {
   return new SandboxGroupClient(new DefaultAzureCredential(), endpointForRegion(required('SANDBOX_REGION')), required('AZURE_SUBSCRIPTION_ID'), required('AZURE_RESOURCE_GROUP'), required('SANDBOX_GROUP'));
 }
-export async function gatherEvidence(store: BlobStore, corpus: ChatCorpus, job: ChatJob, record: (id: string) => Promise<void>) {
-  const signal = AbortSignal.any([AbortSignal.timeout(180_000), ...(store.leaseSignal ? [store.leaseSignal] : [])]);
+export async function gatherEvidence(store: BlobStore, corpus: ChatCorpus, job: ChatJob, record: (id: string) => Promise<void>, options?: { sourceId: string; query?: string; page?: number; visual?: boolean; signal?: AbortSignal }) {
+  if (options) job = { ...job, request: { question: options.query || job.request.question, history: [], sourceId: options.sourceId, ...(options.visual ? { visual: { sourceId: options.sourceId, page: options.page || 1 } } : {}) } };
+  const signal = AbortSignal.any([AbortSignal.timeout(180_000), ...(options?.signal ? [options.signal] : []), ...(store.leaseSignal ? [store.leaseSignal] : [])]);
   const initial = corpusEvidence(corpus);
   const query = [job.request.question, ...job.request.history.filter(turn => turn.role === 'user').map(turn => turn.content)].join('\n');
   const storedIndex = await store.read<{ revision: string; index: unknown }>(`chat/indexes/${corpus.revision}.json`);
@@ -35,7 +36,7 @@ export async function gatherEvidence(store: BlobStore, corpus: ChatCorpus, job: 
     await denyWorkspaceEgress(sandbox.id, signal);
     await writeWorkspaceFile(sandbox.id, '/workspace/evidence.py', await readFile(new URL('../sandbox/evidence.py', import.meta.url)), signal);
     await writeWorkspaceFile(sandbox.id, '/workspace/corpus.json', JSON.stringify({ revision: corpus.revision, sources }), signal);
-    const inputs: { sourceId: string; path: string; hash: string; mime: string; visualPage?: number }[] = [];
+    const inputs: { sourceId: string; path: string; hash: string; mime: string; visualPage?: number; textPage?: number; query?: string }[] = [];
     for (const { note } of sources) {
       if (!note.extraction.artifactHash) continue;
       const raw = store.raw.getBlockBlobClient(note.extraction.artifactHash);
@@ -46,6 +47,7 @@ export async function gatherEvidence(store: BlobStore, corpus: ChatCorpus, job: 
       const filename = `${note.source.key}.source`;
       await writeWorkspaceFile(sandbox.id, `/workspace/data/${filename}`, bytes, signal);
       inputs.push({ sourceId: note.source.id, path: filename, hash: note.extraction.artifactHash, mime: properties.contentType || 'application/octet-stream',
+        ...(options?.page ? { textPage: options.page } : {}), ...(options?.query ? { query: options.query } : {}),
         ...(job.request.visual?.sourceId === note.source.id ? { visualPage: job.request.visual.page } : {}) });
     }
     if (job.request.visual && !inputs.some(input => input.sourceId === job.request.visual!.sourceId)) throw new Error('No retained visual artifact for this source');
@@ -53,7 +55,7 @@ export async function gatherEvidence(store: BlobStore, corpus: ChatCorpus, job: 
     const execution = await client.sandboxes.exec(sandbox.id, { command: 'python3 /workspace/evidence.py' }, { abortSignal: signal });
     if (execution.exitCode !== 0) throw new Error('Sandbox source extraction failed');
     const content = await readWorkspaceFile(sandbox.id, '/workspace/evidence.json', 2 * 1024 * 1024, signal);
-    const extracted = JSON.parse(Buffer.from(content).toString('utf8')) as { sourceId: string; hash: string; pages: { locator: string; text: string }[] }[];
+    const extracted = JSON.parse(Buffer.from(content).toString('utf8')) as { sourceId: string; hash: string; pageCount?: number; pages: { locator: string; text: string }[] }[];
     const evidence = initial.filter(chunk => sources.some(source => source.note.source.id === chunk.sourceId));
     for (const artifact of extracted) {
       const note = sources.find(entry => entry.note.source.id === artifact.sourceId)?.note;
@@ -69,11 +71,12 @@ export async function gatherEvidence(store: BlobStore, corpus: ChatCorpus, job: 
       const bytes = await readWorkspaceFile(sandbox.id, '/workspace/visual.png', 5 * 1024 * 1024, signal);
       if (bytes.length > 5 * 1024 * 1024 || bytes.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') throw new Error('Invalid rendered image');
       const visual = evidenceChunk({ sourceId: visualSource.note.source.id, generationId: visualSource.note.generationId, title: visualSource.note.source.title,
-        kind: 'visual', locator: `Selected source page ${job.request.visual.page}`, text: `Rendered image of the retained artifact, page ${job.request.visual.page}. Read only visible content; uncertain values must be stated as uncertain.` });
+        kind: 'visual', locator: visualSource.note.extraction.method === 'pdf-text' ? `PDF page ${job.request.visual.page}` : 'Stored image', text: `Rendered image of the retained artifact, page ${job.request.visual.page}. Read only visible content; uncertain values must be stated as uncertain.` });
       image = { dataUrl: `data:image/png;base64,${bytes.toString('base64')}`, evidence: visual };
       packed = packEvidence(evidence, query, [visual, ...original.values()]);
     }
-    return { evidence: packed, image };
+    if (options) packed = packEvidence(evidence.filter(chunk => chunk.kind === 'source'), query, image ? [image.evidence] : []);
+    return { evidence: packed, image, pageCount: extracted[0]?.pageCount };
   } finally {
     // Delete before inference, so waiting for the model consumes no sandbox compute.
     if (id) await deleteWorkspace(id);

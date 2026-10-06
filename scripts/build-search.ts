@@ -24,6 +24,5 @@ const documents = await Promise.all(entries.map(async ({ note, humanHtml }) => {
 }));
 await writeFile(`${destination}/search-index.json`, JSON.stringify(buildSearchIndex(documents)));
 await build({ entryPoints: ['apps/reader/src/search.ts'], bundle: true, platform: 'browser', format: 'esm', target: 'es2022', minify: true, outfile: `${destination}/reader-search.js` });
-if (process.env.READER_MODE !== 'public') await build({ entryPoints: ['apps/reader/src/chat.ts'], bundle: true, platform: 'browser', format: 'esm', target: 'es2022', minify: true, outfile: `${destination}/reader-chat.js` });
-else await rm(`${destination}/reader-chat.js`, { force: true });
+await rm(`${destination}/reader-chat.js`, { force: true });
 console.log(JSON.stringify({ fuzzySearchDocuments: documents.length, fullTextSources }));

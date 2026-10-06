@@ -1,9 +1,23 @@
 import { expect, it } from 'vitest';
 import { MemoryStore } from './fixtures.js';
-import { chatStatus, processChatJob, readerIdentity, submitChat } from '../apps/worker/src/chat-service.js';
+import { cancelChat, chatStatus, getConversation, listConversations, processChatJob, readerIdentity, reconcileChat, submitChat } from '../apps/worker/src/chat-service.js';
 import type { ChatJob } from '../shared/chat.js';
-async function store() {
-  const state = new MemoryStore(); const revision = 'a'.repeat(40);
+import { AsyncLocalStorage } from 'node:async_hooks';
+class LeaseStore extends MemoryStore {
+  private frames = new AsyncLocalStorage<Map<string, number>>();
+  private versions = new Map<string, number>();
+  override async read<T>(key: string) { this.frames.getStore()?.set(key, this.versions.get(key) || 0); return super.read<T>(key); }
+  override async write(key: string, value: unknown) {
+    const frame = this.frames.getStore();
+    if (frame && !frame.has(key)) await this.read(key);
+    if (frame && frame.get(key) !== (this.versions.get(key) || 0)) throw Object.assign(new Error('Stale ETag'), { statusCode: 412 });
+    await super.write(key, value);
+    const version = (this.versions.get(key) || 0) + 1; this.versions.set(key, version); frame?.set(key, version);
+  }
+  override async withLease<T>(_key: string, fn: () => Promise<T>) { return this.frames.run(new Map(), fn); }
+}
+async function store(state = new MemoryStore()) {
+  const revision = 'a'.repeat(40);
   await state.create('chat/current.json', { revision });
   await state.create(`chat/corpora/${revision}.json`, { revision, sources: [] }); return state;
 }
@@ -27,11 +41,87 @@ it('bounds paid work per reader and records invalid answers as failures', async 
   }
   await expect(submitChat(state, 'owner', { question: 'More' }, async () => undefined)).rejects.toMatchObject({ status: 429 });
   const invalid = await submitChat(state, 'other', { question: 'A question' }, async () => undefined);
-  const response = async () => ({ answer: { answer: 'Unsupported fact', insufficientEvidence: false, citations: [] }, evidence: [] });
+  const response = async () => ({ answer: { answer: 'Unsupported fact [e_0000000000000000]', insufficientEvidence: false, citations: [] }, evidence: [] });
   await processChatJob(state, invalid.id, response);
   const key = `chat/jobs/${invalid.id}.json`; const pending = (await state.read<ChatJob>(key))!;
   await state.write(key, { ...pending, retryAt: undefined });
   await processChatJob(state, invalid.id, response);
   const failed = (await state.read<ChatJob>(key))!;
   expect(failed.status).toBe('failed'); expect(failed.result).toBeUndefined();
+});
+it('keeps conversation context private and does not repeat paid work after completion storage is recovered', async () => {
+  const state = await store();
+  const first = await submitChat(state, 'owner', { question: 'Remember the label Atlas.' }, async () => undefined);
+  await processChatJob(state, first.id, insufficient);
+  await expect(getConversation(state, 'other', first.conversationId!)).rejects.toMatchObject({ status: 404 });
+  await expect(submitChat(state, 'other', { question: 'Continue', conversationId: first.conversationId }, async () => undefined)).rejects.toMatchObject({ status: 404 });
+  const next = await submitChat(state, 'owner', { question: 'What was the label?', conversationId: first.conversationId }, async () => undefined);
+  await processChatJob(state, next.id, async (_corpus, _job, _record, conversation, progress) => {
+    expect(conversation?.turns[0].question).toBe('Remember the label Atlas.');
+    await progress({ tool: 'search_corpus', title: 'Atlas' });
+    return insufficient();
+  });
+  expect((await listConversations(state, 'owner'))[0].id).toBe(first.conversationId);
+  expect(await listConversations(state, 'other')).toEqual([]);
+  const key = `chat/jobs/${next.id}.json`;
+  await state.write(key, { ...(await state.read<ChatJob>(key))!, status: 'pending', attempts: 0 });
+  await processChatJob(state, next.id, async () => { throw new Error('Paid work must not run twice'); });
+  expect((await chatStatus(state, 'owner', next.id)).status).toBe('complete');
+  expect((await getConversation(state, 'owner', first.conversationId!)).turns).toHaveLength(2);
+});
+it('cancels pending work and stops an in-flight answer before saving it', async () => {
+  const state = await store();
+  const first = await submitChat(state, 'owner', { question: 'Stop before running' }, async () => undefined);
+  await expect(cancelChat(state, 'other', first.id)).rejects.toMatchObject({ status: 404 });
+  await cancelChat(state, 'owner', first.id);
+  await processChatJob(state, first.id, async () => { throw new Error('Cancelled job must not run'); });
+  expect((await chatStatus(state, 'owner', first.id)).status).toBe('cancelled');
+  const next = await submitChat(state, 'owner', { question: 'Stop during an answer' }, async () => undefined);
+  await processChatJob(state, next.id, async () => { await cancelChat(state, 'owner', next.id); return insufficient(); });
+  expect((await chatStatus(state, 'owner', next.id)).status).toBe('cancelled');
+  expect((await getConversation(state, 'owner', next.conversationId!)).turns).toEqual([]);
+});
+it('persists retry and cancellation after a nested conversation lease updates job progress', async () => {
+  const state = await store(new LeaseStore());
+  const failed = await submitChat(state, 'owner', { question: 'Fail after progress' }, async () => undefined);
+  await processChatJob(state, failed.id, async (_corpus, _job, _record, _conversation, progress) => {
+    await progress({ tool: 'search_corpus', title: 'Searching' }); throw new Error('Inference failed');
+  });
+  const retry = (await state.read<ChatJob>(`chat/jobs/${failed.id}.json`))!;
+  expect(retry.status).toBe('pending'); expect(retry.retryAt).toBeDefined();
+  const stopped = await submitChat(state, 'other', { question: 'Cancel after progress' }, async () => undefined);
+  await processChatJob(state, stopped.id, async (_corpus, _job, _record, _conversation, progress) => {
+    await progress({ tool: 'inspect_media', title: 'Viewing' }); await cancelChat(state, 'other', stopped.id); return insufficient();
+  });
+  expect((await chatStatus(state, 'other', stopped.id)).status).toBe('cancelled');
+});
+it('recovers a committed answer when the last attempt fails to update its job', async () => {
+  const state = await store();
+  const submitted = await submitChat(state, 'owner', { question: 'Complete once' }, async () => undefined);
+  const key = `chat/jobs/${submitted.id}.json`;
+  await state.write(key, { ...(await state.read<ChatJob>(key))!, attempts: 1 });
+  const write = state.write.bind(state); let fail = true;
+  state.write = async (path, value) => {
+    if (path === key && (value as ChatJob).status === 'complete' && fail) { fail = false; throw new Error('Storage interrupted'); }
+    return write(path, value);
+  };
+  let calls = 0;
+  await processChatJob(state, submitted.id, async () => { calls++; return insufficient(); });
+  expect((await state.read<ChatJob>(key))?.status).toBe('failed');
+  expect((await chatStatus(state, 'owner', submitted.id)).status).toBe('complete');
+  const next = await submitChat(state, 'owner', { question: 'Continue', conversationId: submitted.conversationId }, async () => undefined);
+  expect(next.id).not.toBe(submitted.id);
+  await reconcileChat(state, async () => { throw new Error('Saved answer must not be queued'); });
+  expect((await state.read<ChatJob>(key))?.status).toBe('complete');
+  await processChatJob(state, submitted.id, async () => { calls++; return insufficient(); });
+  expect(calls).toBe(1);
+});
+it('expires a conversation from creation even when its last turn is recent', async () => {
+  const state = await store();
+  const submitted = await submitChat(state, 'owner', { question: 'Initial' }, async () => undefined);
+  await processChatJob(state, submitted.id, insufficient);
+  const conversation = await getConversation(state, 'owner', submitted.conversationId!);
+  await state.write(`chat/conversations/owner/${conversation.id}.json`, { ...conversation, createdAt: new Date(Date.now() - 25 * 60 * 60_000).toISOString(), updatedAt: new Date().toISOString() });
+  await expect(getConversation(state, 'owner', conversation.id)).rejects.toMatchObject({ status: 404 });
+  expect(await listConversations(state, 'owner')).toEqual([]);
 });

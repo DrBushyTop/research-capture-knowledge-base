@@ -1,4 +1,4 @@
-import { app } from '@azure/functions';
+import { app, type HttpResponseInit } from '@azure/functions';
 import { DefaultAzureCredential } from '@azure/identity';
 import { SecretClient } from '@azure/keyvault-secrets';
 import { processingVersion } from '../../../shared/corpus.js';
@@ -8,10 +8,12 @@ import { discover, reconcile } from './pipeline.js';
 import { extract } from './extraction.js';
 import { enrich, licenseEvidence } from './enrichment.js';
 import { processJob } from './processing.js';
-import { ChatAccessError, chatStatus, processChatJob, readerIdentity, reconcileChat, submitChat } from './chat-service.js';
-import { gatherEvidence, sandboxClient } from './chat-sandbox.js';
+import { ChatAccessError, cancelChat, chatStatus, getConversation, listConversations, processChatJob, readerIdentity, reconcileChat, submitChat } from './chat-service.js';
+import { sandboxClient } from './chat-sandbox.js';
 import { deleteExpiredWorkspaces } from './sandbox-lifecycle.js';
-import { answerQuestion } from './chat-model.js';
+import { discuss } from './chat-agent.js';
+import { corpusTools } from './chat-tools.js';
+import { readChatFile } from './chat-files.js';
 const required = (name: string) => { const value = process.env[name]; if (!value) throw new Error(`Missing configuration: ${name}`); return value; };
 const store = () => new BlobStore(required('STORAGE_ACCOUNT'));
 let zoteroPromise: Promise<Zotero> | undefined;
@@ -37,14 +39,19 @@ app.timer('discoverCaptures', {
 });
 app.http('chatGateway', {
   route: 'chat', methods: ['GET', 'POST'], authLevel: 'function',
-  handler: async request => {
+  handler: async (request): Promise<HttpResponseInit> => {
     try {
       const owner = readerIdentity(request.headers.get('x-ms-client-principal'));
       const state = store();
-      const result = request.method === 'GET' ? await chatStatus(state, owner, request.query.get('id') || '') : await (async () => {
+      if (request.method === 'GET' && (request.query.has('asset') || request.query.has('file'))) {
+        const file = await readChatFile(state, owner, request.query.get('id') || '', request.query.get('asset'), request.query.get('file'), request.query.get('evidence'));
+        return { status: 200, body: file.bytes, headers: { 'Content-Type': file.mime, 'Content-Disposition': `inline; filename="${file.filename}"`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' } };
+      }
+      const result = request.method === 'GET' ? request.query.has('conversation') ? await getConversation(state, owner, request.query.get('conversation') || '') : request.query.has('conversations') ? await listConversations(state, owner) : await chatStatus(state, owner, request.query.get('id') || '') : await (async () => {
         const text = await request.text();
-        if (Buffer.byteLength(text) > 16_384) throw new ChatAccessError(413, 'Question is too large');
+        if (Buffer.byteLength(text) > 40_000) throw new ChatAccessError(413, 'Message is too large');
         let input: unknown; try { input = JSON.parse(text); } catch { throw new ChatAccessError(400, 'Invalid question'); }
+        if ((input as { action?: string })?.action === 'cancel') return cancelChat(state, owner, (input as { id: string }).id);
         return submitChat(state, owner, input, id => state.sendChat(id));
       })();
       return { status: request.method === 'POST' ? 202 : 200, jsonBody: result, headers: { 'Cache-Control': 'private, no-store' } };
@@ -62,10 +69,8 @@ app.storageQueue('answerChat', { queueName: 'chat', connection: 'AzureWebJobsSto
   const payload = typeof message === 'string' ? JSON.parse(message) : message;
   const id = (payload as { jobId: string }).jobId;
   const state = store();
-  await processChatJob(state, id, async (corpus, job, record) => {
-    const { evidence, image } = await gatherEvidence(state, corpus, job, record);
-    context.log(JSON.stringify({ event: 'chat-evidence-ready', jobId: id, passages: evidence.length, visual: Boolean(image) }));
-    return { answer: await answerQuestion(job.request, evidence, image?.dataUrl, state.leaseSignal), evidence };
+  await processChatJob(state, id, async (corpus, job, record, conversation, progress, signal) => {
+    return discuss(job, conversation, await corpusTools(state, corpus, job, record, progress, signal), signal);
   });
   context.log(JSON.stringify({ event: 'chat-processing-complete', jobId: /^[a-f0-9]{32}$/.test(id) ? id : 'invalid' }));
 } });

@@ -3,6 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 import sys
+import re
 from html.parser import HTMLParser
 sys.path.insert(0, '/opt/research-tools')
 import pymupdf
@@ -40,13 +41,22 @@ for item in request['sources'][:4]:
         raise ValueError('Artifact hash mismatch')
     mime = item['mime']
     pages = []
+    page_count = None
     if data.startswith(b'%PDF-'):
         with pymupdf.open(stream=data, filetype='pdf') as document:
-            for number in range(min(document.page_count, 200)):
+            page_count = document.page_count
+            text_page = item.get('textPage')
+            if text_page is not None and (type(text_page) is not int or not 1 <= text_page <= min(document.page_count, 200)):
+                raise ValueError('PDF page unavailable')
+            indices = [text_page - 1] if text_page else range(min(document.page_count, 200))
+            words = re.findall(r'\w{3,}', str(item.get('query', ''))[:500].lower())
+            for number in indices:
+                if words and not text_page and not any(word in document[number].get_text('text').lower() for word in words):
+                    continue
                 text = document[number].get_text('text')[:min(60000, remaining)]
                 pages.append({'locator': 'PDF page ' + str(number + 1), 'text': text})
                 remaining -= len(text)
-                if remaining <= 0 or sum(len(p['text']) for p in pages) >= 60000:
+                if remaining <= 0 or len(pages) >= 8 or sum(len(p['text']) for p in pages) >= 60000:
                     break
             if item.get('visualPage'):
                 number = item['visualPage']
@@ -74,6 +84,6 @@ for item in request['sources'][:4]:
         text = text[:min(60000, remaining)]
         pages.append({'locator': 'Stored HTML text' if 'html' in mime else 'Stored ' + mime, 'text': text})
         remaining -= len(text)
-    results.append({'sourceId': item['sourceId'], 'hash': item['hash'], 'pages': pages})
+    results.append({'sourceId': item['sourceId'], 'hash': item['hash'], 'pageCount': page_count, 'pages': pages})
 Path('/workspace/evidence.json').write_text(json.dumps(results))
 print(json.dumps({'processedSources': len(results)}))

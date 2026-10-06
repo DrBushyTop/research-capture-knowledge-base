@@ -36,3 +36,7 @@ The brief and CONTEXT.md define product behavior. Android captures and a cloud P
 - Show missing text and review needs beside the source.
 - Keep finding and reading comfortable on phone and desktop.
 - Preserve human commentary.
+
+## Interface copy
+
+Use functional labels and necessary instructions. Omit slogans, taglines and descriptive filler such as "Your research, ready to read" or "All your documents, searchable". Chat is a freeform conversation. The model searches and inspects the corpus; users do not select a source or PDF page before asking. Citations open supporting evidence, with tap support on phones.

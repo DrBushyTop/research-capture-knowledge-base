@@ -51,7 +51,7 @@ resource chatRetention 'Microsoft.Storage/storageAccounts/managementPolicies@202
       enabled: true
       type: 'Lifecycle'
       definition: {
-        filters: { blobTypes: ['blockBlob'], prefixMatch: ['pipeline/chat/jobs/', 'pipeline/chat/users/'] }
+        filters: { blobTypes: ['blockBlob'], prefixMatch: ['pipeline/chat/jobs/', 'pipeline/chat/users/', 'pipeline/chat/conversations/', 'pipeline/chat/assets/', 'pipeline/chat/cancellations/'] }
         actions: { baseBlob: { delete: { daysAfterModificationGreaterThan: 1 } } }
       }
     }] }

@@ -1,14 +1,16 @@
 import { z } from 'zod';
 import { hash, noteSchema, sourceId } from './corpus.js';
 import { evidenceQuery } from './search.js';
-export const chatRequestSchema = z.strictObject({ question: z.string().trim().min(1).max(2000), sourceId: sourceId.optional(),
+export const chatRequestSchema = z.strictObject({ question: z.string().trim().min(1).max(8000), conversationId: z.string().regex(/^[a-f0-9]{32}$/).optional(), sourceId: sourceId.optional(),
   history: z.array(z.strictObject({ role: z.enum(['user', 'assistant']), content: z.string().max(3000) })).max(6).default([]),
   visual: z.strictObject({ sourceId, page: z.number().int().min(1).max(200).default(1) }).optional() });
 export type ChatRequest = z.infer<typeof chatRequestSchema>;
 export const chatCorpusSchema = z.strictObject({ revision: z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/), sources: z.array(z.strictObject({ note: noteSchema, humanMarkdown: z.string().max(100_000) })).max(10_000) });
 export type ChatCorpus = z.infer<typeof chatCorpusSchema>;
 export const chatSnapshotRevision = (gitRevision: string, sources: ChatCorpus['sources'], index: unknown) => hash(JSON.stringify({ gitRevision, sources, index }));
-export interface Evidence { id: string; sourceId: string; generationId: string; title: string; kind: 'source' | 'machine' | 'human' | 'metadata' | 'visual'; locator: string; text: string; }
+export interface Evidence { id: string; sourceId: string; generationId: string; title: string; kind: 'source' | 'machine' | 'human' | 'metadata' | 'visual'; locator: string; text: string; sourceUrl?: string | null; pdf?: boolean; assetId?: string; }
+export interface ChatAsset { id: string; sourceId: string; title: string; kind: 'image' | 'pdf' | 'site'; mime: string; page: number | null; blobKey?: string; artifactHash?: string; sourceUrl?: string; originJobId?: string; }
+export interface ChatActivity { tool: string; title: string; sourceId?: string; }
 export const evidenceChunk = (value: Omit<Evidence, 'id'>): Evidence => ({ ...value, id: 'e_' + hash(JSON.stringify(value)).slice(0, 16) });
 export function chunkText(base: Omit<Evidence, 'id' | 'text'>, text: string): Evidence[] {
   const chunks: Evidence[] = [];
@@ -39,18 +41,25 @@ export function packEvidence(chunks: Evidence[], question: string, required: Evi
   return selected;
 }
 export const answerSchema = z.strictObject({ answer: z.string().max(12_000), insufficientEvidence: z.boolean(),
-  citations: z.array(z.strictObject({ evidenceId: z.string().regex(/^e_[a-f0-9]{16}$/), quote: z.string().max(600).nullable() })).max(12) });
+  citations: z.array(z.strictObject({ evidenceId: z.string().regex(/^e_[a-f0-9]{16}$/), quote: z.string().max(600).nullable() })).max(24),
+  attachments: z.array(z.string().regex(/^a_[a-f0-9]{16}$/)).max(8).default([]) });
 export type Answer = z.infer<typeof answerSchema>;
-export function validateAnswer(input: unknown, evidence: Evidence[]) {
+export function validateAnswer(input: unknown, evidence: Evidence[], assets: ChatAsset[] = []) {
   const answer = answerSchema.parse(input);
-  if (!answer.insufficientEvidence && answer.citations.length === 0) throw new Error('Uncited answer');
   const normalize = (s: string) => s.replace(/\s+/g, ' ').trim();
   const citations = answer.citations.map(cite => {
     const chunk = evidence.find(item => item.id === cite.evidenceId);
     if (!chunk || (cite.quote && !normalize(chunk.text).includes(normalize(cite.quote)))) throw new Error('Unsupported citation');
-    return { ...cite, sourceId: chunk.sourceId, title: chunk.title, kind: chunk.kind, locator: chunk.locator, excerpt: chunk.text.slice(0, 1400) };
+    return { ...cite, sourceId: chunk.sourceId, generationId: chunk.generationId, title: chunk.title, kind: chunk.kind, locator: chunk.locator, excerpt: chunk.text.slice(0, 1400), sourceUrl: chunk.sourceUrl || null, pdf: chunk.pdf || false, assetId: chunk.assetId || null };
   });
   for (const match of answer.answer.matchAll(/\[(e_[a-f0-9]{16})\]/g)) if (!citations.some(citation => citation.evidenceId === match[1])) throw new Error('Unsupported inline citation');
-  return { ...answer, answer: answer.insufficientEvidence && !citations.length ? 'The stored evidence does not answer this question. Try selecting a source or a specific page.' : answer.answer, citations };
+  const attachments = answer.attachments.map(id => {
+    const asset = assets.find(asset => asset.id === id);
+    if (!asset) throw new Error('Unsupported attachment');
+    const { blobKey: _blob, artifactHash: _hash, ...publicAsset } = asset;
+    return publicAsset;
+  });
+  return { ...answer, citations, attachments };
 }
-export interface ChatJob { id: string; owner: string; corpusRevision: string; request: ChatRequest; createdAt: string; status: 'pending' | 'running' | 'complete' | 'failed'; attempts: number; lastQueuedAt?: string; retryAt?: string; sandboxId?: string; result?: ReturnType<typeof validateAnswer>; error?: string; }
+export interface ChatJob { id: string; owner: string; corpusRevision: string; conversationId?: string; request: ChatRequest; createdAt: string; status: 'pending' | 'running' | 'complete' | 'failed' | 'cancelled'; attempts: number; lastQueuedAt?: string; retryAt?: string; sandboxId?: string; result?: ReturnType<typeof validateAnswer>; activities?: ChatActivity[]; error?: string; }
+export interface ChatConversation { id: string; owner: string; createdAt: string; updatedAt: string; turns: { jobId: string; question: string; result: NonNullable<ChatJob['result']> }[]; }

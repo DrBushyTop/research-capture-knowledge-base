@@ -1,8 +1,13 @@
 import { randomBytes } from 'node:crypto';
 import { canonical, hash } from '../../../shared/corpus.js';
-import { chatCorpusSchema, chatRequestSchema, validateAnswer, type ChatJob, type ChatCorpus, type Evidence } from '../../../shared/chat.js';
+import { chatCorpusSchema, chatRequestSchema, validateAnswer, type ChatJob, type ChatCorpus, type Evidence, type ChatConversation, type ChatActivity, type ChatAsset } from '../../../shared/chat.js';
 import type { PipelineStore } from './pipeline.js';
 export class ChatAccessError extends Error { constructor(public status: number, message: string) { super(message); } }
+async function savedAnswer(store: PipelineStore, job: ChatJob) {
+  if (!job.conversationId) return undefined;
+  const conversation = await store.read<ChatConversation>(`chat/conversations/${job.owner}/${job.conversationId}.json`);
+  return conversation?.owner === job.owner ? conversation.turns.find(turn => turn.jobId === job.id)?.result : undefined;
+}
 export function readerIdentity(encoded: string | null): string {
   try {
     if (!encoded || encoded.length > 8192) throw new Error();
@@ -20,8 +25,8 @@ export async function submitChat(store: PipelineStore, owner: string, input: unk
     const previous = await store.read<{ startedAt: string; count: number; activeId: string }>(key);
     if (previous) {
       const active = await store.read<ChatJob>(`chat/jobs/${previous.activeId}.json`);
-      if (active && ['pending', 'running'].includes(active.status) && now.getTime() - Date.parse(active.createdAt) < 10 * 60_000) {
-        if (canonical(active.request) === canonical(parsed.data)) return { id: active.id, status: active.status };
+      if (active && ['pending', 'running'].includes(active.status) && now.getTime() - Date.parse(active.createdAt) < 10 * 60_000 && !await savedAnswer(store, active)) {
+        if (canonical(active.request) === canonical(parsed.data)) return { id: active.id, conversationId: active.conversationId, status: active.status };
         throw new ChatAccessError(429, 'A question is already running. Wait for its answer.');
       }
     }
@@ -31,6 +36,9 @@ export async function submitChat(store: PipelineStore, owner: string, input: unk
     const current = await store.read<{ revision: string }>('chat/current.json');
     if (!current) throw new ChatAccessError(503, 'The dataset is not ready for chat yet');
     const corpus = chatCorpusSchema.parse(await store.read<ChatCorpus>(`chat/corpora/${current.revision}.json`));
+    const conversationId = parsed.data.conversationId || randomBytes(16).toString('hex');
+    if (parsed.data.conversationId) await getConversation(store, owner, conversationId);
+    else await store.create(`chat/conversations/${owner}/${conversationId}.json`, { id: conversationId, owner, createdAt: now.toISOString(), updatedAt: now.toISOString(), turns: [] } satisfies ChatConversation);
     for (const id of [parsed.data.sourceId, parsed.data.visual?.sourceId].filter(Boolean)) {
       if (!corpus.sources.some(source => source.note.source.id === id)) throw new ChatAccessError(400, 'Source is unavailable in this dataset');
     }
@@ -40,27 +48,55 @@ export async function submitChat(store: PipelineStore, owner: string, input: unk
       if (note.extraction.artifactMime?.startsWith('image/') && parsed.data.visual.page !== 1) throw new ChatAccessError(400, 'Images have only page 1');
     }
     const id = randomBytes(16).toString('hex');
-    const job: ChatJob = { id, owner, corpusRevision: current.revision, request: parsed.data, createdAt: now.toISOString(), status: 'pending', attempts: 0, lastQueuedAt: now.toISOString() };
+    const job: ChatJob = { id, owner, corpusRevision: current.revision, conversationId, request: parsed.data, createdAt: now.toISOString(), status: 'pending', attempts: 0, lastQueuedAt: now.toISOString() };
     await store.create(`chat/jobs/${id}.json`, job);
     await store.write(key, { startedAt, count: count + 1, activeId: id });
     // The discovery timer also reconciles this durable handoff after a queue outage.
     await send(id).catch(() => undefined);
-    return { id, status: 'pending' };
+    return { id, conversationId, status: 'pending' };
   });
 }
 export async function chatStatus(store: PipelineStore, owner: string, id: string) {
   if (!/^[a-f0-9]{32}$/.test(id)) throw new ChatAccessError(404, 'Question not found');
   const job = await store.read<ChatJob>(`chat/jobs/${id}.json`);
   if (!job || job.owner !== owner || Date.now() - Date.parse(job.createdAt) > 24 * 60 * 60_000) throw new ChatAccessError(404, 'Question not found');
-  return { id: job.id, status: job.status, result: job.result, error: job.error };
+  const saved = job.status !== 'complete' ? await savedAnswer(store, job) : undefined;
+  if (saved) return { id: job.id, conversationId: job.conversationId, status: 'complete' as const, result: saved, activities: job.activities, error: undefined };
+  return { id: job.id, conversationId: job.conversationId, status: job.status, result: job.result, activities: job.activities, error: job.error };
+}
+export async function getConversation(store: PipelineStore, owner: string, id: string) {
+  if (!/^[a-f0-9]{32}$/.test(id)) throw new ChatAccessError(404, 'Conversation not found');
+  const conversation = await store.read<ChatConversation>(`chat/conversations/${owner}/${id}.json`);
+  if (!conversation || conversation.owner !== owner || Date.now() - Date.parse(conversation.createdAt) > 24 * 60 * 60_000) throw new ChatAccessError(404, 'Conversation not found');
+  return conversation;
+}
+export async function listConversations(store: PipelineStore, owner: string) {
+  const conversations: { id: string; title: string; updatedAt: string }[] = [];
+  for (const key of await store.list(`chat/conversations/${owner}/`)) {
+    const conversation = await store.read<ChatConversation>(key);
+    if (conversation?.owner === owner && conversation.turns.length && Date.now() - Date.parse(conversation.createdAt) < 24 * 60 * 60_000) conversations.push({ id: conversation.id, title: conversation.turns[0].question.slice(0, 100), updatedAt: conversation.updatedAt });
+  }
+  return conversations.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 50);
+}
+export async function cancelChat(store: PipelineStore, owner: string, id: string) {
+  const job = await chatStatus(store, owner, id);
+  if (['pending', 'running'].includes(job.status)) await store.create(`chat/cancellations/${id}.json`, { cancelledAt: new Date().toISOString() });
+  if (job.status === 'pending') await store.withLease(`chat-job-${id}`, async () => {
+    const current = await store.read<ChatJob>(`chat/jobs/${id}.json`);
+    if (current?.status === 'pending') await store.write(`chat/jobs/${id}.json`, { ...current, status: 'cancelled' });
+  }).catch(error => { if ((error as { statusCode?: number }).statusCode !== 409) throw error; });
+  return { id, cancelled: true };
 }
 export async function reconcileChat(store: PipelineStore, send: (id: string) => Promise<void>) {
   for (const key of await store.list('chat/jobs/')) {
     const found = await store.read<ChatJob>(key);
-    if (!found || !['pending', 'running'].includes(found.status)) continue;
+    if (!found || !['pending', 'running', 'failed'].includes(found.status)) continue;
     await store.withLease(`chat-job-${found.id}`, async () => {
       const job = await store.read<ChatJob>(key);
-      if (!job || !['pending', 'running'].includes(job.status)) return;
+      if (!job || !['pending', 'running', 'failed'].includes(job.status)) return;
+      const saved = await savedAnswer(store, job);
+      if (saved) { await store.write(key, { ...job, status: 'complete', result: saved, error: undefined }); return; }
+      if (job.status === 'failed') return;
       if (Date.now() - Date.parse(job.createdAt) >= 10 * 60_000 || job.attempts >= 2) {
         await store.write(key, { ...job, status: 'failed', error: 'The question timed out. Submit it again.' }); return;
       }
@@ -71,21 +107,44 @@ export async function reconcileChat(store: PipelineStore, send: (id: string) => 
     }).catch(error => { if ((error as { statusCode?: number }).statusCode !== 409) throw error; });
   }
 }
-export async function processChatJob(store: PipelineStore, id: string, answer: (corpus: ChatCorpus, job: ChatJob, recordSandbox: (id: string) => Promise<void>) => Promise<{ answer: unknown; evidence: Evidence[] }>) {
+export async function processChatJob(store: PipelineStore, id: string, answer: (corpus: ChatCorpus, job: ChatJob, recordSandbox: (id: string) => Promise<void>, conversation: ChatConversation | undefined, progress: (activity: ChatActivity) => Promise<void>, signal: AbortSignal) => Promise<{ answer: unknown; evidence: Evidence[]; assets?: ChatAsset[] }>) {
   if (!/^[a-f0-9]{32}$/.test(id)) return;
   return store.withLease(`chat-job-${id}`, async () => {
     const key = `chat/jobs/${id}.json`; let job = await store.read<ChatJob>(key);
-    if (!job || ['complete', 'failed'].includes(job.status) || (job.retryAt && Date.parse(job.retryAt) > Date.now())) return;
+    if (!job || job.status === 'complete') return;
+    const saved = await savedAnswer(store, job);
+    if (saved) { await store.write(key, { ...job, status: 'complete', result: saved, error: undefined }); return; }
+    if (['failed', 'cancelled'].includes(job.status) || (job.retryAt && Date.parse(job.retryAt) > Date.now())) return;
+    if (await store.read(`chat/cancellations/${id}.json`)) { await store.write(key, { ...job, status: 'cancelled' }); return; }
     if (job.attempts >= 2 || Date.now() - Date.parse(job.createdAt) > 10 * 60_000) { await store.write(key, { ...job, status: 'failed', error: 'The question timed out. Submit it again.' }); return; }
     job = { ...job, attempts: job.attempts + 1, status: 'running' }; await store.write(key, job);
+    const controller = new AbortController();
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(Math.max(1, 600_000 - (Date.now() - Date.parse(job.createdAt)))), ...(store.leaseSignal ? [store.leaseSignal] : [])]);
+    const cancellation = setInterval(() => { void store.read(`chat/cancellations/${id}.json`).then(found => { if (found) controller.abort(new Error('Chat cancelled')); }).catch(() => undefined); }, 5000);
     try {
       const corpus = chatCorpusSchema.parse(await store.read<ChatCorpus>(`chat/corpora/${job.corpusRevision}.json`));
-      const result = await answer(corpus, job, async sandboxId => { job = { ...job!, sandboxId }; await store.write(key, job); });
-      await store.write(key, { ...job, status: 'complete', result: validateAnswer(result.answer, result.evidence), error: undefined });
+      const run = async () => {
+        const conversation = job!.conversationId ? await getConversation(store, job!.owner, job!.conversationId) : undefined;
+        const completed = conversation?.turns.find(turn => turn.jobId === id);
+        if (completed) { await store.write(key, { ...job!, status: 'complete', result: completed.result, error: undefined }); return; }
+        const runSignal = AbortSignal.any([signal, ...(store.leaseSignal ? [store.leaseSignal] : [])]);
+        const result = await answer(corpus, job!, async sandboxId => { job = { ...job!, sandboxId }; await store.write(key, job); }, conversation,
+          async activity => { job = { ...job!, activities: [...(job!.activities || []), activity].slice(-12) }; await store.write(key, job); }, runSignal);
+        runSignal.throwIfAborted();
+        if (await store.read(`chat/cancellations/${id}.json`)) throw new Error('Chat cancelled');
+        const validated = validateAnswer(result.answer, result.evidence, result.assets);
+        if (conversation) await store.write(`chat/conversations/${job!.owner}/${conversation.id}.json`, { ...conversation, updatedAt: new Date().toISOString(), turns: [...conversation.turns.filter(turn => turn.jobId !== id), { jobId: id, question: job!.request.question, result: validated }].slice(-100) });
+        await store.write(key, { ...job!, status: 'complete', result: validated, error: undefined });
+      };
+      if (job.conversationId) await store.withLease(`chat-conversation-${job.owner}-${job.conversationId}`, run);
+      else await run();
     } catch (error) {
+      // Inner conversation writes have their own ETags. Refresh in this lease frame.
+      job = (await store.read<ChatJob>(key)) || job;
+      if (controller.signal.aborted || await store.read(`chat/cancellations/${id}.json`)) { await store.write(key, { ...job, status: 'cancelled', error: undefined }); return; }
       console.error(JSON.stringify({ event: 'chat-attempt-failed', jobId: id, attempt: job.attempts, errorType: error instanceof Error ? error.name : 'Unknown', statusCode: (error as { statusCode?: number })?.statusCode }));
       await store.write(key, { ...job, status: job.attempts >= 2 ? 'failed' : 'pending', retryAt: new Date(Date.now() + 60_000).toISOString(),
         error: 'An answer could not be verified or completed. Retry the question if this persists.' });
-    }
+    } finally { clearInterval(cancellation); }
   });
 }

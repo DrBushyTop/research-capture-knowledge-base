@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-05T16:37:20Z",
+  "generatedAt": "2026-10-06T08:17:32.153Z",
   "title": "Design System: Research library",
   "extensions": {
     "colorMeta": {
@@ -171,6 +171,62 @@
           "oklch(83.57% 0.00514 247.88)",
           "oklch(95.00% 0.00514 247.88)"
         ]
+      },
+      "blue-hover": {
+        "role": "primary",
+        "displayName": "Send hover blue",
+        "tonalRamp": [
+          "oklch(15.00% 0.11638 258.03)",
+          "oklch(26.43% 0.11638 258.03)",
+          "oklch(37.86% 0.11638 258.03)",
+          "oklch(49.29% 0.11638 258.03)",
+          "oklch(60.71% 0.11638 258.03)",
+          "oklch(72.14% 0.11638 258.03)",
+          "oklch(83.57% 0.11638 258.03)",
+          "oklch(95.00% 0.11638 258.03)"
+        ]
+      },
+      "history-hover": {
+        "role": "neutral",
+        "displayName": "Selected history fill",
+        "tonalRamp": [
+          "oklch(15.00% 0.01495 251.16)",
+          "oklch(26.43% 0.01495 251.16)",
+          "oklch(37.86% 0.01495 251.16)",
+          "oklch(49.29% 0.01495 251.16)",
+          "oklch(60.71% 0.01495 251.16)",
+          "oklch(72.14% 0.01495 251.16)",
+          "oklch(83.57% 0.01495 251.16)",
+          "oklch(95.00% 0.01495 251.16)"
+        ]
+      },
+      "chat-error": {
+        "role": "secondary",
+        "displayName": "Chat error ink",
+        "tonalRamp": [
+          "oklch(15.00% 0.13083 38.01)",
+          "oklch(26.43% 0.13083 38.01)",
+          "oklch(37.86% 0.13083 38.01)",
+          "oklch(49.29% 0.13083 38.01)",
+          "oklch(60.71% 0.13083 38.01)",
+          "oklch(72.14% 0.13083 38.01)",
+          "oklch(83.57% 0.13083 38.01)",
+          "oklch(95.00% 0.13083 38.01)"
+        ]
+      },
+      "overlay": {
+        "role": "neutral",
+        "displayName": "Chat dialog overlay",
+        "tonalRamp": [
+          "oklch(15.00% 0.03260 258.29)",
+          "oklch(26.43% 0.03260 258.29)",
+          "oklch(37.86% 0.03260 258.29)",
+          "oklch(49.29% 0.03260 258.29)",
+          "oklch(60.71% 0.03260 258.29)",
+          "oklch(72.14% 0.03260 258.29)",
+          "oklch(83.57% 0.03260 258.29)",
+          "oklch(95.00% 0.03260 258.29)"
+        ]
       }
     },
     "typographyMeta": {
@@ -201,14 +257,29 @@
       "status": {
         "displayName": "Review state",
         "purpose": "Compact text within informational review badges."
+      },
+      "discussion": {
+        "displayName": "Chat discussion",
+        "purpose": "Sans serif chat messages and Markdown answer prose. Both participants use this family."
       }
     },
-    "shadows": [],
+    "shadows": [
+      {
+        "name": "chat-evidence-popover",
+        "value": "0 8px 28px rgb(32 45 61 / .2)",
+        "purpose": "Desktop chat evidence popovers only. Library rows and research notes remain flat."
+      }
+    ],
     "motion": [
       {
         "name": "link-color",
         "value": "color 0.15s ease-out",
         "purpose": "Source rows and note-section links, only when prefers-reduced-motion is no-preference."
+      },
+      {
+        "name": "chat-evidence-sheet",
+        "value": "chat-sheet-open 0.18s cubic-bezier(.16,1,.3,1)",
+        "purpose": "Phone evidence sheet entrance through a 10px vertical offset and a clipped upper edge, only when prefers-reduced-motion is no-preference."
       }
     ],
     "breakpoints": [
@@ -274,16 +345,41 @@
       "description": "A pale reading block for limitations and open questions.",
       "html": "<section class=\"ds-limitations\"><h2>Limitations and open questions</h2><p>Limitations have not been assessed from usable source text.</p></section>",
       "css": ".ds-limitations{font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;line-height:1.6;color:var(--ink,#202d3d);padding:1.2rem 1.4rem;background:#f2f5f8;border-radius:8px}.ds-limitations h2{margin:0 0 .9rem;font-size:1.22rem;font-weight:700;line-height:1.3}.ds-limitations p{margin:0}@media(max-width:720px){.ds-limitations{padding:1.2rem}}"
+    },
+    {
+      "name": "Chat Send",
+      "kind": "button",
+      "refersTo": "chat-send",
+      "description": "A circular blue 44px action. The active job replaces the arrow with Stop.",
+      "html": "<button class=\"ds-chat-send\" type=\"button\" aria-label=\"Send\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 7-7 7 7M12 5v14\"/></svg></button>",
+      "css": ".ds-chat-send{font-family:'Source Sans 3 Variable',system-ui,sans-serif;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:var(--blue,#2356a5);color:var(--paper,#fff);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}.ds-chat-send:hover{background:var(--blue-hover,#194584)}.ds-chat-send:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}.ds-chat-send:disabled{background:var(--ground,#edf1f5);color:var(--muted,#546476);cursor:default}"
+    },
+    {
+      "name": "Chat composer",
+      "kind": "input",
+      "refersTo": "chat-composer",
+      "description": "A bottom message field with a blue focus border, a growing textarea, and a circular send action.",
+      "html": "<div class=\"ds-chat-composer\"><label class=\"ds-chat-label\" for=\"ds-chat-message\">Message</label><textarea id=\"ds-chat-message\" rows=\"1\" placeholder=\"Message\"></textarea><button class=\"ds-composer-send\" type=\"button\" aria-label=\"Send\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 7-7 7 7M12 5v14\"/></svg></button></div>",
+      "css": ".ds-chat-composer{font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;display:flex;align-items:flex-end;gap:.5rem;border:1px solid #a8b5c5;border-radius:16px;background:var(--paper,#fff);padding:.45rem}.ds-chat-composer:focus-within{border-color:var(--blue,#2356a5)}.ds-chat-label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.ds-chat-composer textarea{display:block;flex:1;min-width:0;min-height:44px;max-height:180px;resize:none;border:0;background:transparent;color:var(--ink,#202d3d);font:inherit;font-size:1rem;line-height:1.5;padding:.55rem .65rem;caret-color:var(--blue,#2356a5)}.ds-chat-composer textarea:focus-visible{outline:0}.ds-chat-composer textarea::placeholder{color:var(--muted,#546476)}.ds-composer-send{width:44px;height:44px;padding:0;border:0;border-radius:50%;background:var(--blue,#2356a5);color:var(--paper,#fff);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}.ds-composer-send:hover{background:var(--blue-hover,#194584)}.ds-composer-send:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}.ds-composer-send:disabled{background:var(--ground,#edf1f5);color:var(--muted,#546476);cursor:default}@media(max-width:720px){.ds-chat-composer{border-radius:14px}.ds-chat-composer textarea{font-size:16px}}"
+    },
+    {
+      "name": "Chat inline evidence",
+      "kind": "custom",
+      "refersTo": "chat-citation",
+      "description": "A compact numbered citation with a white evidence popover. The phone route opens the same evidence in a bottom sheet.",
+      "html": "<div class=\"ds-citation\"><button class=\"ds-citation-button\" type=\"button\" aria-label=\"Source 1: Saved research note\">1</button><section class=\"ds-citation-preview\" aria-label=\"Citation evidence\"><h4>Saved research note</h4><p class=\"ds-citation-location\">Document text · Saved passage</p><blockquote>The source passage appears here, beside links to its saved note and original source.</blockquote><div class=\"ds-citation-links\"><a href=\"#research-note\">Open note</a><a href=\"#original-source\">Open site</a></div></section></div>",
+      "css": ".ds-citation{position:relative;display:inline-block;font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;color:var(--ink,#202d3d)}.ds-citation-button{display:inline-flex;align-items:center;justify-content:center;min-width:25px;min-height:25px;border:0;border-radius:12px;background:var(--ground,#edf1f5);color:var(--muted,#546476);font-family:inherit;font-size:.7rem;line-height:1;cursor:pointer;font-variant-numeric:tabular-nums}.ds-citation-button:hover,.ds-citation:focus-within .ds-citation-button{background:var(--blue-wash,#eaf1fc);color:var(--blue,#2356a5)}.ds-citation-button:focus-visible,.ds-citation-links a:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}.ds-citation-preview{display:none;position:relative;width:min(380px,calc(100vw - 32px));max-height:min(70vh,620px);overflow:auto;padding:1.2rem;background:var(--paper,#fff);border-radius:12px;box-shadow:0 8px 28px rgb(32 45 61 / .2);font-size:.9rem}.ds-citation:hover .ds-citation-preview,.ds-citation:focus-within .ds-citation-preview{display:block}.ds-citation-preview h4{font-family:inherit;font-size:1rem;font-weight:500;line-height:1.4;margin:0}.ds-citation-location{font-size:.8rem;color:var(--muted,#546476);margin:.5rem 0 0;overflow-wrap:anywhere}.ds-citation-preview blockquote{max-height:36vh;overflow:auto;margin:1rem 0;padding-left:.75rem;border-left:1px solid var(--line,#d6dee7);color:var(--muted,#546476);font-style:normal;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.9rem;line-height:1.6}.ds-citation-links{display:flex;gap:.25rem 1.1rem;flex-wrap:wrap}.ds-citation-links a{color:var(--blue,#2356a5);min-height:44px;display:inline-flex;align-items:center;font-size:.85rem;text-underline-offset:.2em}@media(max-width:720px){.ds-citation-button{min-width:32px;min-height:32px;position:relative}.ds-citation-button::after{content:'';position:absolute;inset:-6px}}"
     }
   ],
   "narrative": {
     "northStar": "The research notebook",
-    "overview": "A cool gray library margin sits beside a white reading page. Source Sans 3 carries controls, source facts, and machine interpretation. Source Serif 4 gives saved titles and personal commentary a different reading rhythm.\n\nThe notebook separates evidence origins through headings, rules, and status text. It keeps the source citation and review state close to the title. The recorded system covers the shipped library and research note routes in `apps/reader`.",
+    "overview": "A cool gray library margin sits beside a white reading page. Source Sans 3 carries controls, source facts, and machine interpretation. Source Serif 4 gives saved titles and personal commentary a different reading rhythm.\n\nThe notebook separates evidence origins through headings, rules, and status text. It keeps the source citation and review state close to the title. The recorded system covers the library, research note, and private chat routes in `apps/reader`. Chat carries the same colors and controls into a continuous sans serif discussion.",
     "keyCharacteristics": [
       "A library margin beside a white reading page.",
       "Full-width source rows with serif titles and short sans serif summaries.",
       "Separate sections for source facts, machine interpretation, limitations, and human notes.",
-      "Text labels beside color-coded review states."
+      "Text labels beside color-coded review states.",
+      "A continuous chat page with inline evidence and a bottom composer."
     ],
     "rules": [
       {
@@ -293,7 +389,7 @@
       },
       {
         "name": "The Two Reading Voices Rule",
-        "body": "Use Source Sans 3 for facts, machine interpretation, and controls. Use Source Serif 4 for source titles and human commentary.",
+        "body": "Use Source Sans 3 for facts, machine interpretation, controls, and chat messages. Use Source Serif 4 for saved source titles and human commentary in research notes.",
         "section": "typography"
       },
       {
@@ -306,9 +402,11 @@
       "Do pair the cool library margin with a white reading page.",
       "Do keep source facts, machine interpretation, limitations, and human notes in separate labeled sections.",
       "Do retain a visible label for search and every filter.",
-      "Do keep source titles and personal commentary in the serif reading voice.",
-      "Do give keyboard focus the recorded blue outline and preserve 44px control and navigation targets.",
-      "Do keep long source titles and URLs within the reading column."
+      "Do keep saved source titles and research-note commentary in the serif reading voice; use sans serif for chat messages.",
+      "Do retain the blue keyboard focus outline on reader links and buttons, and the blue composer border in chat.",
+      "Do preserve 44px navigation and composer controls, including expanded phone citation hit areas.",
+      "Do keep long source titles and URLs within the reading column.",
+      "Do let chat charts and tables use the discussion pane while keeping answer prose within its reading measure."
     ],
     "donts": [
       "Don't communicate review state through color alone.",

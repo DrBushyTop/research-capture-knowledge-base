@@ -1,0 +1,37 @@
+import { expect, it } from 'vitest';
+import { MemoryStore, snapshot } from './fixtures.js';
+import { normalize, noteSchema } from '../shared/corpus.js';
+import { evidenceChunk, validateAnswer, type ChatJob } from '../shared/chat.js';
+import { readChatFile } from '../apps/worker/src/chat-files.js';
+import type { BlobStore } from '../apps/worker/src/storage.js';
+const id = '1'.repeat(32); const revision = '2'.repeat(64);
+it('serves the cited original generation and refuses another reader or uncited source', async () => {
+  const state = new MemoryStore(); const keys: string[] = [];
+  const raw = { getBlockBlobClient: (key: string) => { keys.push(key); return { getProperties: async () => ({ contentLength: 4, etag: 'version' }), downloadToBuffer: async () => Buffer.from('file') }; } };
+  const generationId = 'a'.repeat(64); const artifactHash = 'b'.repeat(64);
+  const source = normalize(snapshot)[0].source;
+  const note = noteSchema.parse({ schemaVersion: 1, generationId, source, extraction: { status: 'text', method: 'pdf-text', reason: null, truncated: false, retrievedAt: new Date().toISOString(), artifactHash }, analysis: null, processing: { version: '2', model: null, processedAt: new Date().toISOString() }, rightsEvidence: [] });
+  const cite = evidenceChunk({ sourceId: source.id, generationId, title: source.title, kind: 'source', locator: 'PDF page 2', text: 'Saved original text', sourceUrl: 'https://example.org/original', pdf: true });
+  const result = validateAnswer({ answer: `Original [${cite.id}]`, insufficientEvidence: false, citations: [{ evidenceId: cite.id, quote: 'Saved original text' }] }, [cite]);
+  const job: ChatJob = { id, owner: 'owner', createdAt: new Date().toISOString(), corpusRevision: revision, request: { question: 'Original?', history: [] }, status: 'complete', attempts: 1, result };
+  await state.create(`chat/jobs/${id}.json`, job);
+  await state.create(`chat/corpora/${revision}.json`, { revision, sources: [{ note: { ...note, generationId: 'c'.repeat(64), extraction: { ...note.extraction, artifactHash: 'd'.repeat(64) } }, humanMarkdown: '' }] });
+  await state.create(`analysis/${generationId}.json`, note);
+  const store = Object.assign(state, { raw }) as unknown as BlobStore;
+  await expect(readChatFile(store, 'other', id, null, source.id)).rejects.toMatchObject({ status: 404 });
+  await expect(readChatFile(store, 'owner', id, null, 'zotero-users-12345-UNKNOWN1')).rejects.toMatchObject({ status: 404 });
+  await expect(readChatFile(store, 'owner', id, null, source.id, 'e_' + '0'.repeat(16))).rejects.toMatchObject({ status: 404 });
+  expect(keys).toEqual([]);
+  expect((await readChatFile(store, 'owner', id, null, source.id, cite.id)).mime).toBe('application/pdf');
+  expect(keys).toEqual([artifactHash]);
+  expect(result.citations[0].sourceUrl).toBe('https://example.org/original');
+});
+it('serves cited image evidence even when it is not an answer attachment', async () => {
+  const state = new MemoryStore(); const asset = 'a_' + 'a'.repeat(16); const sourceId = 'zotero-users-12345-PBA4T3PN';
+  const cite = evidenceChunk({ sourceId, generationId: 'b'.repeat(64), title: 'Image', kind: 'visual', locator: 'Image', text: 'Rendered image', assetId: asset });
+  await state.create(`chat/jobs/${id}.json`, { id, owner: 'owner', createdAt: new Date().toISOString(), status: 'complete', result: validateAnswer({ answer: `Image [${cite.id}]`, insufficientEvidence: false, citations: [{ evidenceId: cite.id, quote: null }] }, [cite]) });
+  await state.create(`chat/assets/${id}/${asset}.json`, { id: asset, sourceId, kind: 'image', blobKey: `chat/assets/${id}/${asset}.png` });
+  const store = Object.assign(state, { container: { getBlockBlobClient: () => ({ getProperties: async () => ({ contentLength: 3, etag: 'version' }), downloadToBuffer: async () => Buffer.from('png') }) } }) as unknown as BlobStore;
+  expect((await readChatFile(store, 'owner', id, asset, null)).mime).toBe('image/png');
+  await expect(readChatFile(store, 'other', id, asset, null)).rejects.toMatchObject({ status: 404 });
+});

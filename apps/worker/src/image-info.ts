@@ -25,4 +25,3 @@ export function imageInfo(bytes: Buffer): { mime: ChatUpload['mime']; width: num
   }
   return undefined;
 }
-

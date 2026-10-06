@@ -144,6 +144,13 @@ export class SqlStore extends BlobStore {
     const result = await (await this.request()).query('SELECT note_json,human_markdown FROM dbo.Sources WHERE active=1 ORDER BY captured_at DESC,source_id');
     return result.recordset.map(row => ({ note: noteSchema.parse(JSON.parse(row.note_json)), humanMarkdown: row.human_markdown }));
   }
+  async expireTemporaryRecords() {
+    // Conversations, templates and reader notes are durable. Only transient chat records expire.
+    await (await this.request()).query(`DELETE TOP (500) FROM dbo.Records
+      WHERE updated_at < DATEADD(day,-1,SYSUTCDATETIME())
+      AND (record_key LIKE 'chat/jobs/%' OR record_key LIKE 'chat/users/%'
+        OR record_key LIKE 'chat/assets/%' OR record_key LIKE 'chat/cancellations/%');`);
+  }
   private async snapshot() {
     const sources = await this.sources();
     const documents = await Promise.all(sources.map(async ({ note, humanMarkdown }) => {

@@ -6,6 +6,8 @@ Azure SQL Database Standard S0, 10 DTUs, is the authoritative application store.
 
 Processing publishes directly to `Sources`. The reader loads `/api/chat?library=1`; saving or reprocessing does not require a Git push or static deployment. Old `/research/{id}/` links load the same live reader. Chat freezes its retrieval snapshot at submission time and adds current reader notes when answering.
 
+The recovery timer removes expired temporary chat records from SQL in bounded batches. Conversations, source data, category revisions and reader notes do not share that expiry rule. Blob lifecycle still expires temporary binary chat files.
+
 ## Provisioning
 
 Deploy `infra/sql.bicep` with the Entra administrator's object ID and login. It creates `research` and an optional `research_dev`, both S0. Set `includeDevelopmentDatabase=false` if an x86 local SQL Server is available. The development database is a second billable S0 database.

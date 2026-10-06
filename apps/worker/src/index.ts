@@ -110,6 +110,7 @@ app.http('chatGateway', {
 });
 app.timer('recoverChats', { schedule: '30 */5 * * * *', handler: async (_timer, context) => {
   const state = store(); await reconcileChat(state, id => state.sendChat(id));
+  await state.expireTemporaryRecords();
   await deleteExpiredWorkspaces(sandboxClient());
   context.log(JSON.stringify({ event: 'chat-reconciliation-complete' }));
 } });

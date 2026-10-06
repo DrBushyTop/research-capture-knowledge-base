@@ -24,3 +24,8 @@ The workflow deploys current code and does not change Key Vault contents or enab
 4. Verify a capture, source reading, chat, citations and recovery under genuine user sessions. Until then the production application is provisioned and deployed, not accepted as ready for use.
 
 The clean production sandbox snapshot is built without user data by `scripts/bootstrap-browser-sandbox.ts`. It includes Chromium/Playwright and fixed PDF tooling. Browser and evidence operations use separate ephemeral sandbox instances and egress policies even when they restore the same clean image. Do not snapshot a customer session. Keep image IDs in production parameters and settings; never use a dev source artifact as an image seed.
+
+See [monthly cost assumptions](monthly-cost.md) for idle and usage-dependent production estimates.
+
+Production reader: `https://orange-ground-01b0c6a03.3.azurestaticapps.net/`.
+Vault: `https://kv-research-prod-16681c6.vault.azure.net/`.

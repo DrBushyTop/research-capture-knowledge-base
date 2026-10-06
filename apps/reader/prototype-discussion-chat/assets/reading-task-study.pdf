@@ -1,0 +1,67 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 7 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 390 >>
+stream
+BT /F1 14 Tf 48 780 Td 24 TL
+(Reading task study - 2023) Tj T*
+(Synthetic document for the discussion UI prototype.) Tj T*
+(Methods and results) Tj T*
+(Primary endpoint: between-group retention score difference.) Tj T*
+(Follow-up: 12 weeks.) Tj T*
+(Reading-task group retention score: 74.) Tj T*
+(Comparison group retention score: 70.) Tj T*
+(No week-24 measurement was collected.) Tj T*
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 7 0 R >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 754 >>
+stream
+BT /F1 14 Tf 48 780 Td 24 TL
+(Reading task study - 2025) Tj T*
+(Synthetic document for the discussion UI prototype.) Tj T*
+(Methods and results) Tj T*
+(Primary endpoint: between-group retention score difference.) Tj T*
+(Follow-up: 12 and 24 weeks.) Tj T*
+(Week 12: reading-task group 74, comparison group 70.) Tj T*
+(Week 24: reading-task group 79, comparison group 70.) Tj T*
+(The follow-up duration alone does not establish causality.) Tj T*
+ET
+0.84 0.87 0.91 RG 1 w 80 290 m 510 290 l S 80 346 m 510 346 l S 80 402 m 510 402 l S
+0.14 0.34 0.65 RG 3 w 120 334 m 470 390 l S
+0.42 0.48 0.56 RG 3 w 120 290 m 470 290 l S
+BT /F1 12 Tf 80 430 Td (Retention by study week - synthetic data) Tj ET
+BT /F1 12 Tf 105 264 Td (Week 12) Tj 348 0 Td (Week 24) Tj ET
+
+endstream
+endobj
+7 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000000688 00000 n 
+0000000814 00000 n 
+0000001619 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+1689
+%%EOF

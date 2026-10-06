@@ -1,0 +1,71 @@
+<!doctype html>
+<!-- THROWAWAY PROTOTYPE. Three discussion layouts on the chat route, selected with ?variant=A|B|C. Synthetic evidence only. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Chat · Research library</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body data-variant="A">
+  <a class="skip-link" href="#conversation">Skip to conversation</a>
+  <header class="masthead">
+    <button type="button" class="library-link" data-action="sources">Research library</button>
+    <nav aria-label="Library">
+      <button type="button" class="text-button" data-action="sources">Sources</button>
+      <a href="?variant=A" aria-current="page">Chat</a>
+    </nav>
+    <button type="button" class="text-button sign-out" data-action="signout">Sign out</button>
+  </header>
+  <div class="app-frame">
+    <aside class="chat-margin" id="history" aria-label="Chats">
+      <div class="margin-heading"><h2>Chats</h2><button type="button" class="icon-button drawer-close" data-action="close-history" aria-label="Close chats"></button></div>
+      <button type="button" class="new-chat" data-action="new-chat"><span data-icon="plus"></span>New chat</button>
+      <div class="chat-list" id="chat-list"></div>
+    </aside>
+    <main class="chat-panel" id="main">
+      <div class="conversation-toolbar">
+        <button type="button" class="icon-button history-button" data-action="history" aria-label="Open chats" aria-expanded="false"><span data-icon="menu"></span></button>
+        <h1>Chat</h1>
+        <div class="toolbar-actions">
+          <button type="button" class="icon-button" data-action="source-rail" aria-label="Open sources" aria-expanded="false"><span data-icon="file"></span></button>
+          <button type="button" class="icon-button" data-action="new-chat" aria-label="New chat"><span data-icon="plus"></span></button>
+        </div>
+      </div>
+      <div class="conversation-scroll" id="conversation" tabindex="-1">
+        <div class="transcript" id="transcript" aria-label="Conversation"></div>
+      </div>
+      <div class="composer-region">
+        <form id="chat-form" class="composer">
+          <label for="message" class="sr-only">Message</label>
+          <textarea id="message" name="message" rows="1" placeholder="Message" maxlength="10000"></textarea>
+          <button id="send" type="submit" class="send-button" aria-label="Send" disabled><span data-icon="arrow-up"></span></button>
+        </form>
+        <div id="chat-status" class="chat-status" role="status" aria-live="polite"></div>
+      </div>
+    </main>
+    <aside class="source-rail" id="source-rail" aria-label="Sources">
+      <div class="margin-heading"><h2>Sources</h2><button type="button" class="icon-button" data-action="close-sources" aria-label="Close sources"><span data-icon="close"></span></button></div>
+      <div id="rail-sources"></div>
+    </aside>
+  </div>
+  <button type="button" class="drawer-backdrop" aria-label="Close chats" data-action="close-history" hidden></button>
+  <section id="evidence" class="evidence-popover" popover="auto" role="dialog" aria-label="Source evidence" tabindex="-1"></section>
+  <dialog class="image-dialog" id="image-dialog" aria-label="Image">
+    <div class="image-dialog-header"><h2>Retention by study week</h2><button type="button" class="icon-button" data-action="close-image" aria-label="Close image"><span data-icon="close"></span></button></div>
+    <img src="assets/retention-chart.svg" alt="Synthetic chart. The reading-task group scores 74 at week 12 and 79 at week 24; the comparison group scores 70 at both weeks.">
+    <div class="image-actions"><button type="button" class="text-button" data-source="2025">Reading task study · 2025</button><a href="assets/retention-chart.svg" download>Download image</a></div>
+  </dialog>
+  <dialog id="sources-dialog" aria-label="Sources">
+    <div class="image-dialog-header"><h2>Sources</h2><button type="button" class="icon-button" data-action="close-library" aria-label="Close sources"><span data-icon="close"></span></button></div>
+    <div id="library-sources"></div>
+  </dialog>
+  <div class="prototype-switcher" id="prototype-switcher" aria-label="Prototype variants">
+    <button type="button" class="icon-button" data-action="previous" aria-label="Previous variant"><span data-icon="chevron-left"></span></button>
+    <div><div id="variant-label"></div><output id="prototype-state"></output></div>
+    <button type="button" class="icon-button" data-action="next" aria-label="Next variant"><span data-icon="chevron-right"></span></button>
+  </div>
+</body>
+</html>

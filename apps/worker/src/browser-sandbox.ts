@@ -5,7 +5,7 @@ import { publicAddress } from './extraction.js';
 import { sandboxClient } from './chat-sandbox.js';
 import { createWorkspace, deleteWorkspace, readWorkspaceFile, writeWorkspaceFile } from './sandbox-lifecycle.js';
 import { captureDecisionSchema, captureDocument, browserCaptureVersion, browserCaptureNeeded, type BrowserCapture, type BrowserCaptureSession, type BrowserView } from './browser-capture.js';
-import { infer } from './enrichment.js';
+import { infer, type InferenceSession } from './enrichment.js';
 import { sourceImage } from './image-input.js';
 import type { PipelineStore } from './pipeline.js';
 
@@ -70,10 +70,17 @@ export async function recoverWebpage(snapshot: SourceSnapshot, store: PipelineSt
   const cached = await store.read<BrowserCapture>(key);
   if (cached?.version === browserCaptureVersion && cached.sourceUrl === snapshot.source.url && cached.text.length >= 80 && cached.views.some(view => !browserCaptureNeeded(view.text, ''))) return cached;
   const session = await openBrowserSession(snapshot.source.url, signal, async id => { await store.write(`browser-workspaces/${id}.json`, { sourceId: snapshot.source.id, createdAt: new Date().toISOString() }); });
+  const planning: InferenceSession = { key: key, messages: [] };
   try {
     const result = await captureDocument({ title: snapshot.source.title, url: snapshot.source.url }, session, async (source, view, history, caller) => {
+      // Retain stable previous observations/decisions in order; only the new observation is appended.
+      // Bound text context without padding prompts merely to reach a cache threshold.
+      if (JSON.stringify(planning.messages, (key, value) => key === 'url' && typeof value === 'string' && value.startsWith('data:image/') ? '[image]' : value).length > 100000 || planning.messages.length >= 17) {
+        planning.messages = [];
+        planning.key = key + ':window:' + history.length;
+      }
       const image = view.screenshot ? sourceImage(Buffer.from(view.screenshot, 'base64'), 'image/png') : undefined;
-      return captureDecisionSchema.parse(await infer({ source, view: { ...view, screenshot: undefined }, history, budgets: { remainingActions: 40 - history.length } }, instructions, captureDecisionSchema, process.env.FOUNDRY_ENDPOINT!, process.env.FOUNDRY_DEPLOYMENT!, caller, image ? [image] : []));
+      return captureDecisionSchema.parse(await infer({ source: planning.messages.length ? undefined : source, view: { ...view, screenshot: undefined }, priorAction: history.at(-1)?.action, budgets: { remainingActions: 40 - history.length } }, instructions, captureDecisionSchema, process.env.FOUNDRY_ENDPOINT!, process.env.FOUNDRY_DEPLOYMENT!, caller, image ? [image] : [], planning));
     }, signal);
     // Screenshots stay in private Blob storage, not SQL records or model conversation history.
     for (const view of result.views) if (view.screenshot) {

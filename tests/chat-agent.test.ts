@@ -80,3 +80,23 @@ it('reports authored commentary and streamed drafts, and clears a draft whose an
   expect(drafts).toEqual(['First block.', '', 'Verified first block.']);
   expect(answer.answer.answer).toBe('Verified first block.\n\nSecond');
 });
+it('keeps tool definitions stable at the budget boundary and requests no further calls', async () => {
+ let count = 0; let first = '';
+ const tools: ChatTools = { evidence: [], assets: [], execute: async () => ({ content: {} }) };
+ await discuss(job, undefined, tools, undefined, async (_messages, definitions, _signal, _text, options) => {
+  const serialized = JSON.stringify(definitions);
+  if (!count) first = serialized;
+  expect(serialized).toBe(first);
+  if (count++ < 8) return { tool_calls: [{ id: String(count), type: 'function', function: { name: 'search_corpus', arguments: '{"query":"","offset":0,"limit":1}' } }] };
+  expect(options?.toolsExhausted).toBe(true);
+  return { content: JSON.stringify(result) };
+ });
+});
+it('replays the exact validated model answer rather than enriched citation metadata', async () => {
+ const raw = JSON.stringify(result);
+ const conversation: ChatConversation = { id:'3'.repeat(32), owner:'reader', createdAt:job.createdAt, updatedAt:job.createdAt, turns:[{jobId:'4'.repeat(32),question:'Prior',result,modelAnswer:raw}] };
+ await discuss(job, conversation, {evidence:[],assets:[],execute:async()=>({content:{}})}, undefined, async messages => {
+  expect(messages.find(m=>m.role==='assistant')?.content).toBe(raw);
+  return {content:raw};
+ });
+});

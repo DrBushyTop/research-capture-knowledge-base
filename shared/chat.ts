@@ -80,4 +80,4 @@ export interface ChatJob { id: string; owner: string; corpusRevision: string; co
   /** Complete Markdown blocks streamed so far by the current attempt. Unverified; the validated result replaces it. */
   draft?: string; startedAt?: string; }
 export interface ChatSourceContext { sourceId: string; title: string; }
-export interface ChatConversation { id: string; owner: string; createdAt: string; updatedAt: string; sourceContext?: ChatSourceContext; turns: { jobId: string; question: string; images?: ChatImage[]; result: NonNullable<ChatJob['result']>; activities?: ChatActivity[]; workedMs?: number }[]; }
+export interface ChatConversation { id: string; owner: string; createdAt: string; updatedAt: string; sourceContext?: ChatSourceContext; turns: { jobId: string; question: string; images?: ChatImage[]; result: NonNullable<ChatJob['result']>; activities?: ChatActivity[]; workedMs?: number; modelAnswer?: string }[]; }

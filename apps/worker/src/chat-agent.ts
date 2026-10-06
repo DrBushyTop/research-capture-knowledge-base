@@ -1,5 +1,6 @@
 import { DefaultAzureCredential } from '@azure/identity';
 import { z } from 'zod';
+import { cacheBreakpoint, cachePolicy, promptCacheKey, recordModelUsage, stableJson, type ModelUsage } from './model-cache.js';
 import { inferenceSchema } from './enrichment.js';
 import { answerSchema, validateAnswer, type ChatActivity, type ChatAsset, type ChatConversation, type ChatJob, type Evidence } from '../../../shared/chat.js';
 import { sourceId } from '../../../shared/corpus.js';
@@ -27,7 +28,8 @@ interface ResponseItem { type: string; phase?: string; call_id?: string; name?: 
 interface ModelMessage { responseItems?: ResponseItem[]; role: 'system' | 'user' | 'assistant' | 'tool'; content: unknown; tool_calls?: ToolCall[]; tool_call_id?: string; }
 interface ToolCall { id: string; type: 'function'; function: { name: string; arguments: string }; }
 /** `onText` receives the final-answer text streamed so far in this round. */
-export type ModelRound = (messages: ModelMessage[], tools: unknown[], signal?: AbortSignal, onText?: (text: string) => Promise<void>) => Promise<{ content?: string | null; tool_calls?: ToolCall[]; responseItems?: ResponseItem[] }>;
+export interface ModelRequestOptions { cacheScope?: string; toolsExhausted?: boolean }
+export type ModelRound = (messages: ModelMessage[], tools: unknown[], signal?: AbortSignal, onText?: (text: string) => Promise<void>, options?: ModelRequestOptions) => Promise<{ content?: string | null; tool_calls?: ToolCall[]; responseItems?: ResponseItem[] }>;
 const descriptions: Record<ChatToolName, string> = {
   search_corpus: 'Search all stored document text, metadata, generated analysis and human notes. Empty query lists sources. Use short keywords and paginate results.',
   read_source: 'Read a saved original document, generated analysis, human notes or metadata. For original PDFs, query finds matching pages; page selects any specific page. Returned passages have evidence IDs. Returns available files and site links.',
@@ -52,7 +54,7 @@ export async function readStream(body: ReadableStream<Uint8Array>, onText?: (tex
       const data = buffer.slice(0, end).split('\n').filter(line => line.startsWith('data:')).map(line => line.slice(5).trimStart()).join('\n');
       buffer = buffer.slice(end + 2);
       if (!data || data === '[DONE]') continue;
-      const event = JSON.parse(data) as { type: string; delta?: string; item?: ResponseItem; response?: { status?: string; output?: ResponseItem[] } };
+      const event = JSON.parse(data) as { type: string; delta?: string; item?: ResponseItem; response?: { status?: string; output?: ResponseItem[]; usage?: ModelUsage } };
       if (event.type === 'response.output_item.added' && event.item?.type === 'message') finalItem = event.item.phase !== 'commentary';
       if (event.type === 'response.output_text.delta' && finalItem && event.delta) { text += event.delta; await onText?.(text); }
       if (['response.completed', 'response.incomplete', 'response.failed'].includes(event.type)) return event.response;
@@ -61,19 +63,27 @@ export async function readStream(body: ReadableStream<Uint8Array>, onText?: (tex
   }
   throw new Error('Chat response ended early');
 }
-export const modelRound: ModelRound = async (messages, tools, signal, onText) => {
+export const modelRound: ModelRound = async (messages, tools, signal, onText, options) => {
   const endpoint = process.env.FOUNDRY_ENDPOINT; const model = process.env.FOUNDRY_DEPLOYMENT;
   if (!endpoint || !model) throw new Error('Inference configuration missing');
+  const schema = JSON.parse(stableJson(inferenceSchema(answerSchema)));
+  const cacheKey = promptCacheKey('chat', [messages.filter(message => message.role === 'system'), tools, schema], options?.cacheScope);
+  const input = responseInput(messages).map((item, index) => {
+    if (index !== 0 || !item || typeof item !== 'object') return item;
+    const message = item as { role: string; content: unknown };
+    return typeof message.content === 'string' ? { ...message, content: [{ type: 'input_text', text: message.content, prompt_cache_breakpoint: cacheBreakpoint }] } : message;
+  });
   const token = await new DefaultAzureCredential().getToken('https://cognitiveservices.azure.com/.default');
   const response = await fetch(`${endpoint.replace(/\/$/, '')}/openai/v1/responses`, {
     method: 'POST', signal: AbortSignal.any([AbortSignal.timeout(180_000), ...(signal ? [signal] : [])]),
     headers: { Authorization: `Bearer ${token?.token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, stream: true, reasoning: { effort: 'medium' }, max_output_tokens: 6000, input: responseInput(messages), store: false, include: ['reasoning.encrypted_content'],
-      ...(tools.length ? { tools: tools.map(tool => ({ type: 'function', ...(tool as { function: object }).function })), tool_choice: 'auto', parallel_tool_calls: false } : {}),
-      text: { format: { type: 'json_schema', name: 'chat_answer', strict: true, schema: inferenceSchema(answerSchema) } } })
+    body: JSON.stringify({ model, stream: true, reasoning: { effort: 'medium' }, max_output_tokens: 6000, input, prompt_cache_key: cacheKey, prompt_cache_options: cachePolicy, store: false, include: ['reasoning.encrypted_content'],
+      ...(tools.length ? { tools: tools.map(tool => ({ type: 'function', ...(tool as { function: object }).function })), tool_choice: options?.toolsExhausted ? 'none' : 'auto', parallel_tool_calls: false } : {}),
+      text: { format: { type: 'json_schema', name: 'chat_answer', strict: true, schema } } })
   });
   if (!response.ok || !response.body) { await response.body?.cancel(); throw new Error(`Chat inference HTTP ${response.status}`); }
   const body = await readStream(response.body, onText);
+  recordModelUsage('chat', body?.usage);
   if (body?.status !== 'completed' || !body.output || body.output.some(item => item.content?.some(part => part.type === 'refusal'))) throw new Error('Chat response unavailable');
   return { responseItems: body.output,
     content: body.output.flatMap(item => item.type === 'message' && item.phase !== 'commentary' ? (item.content || []).filter(part => part.type === 'output_text').map(part => part.text || '') : []).join(''),
@@ -111,7 +121,7 @@ export async function discuss(job: ChatJob, conversation: ChatConversation | und
   };
   for (const turn of history) {
     await tools.remember?.(turn.result, turn.jobId);
-    messages.push({ role: 'user', content: await userContent(turn.question, replay.get(turn.jobId)) }, { role: 'assistant', content: JSON.stringify(turn.result) });
+    messages.push({ role: 'user', content: await userContent(turn.question, replay.get(turn.jobId)) }, { role: 'assistant', content: turn.modelAnswer || JSON.stringify(turn.result) });
     for (const cite of turn.result.citations) if (!tools.evidence.some(item => item.id === cite.evidenceId)) tools.evidence.push({ id: cite.evidenceId, sourceId: cite.sourceId, generationId: cite.generationId, title: cite.title, kind: cite.kind, locator: cite.locator, text: [cite.excerpt, cite.quote].filter(Boolean).join('\n'), sourceUrl: cite.sourceUrl, pdf: cite.pdf, assetId: cite.assetId || undefined });
   }
   if (!conversation) for (const turn of job.request.history) messages.push({ role: turn.role, content: turn.content });
@@ -121,17 +131,17 @@ export async function discuss(job: ChatJob, conversation: ChatConversation | und
     signal?.throwIfAborted();
     if (JSON.stringify(messages, (key, value) => key === 'encrypted_content' ? '[reasoning]' : (key === 'url' || key === 'image_url') && typeof value === 'string' && value.startsWith('data:image/') ? '[image]' : value).length > 300_000) throw new Error('Conversation context limit reached');
     let shown = '';
-    const response = await round(messages, calls >= 8 ? [] : definitions, signal, async text => {
+    const response = await round(messages, definitions, signal, async text => {
       const draft = streamedDraft(text);
       if (draft !== shown) { shown = draft; await tools.draft?.(draft); }
-    });
+    }, { cacheScope: `${job.owner}:${job.conversationId || job.id}`, toolsExhausted: calls >= 8 });
     for (const text of commentaryOf(response.responseItems)) await tools.progress?.({ tool: 'commentary', title: text });
     if (!response.tool_calls?.length) {
       try {
         if (!response.content) throw new Error('Empty chat answer');
         const answer = answerSchema.parse(JSON.parse(response.content));
         validateAnswer(answer, tools.evidence, tools.assets);
-        return { answer, evidence: tools.evidence, assets: tools.assets };
+        return { answer, evidence: tools.evidence, assets: tools.assets, modelAnswer: response.content };
       } catch (error) {
         if (++repairs > 2) throw error;
         if (shown) await tools.draft?.('');

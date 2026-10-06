@@ -156,7 +156,7 @@ export async function reconcileChat(store: PipelineStore, send: (id: string) => 
     }).catch(error => { if ((error as { statusCode?: number }).statusCode !== 409) throw error; });
   }
 }
-export async function processChatJob(store: PipelineStore, id: string, answer: (corpus: ChatCorpus, job: ChatJob, recordSandbox: (id: string) => Promise<void>, conversation: ChatConversation | undefined, progress: (activity: ChatActivity) => Promise<void>, signal: AbortSignal, draft: (text: string) => Promise<void>) => Promise<{ answer: unknown; evidence: Evidence[]; assets?: ChatAsset[] }>) {
+export async function processChatJob(store: PipelineStore, id: string, answer: (corpus: ChatCorpus, job: ChatJob, recordSandbox: (id: string) => Promise<void>, conversation: ChatConversation | undefined, progress: (activity: ChatActivity) => Promise<void>, signal: AbortSignal, draft: (text: string) => Promise<void>) => Promise<{ answer: unknown; evidence: Evidence[]; assets?: ChatAsset[]; modelAnswer?: string }>) {
   if (!/^[a-f0-9]{32}$/.test(id)) return;
   return store.withLease(`chat-job-${id}`, async () => {
     const key = `chat/jobs/${id}.json`; let job = await store.read<ChatJob>(key);
@@ -197,7 +197,7 @@ export async function processChatJob(store: PipelineStore, id: string, answer: (
         if (await store.read(`chat/cancellations/${id}.json`) || (job!.conversationId && await deleted(store, job!.owner, job!.conversationId))) throw new Error('Chat cancelled');
         const validated = validateAnswer(result.answer, result.evidence, result.assets);
         if (conversation) await store.write(`chat/conversations/${job!.owner}/${conversation.id}.json`, { ...conversation, updatedAt: new Date().toISOString(), turns: [...conversation.turns.filter(turn => turn.jobId !== id), { jobId: id, question: job!.request.question, ...(job!.images?.length ? { images: job!.images } : {}), result: validated,
-          ...(job!.activities?.length ? { activities: job!.activities } : {}), workedMs: Date.now() - Date.parse(job!.startedAt || job!.createdAt) }].slice(-100) });
+          ...(job!.activities?.length ? { activities: job!.activities } : {}), ...(result.modelAnswer && result.modelAnswer.length <= 100000 ? { modelAnswer: result.modelAnswer } : {}), workedMs: Date.now() - Date.parse(job!.startedAt || job!.createdAt) }].slice(-100) });
         await store.write(key, { ...job!, status: 'complete', result: validated, draft: undefined, error: undefined });
         if (job!.conversationId && await deleted(store, job!.owner, job!.conversationId)) throw new Error('Chat cancelled');
       };

@@ -42,3 +42,16 @@ GitHub Actions included minutes depend on the account plan. This estimate exclud
 - https://sandboxes.azure.com/docs/sandboxes/cost
 
 Use actual token usage and Cost Management resource-group totals after the first week to replace these assumptions. Sponsorship credits reduce cash paid while available, not the underlying consumption cost.
+
+## Prompt-cache optimization, 2026-10-07
+
+The earlier scenarios deliberately treated all input as uncached and are not expected-use forecasts. They also omitted cache-write billing. The runtime now uses stable hashed prompt cache keys, canonical output schemas, stable chat tool definitions, explicit stable-instruction breakpoints plus implicit latest-message caching, and append-only browser planning within bounded windows. Chat stores the exact validated final model JSON for replay rather than rebuilding that message from enriched citations. Full tool/reasoning transcripts are still not persisted across conversation turns; screenshot expiry and history-window changes can also shorten the reusable prefix.
+
+The runtime logs numeric input, cached-input, cache-write, output and reasoning counts as `model-usage`, without prompts or credentials. Missing usage is unknown, not zero. For GPT-6.1 Sol short-context Data Zone, cache-write rate from the same Azure pricing table is $3/million tokens. Use the provider's usage categories rather than assuming every repeated input is free. A cost calculation must distinguish cache-read tokens, cache-write tokens and ordinary input tokens, and include output/ reasoning charges.
+
+Synthetic live checks on the development deployment proved the exact controls are accepted:
+
+- Responses chat: first request 7,314 input / 0 cached / 7,311 written; appended follow-up 7,347 input / 7,311 cached / 33 written. Outputs were 27 and 28 tokens with no reasoning tokens in this tiny task. Follow-up reuse was about 99.5%, but this intentionally repeated a long static reference, not a representative production answer.
+- Append-only Chat Completions: 10,062 / 20,094 / 30,126 input across three requests, with 0 / 10,059 / 20,091 cache reads. Newly appended material incurred roughly 10,032 cache-write tokens per later request because the synthetic test appended another full reference each time.
+
+These tests validate mechanics, not a monthly savings percentage. Replace the example budgets with measured normal captures, real retrieval chat sessions and browser workflows after activation. Do not add filler to reach the caching threshold or retain unlimited old screenshots/history for hypothetical cache savings.

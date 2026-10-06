@@ -11,6 +11,7 @@ const status = element<HTMLParagraphElement>('chat-status');
 const transcript = element<HTMLDivElement>('chat-transcript');
 const history: ChatRequest['history'] = [];
 let active = false;
+let answerNumber = 0;
 const labels = { source: 'Stored source text', machine: 'Generated analysis', human: 'Human notes', metadata: 'Source metadata', visual: 'Rendered source page or image' };
 function turn(kind: 'question' | 'answer', text: string) {
   const section = document.createElement('section'); section.className = `chat-turn ${kind}`;
@@ -19,19 +20,33 @@ function turn(kind: 'question' | 'answer', text: string) {
   transcript.append(section); return section;
 }
 function render(result: NonNullable<ChatJob['result']>) {
-  const section = turn('answer', result.answer);
+  const section = turn('answer', '');
+  const number = ++answerNumber;
+  const body = section.querySelector('.chat-answer-text')!;
+  let start = 0;
+  for (const match of result.answer.matchAll(/\[(e_[a-f0-9]{16})\]/g)) {
+    body.append(document.createTextNode(result.answer.slice(start, match.index)));
+    const index = result.citations.findIndex(citation => citation.evidenceId === match[1]);
+    if (index >= 0) {
+      const marker = document.createElement('a'); marker.href = `#chat-citation-${number}-${index + 1}`; marker.textContent = `[${index + 1}]`; marker.setAttribute('aria-label', `Evidence ${index + 1}`); body.append(marker);
+    } else body.append(document.createTextNode('[Citation unavailable]'));
+    start = match.index + match[0].length;
+  }
+  body.append(document.createTextNode(result.answer.slice(start)));
+  const answerHeading = section.querySelector('h2')!; answerHeading.tabIndex = -1;
   if (result.insufficientEvidence) { const notice = document.createElement('p'); notice.className = 'evidence-notice'; notice.textContent = 'The stored evidence does not fully answer this question.'; section.append(notice); }
   if (result.citations.length) {
     const heading = document.createElement('h3'); heading.textContent = 'Evidence to check'; section.append(heading);
     const list = document.createElement('ol'); list.className = 'chat-citations';
-    for (const citation of result.citations) {
-      const row = document.createElement('li'); const link = document.createElement('a'); link.href = `/research/${encodeURIComponent(citation.sourceId)}/`; link.textContent = citation.title; row.append(link);
+    for (const [index, citation] of result.citations.entries()) {
+      const row = document.createElement('li'); row.id = `chat-citation-${number}-${index + 1}`; const link = document.createElement('a'); link.href = `/research/${encodeURIComponent(citation.sourceId)}/`; link.textContent = citation.title; row.append(link);
       const locator = document.createElement('p'); locator.className = 'chat-evidence-label'; locator.textContent = `${labels[citation.kind]} · ${citation.locator}`; row.append(locator);
       const details = document.createElement('details'); const summary = document.createElement('summary'); summary.textContent = 'Read the supplied passage'; details.append(summary);
       const excerpt = document.createElement('p'); excerpt.textContent = citation.quote || citation.excerpt; details.append(excerpt); row.append(details); list.append(row);
     }
     section.append(list);
   }
+  return answerHeading;
 }
 async function api(url: string, init?: RequestInit) {
   const response = await fetch(url, { ...init, credentials: 'same-origin', redirect: 'follow', signal: AbortSignal.timeout(35_000) });
@@ -45,9 +60,12 @@ if (preselected && [...source.options].some(option => option.value === preselect
 clear.addEventListener('click', () => { if (active) return; transcript.replaceChildren(); history.length = 0; element('chat-empty').hidden = false; clear.hidden = true; status.textContent = ''; question.value = ''; question.focus(); });
 form.addEventListener('submit', async event => {
   event.preventDefault(); if (active || !question.value.trim()) return;
+  if (!form.reportValidity()) return;
   const text = question.value.trim();
   const request: ChatRequest = { question: text, history: history.slice(-6), ...(source.value ? { sourceId: source.value } : {}),
     ...(visual.value ? { visual: { sourceId: visual.value, page: Number(page.value) } } : {}) };
+  while (new TextEncoder().encode(JSON.stringify(request)).length > 16_000 && request.history.length) request.history.shift();
+  let answerHeading: HTMLElement | undefined;
   active = true; submit.disabled = clear.disabled = question.disabled = source.disabled = visual.disabled = page.disabled = true;
   submit.textContent = 'Finding evidence…'; status.textContent = 'Reading stored sources. This may take a minute.'; element('chat-empty').hidden = true; element('chat-signin').hidden = true;
   const pending = turn('question', text);
@@ -59,7 +77,7 @@ form.addEventListener('submit', async event => {
       const job = await api(`/api/chat?id=${encodeURIComponent(id)}`) as Pick<ChatJob, 'status' | 'result' | 'error'>;
       if (job.status === 'failed') throw new Error(job.error || 'The question could not be completed. Try again.');
       if (job.status === 'complete' && job.result) {
-        render(job.result); history.push({ role: 'user', content: text.slice(0, 3000) }, { role: 'assistant', content: job.result.answer.slice(0, 3000) });
+        answerHeading = render(job.result); history.push({ role: 'user', content: text.slice(0, 3000) }, { role: 'assistant', content: job.result.answer.slice(0, 3000) });
         history.splice(0, Math.max(0, history.length - 6)); question.value = ''; clear.hidden = false; status.textContent = 'Answer ready. Check its cited evidence.'; return;
       }
       status.textContent = 'Finding evidence and preparing an answer. You can keep reading while this finishes.';
@@ -70,6 +88,10 @@ form.addEventListener('submit', async event => {
     element('chat-empty').hidden = transcript.children.length > 0;
   } finally {
     active = false; submit.disabled = clear.disabled = question.disabled = source.disabled = visual.disabled = false; page.disabled = !visual.value;
-    submit.textContent = 'Ask collection'; question.focus();
+    submit.textContent = 'Ask collection';
+    if (document.activeElement === document.body || form.contains(document.activeElement)) {
+      if (answerHeading) { answerHeading.focus({ preventScroll: true }); answerHeading.scrollIntoView({ block: 'start' }); }
+      else question.focus();
+    }
   }
 });

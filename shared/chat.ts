@@ -5,8 +5,9 @@ export const chatRequestSchema = z.strictObject({ question: z.string().trim().mi
   history: z.array(z.strictObject({ role: z.enum(['user', 'assistant']), content: z.string().max(3000) })).max(6).default([]),
   visual: z.strictObject({ sourceId, page: z.number().int().min(1).max(200).default(1) }).optional() });
 export type ChatRequest = z.infer<typeof chatRequestSchema>;
-export const chatCorpusSchema = z.strictObject({ revision: z.string().regex(/^[a-f0-9]{40}$/), sources: z.array(z.strictObject({ note: noteSchema, humanMarkdown: z.string().max(100_000) })).max(10_000) });
+export const chatCorpusSchema = z.strictObject({ revision: z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/), sources: z.array(z.strictObject({ note: noteSchema, humanMarkdown: z.string().max(100_000) })).max(10_000) });
 export type ChatCorpus = z.infer<typeof chatCorpusSchema>;
+export const chatSnapshotRevision = (gitRevision: string, sources: ChatCorpus['sources'], index: unknown) => hash(JSON.stringify({ gitRevision, sources, index }));
 export interface Evidence { id: string; sourceId: string; generationId: string; title: string; kind: 'source' | 'machine' | 'human' | 'metadata' | 'visual'; locator: string; text: string; }
 export const evidenceChunk = (value: Omit<Evidence, 'id'>): Evidence => ({ ...value, id: 'e_' + hash(JSON.stringify(value)).slice(0, 16) });
 export function chunkText(base: Omit<Evidence, 'id' | 'text'>, text: string): Evidence[] {
@@ -49,6 +50,7 @@ export function validateAnswer(input: unknown, evidence: Evidence[]) {
     if (!chunk || (cite.quote && !normalize(chunk.text).includes(normalize(cite.quote)))) throw new Error('Unsupported citation');
     return { ...cite, sourceId: chunk.sourceId, title: chunk.title, kind: chunk.kind, locator: chunk.locator, excerpt: chunk.text.slice(0, 1400) };
   });
-  return { ...answer, citations };
+  for (const match of answer.answer.matchAll(/\[(e_[a-f0-9]{16})\]/g)) if (!citations.some(citation => citation.evidenceId === match[1])) throw new Error('Unsupported inline citation');
+  return { ...answer, answer: answer.insufficientEvidence && !citations.length ? 'The stored evidence does not answer this question. Try selecting a source or a specific page.' : answer.answer, citations };
 }
 export interface ChatJob { id: string; owner: string; corpusRevision: string; request: ChatRequest; createdAt: string; status: 'pending' | 'running' | 'complete' | 'failed'; attempts: number; lastQueuedAt?: string; retryAt?: string; sandboxId?: string; result?: ReturnType<typeof validateAnswer>; error?: string; }

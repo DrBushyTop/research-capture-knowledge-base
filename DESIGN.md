@@ -201,6 +201,12 @@ Source facts use a two-column definition list on desktop. Claim evidence has a t
 
 The reader limits color transitions to 0.15s ease-out when reduced motion is not requested. No animated layout or entrance effects are present.
 
+### Private chat
+
+Chat extends the library margin and white reading page. The margin holds source scope and an optional PDF page or image. Submitted questions use the serif voice; answers and controls use the sans serif voice. Each answer has numbered links to an evidence list, with source origin, page or passage and a disclosure containing the supplied text.
+
+The form reports waiting, failure and session expiry through its status region. It preserves the question after a failure. A selected PDF page requires a whole number from 1 to 200. Completion focuses the answer heading when focus remains in the form and preserves focus elsewhere. The desktop columns stack at the reader's mobile breakpoint.
+
 ## Do's and Don'ts
 
 ### Do:

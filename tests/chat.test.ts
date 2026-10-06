@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { chatRequestSchema, evidenceChunk, packEvidence, validateAnswer } from '../shared/chat.js';
+import { chatRequestSchema, chatSnapshotRevision, evidenceChunk, packEvidence, validateAnswer } from '../shared/chat.js';
 it('bounds questions and rejects invented citations and unsupported quoted evidence', () => {
   expect(chatRequestSchema.safeParse({ question: 'x'.repeat(2001) }).success).toBe(false);
   const chunk = evidenceChunk({ sourceId: 'zotero-users-12345-PBA4T3PN', generationId: 'a'.repeat(64), title: 'Paper', kind: 'source', locator: 'PDF page 2', text: 'The paper reports uncertain evidence.' });
@@ -8,6 +8,19 @@ it('bounds questions and rejects invented citations and unsupported quoted evide
   expect(() => validateAnswer({ ...answer, citations: [{ evidenceId: 'e_' + '0'.repeat(16), quote: null }] }, [chunk])).toThrow();
   expect(() => validateAnswer({ ...answer, citations: [{ evidenceId: chunk.id, quote: 'proved effective' }] }, [chunk])).toThrow();
   expect(() => validateAnswer({ ...answer, citations: [] }, [chunk])).toThrow();
+  expect(() => validateAnswer({ ...answer, answer: 'Claim [e_0000000000000000]' }, [chunk])).toThrow('Unsupported inline citation');
+});
+it('replaces uncited insufficient-evidence claims with a fixed server response', () => {
+  const answer = validateAnswer({ answer: 'A fabricated trial proved a treatment effective.', insufficientEvidence: true, citations: [] }, []);
+  expect(answer.answer).toBe('The stored evidence does not answer this question. Try selecting a source or a specific page.');
+  expect(answer.citations).toEqual([]);
+});
+it('pins a new chat snapshot when original document text is backfilled at the same Git commit', () => {
+  const gitRevision = 'a'.repeat(40);
+  const before = chatSnapshotRevision(gitRevision, [], { documentText: '' });
+  const after = chatSnapshotRevision(gitRevision, [], { documentText: 'Original-only evidence' });
+  expect(after).not.toBe(before);
+  expect(chatSnapshotRevision(gitRevision, [], { documentText: 'Original-only evidence' })).toBe(after);
 });
 it('packs a bounded and diverse evidence set without turning generated notes into source evidence', () => {
   const chunks = Array.from({ length: 20 }, (_, i) => evidenceChunk({ sourceId: `source-${Math.floor(i / 5)}`, generationId: 'b'.repeat(64), title: 'Pain research', kind: i % 2 ? 'machine' : 'source', locator: `section ${i}`, text: 'Pain evidence '.repeat(150) }));

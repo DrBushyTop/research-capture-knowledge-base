@@ -56,8 +56,8 @@
   ],
   "responseOverrides": {
     "401": {
-      "redirect": "/login.html",
-      "statusCode": 302
+      "rewrite": "/login.html",
+      "statusCode": 401
     },
     "403": {
       "rewrite": "/login.html",

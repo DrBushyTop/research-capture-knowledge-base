@@ -4,19 +4,22 @@ import { expect, it } from 'vitest';
 
 const html = await readFile('apps/reader/public/login.html', 'utf8');
 const script = await readFile('apps/reader/public/access.js', 'utf8');
-async function render(principal: unknown, error?: 'network' | 'html' | 'malformed') {
-  const dom = new JSDOM(html, { url: 'https://reader.invalid/login.html', runScripts: 'outside-only' });
+async function render(principal: unknown, error?: 'network' | 'html' | 'malformed', url = 'https://reader.invalid/login.html', denied = false) {
+  const dom = new JSDOM(html, { url, runScripts: 'outside-only' });
   const calls: { path: string; options: RequestInit }[] = [];
   dom.window.fetch = (async (path: string, options: RequestInit) => {
     calls.push({ path, options });
+    if (path !== '/.auth/me') return new Response(denied ? '<h1>Sign in</h1>' : '<div id="root"></div>', { status: denied ? 403 : 200, headers: { 'Content-Type': 'text/html' } });
     if (error === 'network') throw new Error('offline');
     return new Response(JSON.stringify(error === 'malformed' ? {} : { clientPrincipal: principal }), {
       headers: { 'Content-Type': error === 'html' ? 'text/html' : 'application/json' }
     });
   }) as typeof fetch;
-  dom.window.eval(script);
+  const redirects: string[] = [];
+  (dom.window as any).recordRedirect = (path: string) => redirects.push(path);
+  dom.window.eval(script.replace('location.replace(destination)', 'window.recordRedirect(destination)'));
   await new Promise(resolve => setTimeout(resolve, 0));
-  return { dom, calls, document: dom.window.document };
+  return { dom, calls, redirects, document: dom.window.document };
 }
 it('shows ordinary sign in only when the session is signed out', async () => {
   const { dom, calls, document } = await render(null);
@@ -31,18 +34,30 @@ it('explains missing session roles without claiming sign-in or invitation failed
   expect(document.querySelector('h1')?.textContent).toBe('Signed in, access unavailable');
   expect(document.querySelector('#message')?.textContent).toContain('<DrBushyTop>');
   expect(document.querySelector('#message')?.innerHTML).toContain('&lt;DrBushyTop&gt;');
-  expect(document.querySelector('#primary')?.getAttribute('href')).toBe('/.auth/logout?post_logout_redirect_uri=%2Flogin.html');
+  expect(document.querySelector('#primary')?.getAttribute('href')).toBe('/.auth/logout?post_logout_redirect_uri=%2Flogin.html%3FreturnTo%3D%252F');
   expect(document.querySelector('#switch')?.hasAttribute('hidden')).toBe(false);
   dom.window.close();
 });
-it('lets an authorized session open the app without automatic redirect loops', async () => {
-  const { dom, calls, document } = await render({ identityProvider: 'github', userDetails: 'DrBushyTop', userRoles: ['reader', 'library_member'] });
-  expect(document.querySelector('#primary')?.getAttribute('href')).toBe('/');
-  expect(document.querySelector('h1')?.textContent).toBe('Open the library');
-  expect(calls).toHaveLength(1);
-  (document.querySelector('#check') as HTMLButtonElement).click();
-  await new Promise(resolve => setTimeout(resolve, 0));
-  expect(calls).toHaveLength(2);
+const authorized = { identityProvider: 'github', userDetails: 'DrBushyTop', userRoles: ['reader', 'library_member'] };
+it('automatically opens the requested source for an authorized session', async () => {
+  const { dom, redirects } = await render(authorized, undefined, 'https://reader.invalid/sources/?source=abc');
+  expect(redirects).toEqual(['/sources/?source=abc']);
+  dom.window.close();
+});
+it('preserves an explicit safe return target through login', async () => {
+  const { dom, redirects } = await render(authorized, undefined, 'https://reader.invalid/login.html?returnTo=%2Fchat%2Fabc%2F');
+  expect(redirects).toEqual(['/chat/abc/']);
+  dom.window.close();
+});
+it('does not redirect an authorized identity when the protected page still returns 403', async () => {
+  const { dom, redirects, document } = await render(authorized, undefined, 'https://reader.invalid/login.html', true);
+  expect(redirects).toEqual([]);
+  expect(document.querySelector('h1')?.textContent).toBe('Access could not be confirmed');
+  dom.window.close();
+});
+it('rejects external return targets', async () => {
+  const { dom, redirects } = await render(authorized, undefined, 'https://reader.invalid/login.html?returnTo=https%3A%2F%2Fevil.example');
+  expect(redirects).toEqual(['/']);
   dom.window.close();
 });
 for (const error of ['network', 'html', 'malformed'] as const) {

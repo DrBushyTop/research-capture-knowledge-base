@@ -48,6 +48,15 @@ export default function Layout() {
   const path = useRouterState({ select: state => state.location.pathname });
   const title = useMatches({ select: matches => matches.findLast(match => match.staticData.title)?.staticData.title });
   useEffect(() => { document.title = title ? `${title} · Research library` : 'Research library'; }, [title]);
+  useEffect(() => {
+    if (!lost && access === 'allowed') {
+      try { sessionStorage.removeItem('access-return:' + location.pathname + location.search + location.hash); } catch { /* Storage may be disabled. */ }
+    }
+    if (lost || access === 'unavailable') {
+      const destination = location.pathname + location.search + location.hash;
+      location.replace('/login.html?returnTo=' + encodeURIComponent(destination));
+    }
+  }, [lost, access]);
   const current = (active: boolean) => active ? 'page' as const : undefined;
   return <>
     <a className="skip-link" href="#main">Skip to content</a>

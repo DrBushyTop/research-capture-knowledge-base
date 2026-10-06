@@ -229,6 +229,18 @@ it('does not retry validation errors and lets temporary failures retry a bounded
   expect(calls).toHaveLength(3);
 });
 
+it('keeps capture diagnostics below reading content in a closed disclosure', async () => {
+  handler = (url, init) => url.includes('library=1') ? json([{ ...entry(ids[0], 'Alpha'), note: { ...entry(ids[0], 'Alpha').note, extraction: { status: 'text', method: 'browser', reason: 'Only one menu section captured.', truncated: true } } }]) : api(url, init);
+  await mount(`/sources/?source=${ids[0]}`);
+  const disclosure = host.querySelector('details#capture-details');
+  expect(disclosure).toBeTruthy();
+  expect(disclosure?.hasAttribute('open')).toBe(false);
+  expect(disclosure?.textContent).toContain('Only one menu section captured.');
+  expect(host.querySelector('.capture-status')?.textContent).toBe('Partial capture');
+  expect(host.querySelector('.evidence-notice')).toBeNull();
+  expect(host.querySelector('#analysis')!.compareDocumentPosition(disclosure!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
 it('clears private data on authorization loss, ignores late answers, and shows sign-in recovery', async () => {
   let release!: (response: Response) => void;
   handler = (url, init) => url.includes('notes=') ? new Promise<Response>(resolve => { release = resolve; }) : api(url, init);

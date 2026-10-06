@@ -101,6 +101,7 @@ export default function Sources() {
 
 function Reading({ entry: { note, humanHtml } }: { entry: Entry }) {
   const { source, analysis } = note, c = category(note), content = sections(note);
+  const captureLabel = note.extraction.truncated ? 'Partial capture' : note.extraction.status === 'metadata-only' ? 'Source text unavailable' : note.extraction.status === 'image' ? 'Image-based analysis' : 'Capture details';
   return <main id="main" className="reading-pane" data-tone={categoryTone(c?.id)}>
     <article className="research-note"><nav className="reading-back" aria-label="Breadcrumb"><Link to="/sources/" search={previous => ({ ...previous, source: undefined })}>Sources</Link></nav>
       <header className="note-head">
@@ -112,8 +113,7 @@ function Reading({ entry: { note, humanHtml } }: { entry: Entry }) {
         </div>
       </header>
       <nav className="note-tabs" aria-label="Note sections"><a href="#analysis">Summary</a>{content.map(s => <a key={s.id} href={`#section-${s.id}`}>{s.heading}</a>)}<a href="#human">Notes</a><a href="#original">Original text</a><a href="#source">Details</a></nav>
-      {note.extraction.reason && <div className="evidence-notice"><strong>Needs review</strong><p>{note.extraction.reason}</p></div>}
-      <section id="analysis" className="summary-section"><h2>Summary <span className="origin-tag">Generated</span></h2><p>{analysis?.summary || 'Analysis unavailable.'}</p>
+      <section id="analysis" className="summary-section">{note.extraction.reason && <a className="capture-status" href="#capture-details">{captureLabel}</a>}<h2>Summary <span className="origin-tag">Generated</span></h2><p>{analysis?.summary || 'Analysis unavailable.'}</p>
         <ul className="topic-list">{(analysis?.topics || source.tags).map(t => <li key={t}>{t}</li>)}</ul></section>
       {content.map(s => <section className="analysis-section" id={`section-${s.id}`} key={s.id}><h2>{s.heading}</h2>
         {s.format === 'text' ? <p>{s.text}</p> : s.format === 'steps' ? <ol>{s.items.map((item, i) => <li key={i}>{item}</li>)}</ol> : <ul>{s.items.map((item, i) => <li key={i}>{item}</li>)}</ul>}</section>)}
@@ -124,7 +124,7 @@ function Reading({ entry: { note, humanHtml } }: { entry: Entry }) {
         <div><dt>Captured</dt><dd>{new Date(source.capturedAt).toLocaleDateString()}</dd></div><div><dt>Source type</dt><dd>{sourceTypeLabel(source.itemType)}</dd></div>
         <div><dt>Text</dt><dd>{note.extraction.method}</dd></div><div><dt>Analysis prepared</dt><dd>{new Date(note.processing.processedAt).toLocaleDateString()}</dd></div>
         {c && <div><dt>Category</dt><dd>{c.name}, template {c.templateRevision} · {c.assignment}</dd></div>}
-      </dl></section>
+      </dl>{note.extraction.reason && <details id="capture-details" className="capture-details"><summary>{captureLabel}</summary><p>{note.extraction.reason}</p></details>}</section>
     </article><button className="ask-fab" type="button" data-ask-open aria-controls="source-ask" aria-expanded="false">Ask</button>
   </main>;
 }

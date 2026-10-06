@@ -159,3 +159,9 @@
   @keyframes ask-open{from{opacity:.4;transform:translateX(18px)}to{opacity:1;transform:none}}
 }
 .chat-history-open small span{overflow:hidden;text-overflow:ellipsis;min-width:0}
+
+.capture-status{display:inline-block;margin-bottom:.5rem;font-size:.85rem;color:var(--muted);text-underline-offset:.2em}
+.capture-details{margin-top:1rem;padding-top:.75rem;border-top:1px solid var(--line);color:var(--muted)}
+.capture-details summary{cursor:pointer;font-weight:600;padding:.4rem 0}
+.capture-details p{margin:.5rem 0 0;overflow-wrap:anywhere}
+.capture-details:target{scroll-margin-top:5rem}

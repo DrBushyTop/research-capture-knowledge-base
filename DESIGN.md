@@ -315,3 +315,5 @@ Chat and Sources render their full-height shells before JavaScript hydration. As
 During a reply, the collapsed activity summary names the latest actual tool action or answer writing. Expanding it shows tool queries, source titles and available outcomes. Short model-authored commentary remains separate from tool steps and never displays hidden reasoning. Completed turns retain their action history and elapsed time.
 
 Answers display complete Markdown blocks as the worker produces them. Tables and code fences remain buffered until complete; validated final answers replace provisional text and add citations. Stopped or failed drafts are labelled unverified and are not saved as completed conversation turns. Live indicators respect reduced motion, and progress does not force readers away from their current scroll position.
+
+Capture diagnostics live in a collapsed disclosure under source Details, after the reading content. A concise capture-status link beside the summary states partial or unavailable evidence without placing operational instructions above the content.

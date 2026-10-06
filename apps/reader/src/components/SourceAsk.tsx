@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import Chat from './Chat';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+
+const Chat = lazy(() => import('./Chat'));
 
 const overlayQuery = '(max-width: 1199px)';
 
@@ -56,6 +57,8 @@ export default function SourceAsk({ sourceId, title }: { sourceId: string; title
   const modal = open && overlay;
   return <div ref={panel} id="source-ask" className="source-ask" hidden={!open}
     {...(modal ? { role: 'dialog', 'aria-modal': true, 'aria-label': `Ask about ${title}` } : {})}>
-    {mounted && <Chat embedded source={{ sourceId, title }} onClose={close} />}
+    {mounted && <Suspense fallback={<p className="source-ask-loading" role="status">Loading chat…</p>}>
+      <Chat embedded source={{ sourceId, title }} onClose={close} />
+    </Suspense>}
   </div>;
 }

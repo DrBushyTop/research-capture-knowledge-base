@@ -9,6 +9,7 @@
 
 .sources-shell{display:grid;grid-template-columns:minmax(280px,330px) minmax(0,1fr);height:calc(100dvh - 56px);min-height:420px}
 .sources-shell>*{min-width:0;min-height:0;overflow-y:auto}
+.source-ask-loading{padding:1.5rem;color:var(--muted)}
 
 /* List */
 .source-list{background:var(--ground);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}

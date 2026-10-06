@@ -5,8 +5,9 @@ import SourceAsk from './SourceAsk';
 import ReaderNotes from './ReaderNotes';
 import OriginalText from './OriginalText';
 import { buildSearchIndex, searchIds } from '../../../../shared/search';
+import { cachedLibrary, clearLibrary, rememberLibrary, type LibraryEntry } from '../lib/library-cache';
 
-type Entry = { note: Note; humanHtml: string; searchText: string };
+type Entry = LibraryEntry;
 type Section = { id: string; heading: string; format: 'text' | 'bullets' | 'steps'; text: string | null; items: string[] };
 const selectedId = () => new URLSearchParams(location.search).get('source') || location.pathname.match(/^\/research\/([^/]+)/)?.[1] || '';
 const year = (value: string | null) => value?.match(/\b(?:19|20)\d{2}\b/)?.[0] || 'Unknown';
@@ -38,10 +39,15 @@ export default function Sources() {
   useEffect(() => {
     const controller = new AbortController();
     setSelected(selectedId());
+    const cached = cachedLibrary();
+    if (cached) { setEntries(cached); setLoading(false); }
     fetch('/api/chat?library=1', { signal: controller.signal }).then(async response => {
+      if (response.status === 401 || response.status === 403 || !response.headers.get('content-type')?.includes('application/json')) {
+        clearLibrary(); setEntries([]);
+      }
       if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw new Error('Sources could not load. Sign in to the private reader and try again.');
       return response.json() as Promise<Entry[]>;
-    }).then(setEntries).catch(error => { if (!controller.signal.aborted) setError(error.message); })
+    }).then(entries => { rememberLibrary(entries); setEntries(entries); }).catch(error => { if (!controller.signal.aborted) setError(error.message); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     const pop = () => setSelected(selectedId());
     window.addEventListener('popstate', pop);
@@ -98,10 +104,10 @@ export default function Sources() {
         </a></li>;
       })}</ul>
     </aside>
-    {current ? <Reading key={current.note.source.id} entry={current} back={() => select('')} /> : <main id="main" className="reading-pane reading-empty">
+    {current ? <Reading key={`reading:${current.note.source.id}`} entry={current} back={() => select('')} /> : <main id="main" className="reading-pane reading-empty">
       <p>{selected && !loading ? 'This source is unavailable. Select another source.' : 'Select a source to read it here.'}</p>
     </main>}
-    {current && <SourceAsk key={current.note.source.id} sourceId={current.note.source.id} title={current.note.source.title} />}
+    {current && <SourceAsk key={`ask:${current.note.source.id}`} sourceId={current.note.source.id} title={current.note.source.title} />}
   </div>;
 }
 

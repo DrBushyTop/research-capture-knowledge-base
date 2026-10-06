@@ -2,4 +2,4 @@
 import Layout from '../components/Layout.astro';
 import Chat from '../components/Chat';
 ---
-<Layout title="Chat"><Chat client:only="react" /><noscript><main id="main"><p>Chat needs JavaScript. <a href="/sources/">Open sources</a></p></main></noscript></Layout>
+<Layout title="Chat"><Chat client:load /><noscript><p>Chat needs JavaScript. <a href="/sources/">Open sources</a></p></noscript></Layout>

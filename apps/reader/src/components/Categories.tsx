@@ -34,6 +34,7 @@ async function api(body?: unknown, query = '') {
   if (!response.headers.get('content-type')?.includes('application/json')) throw new ApiError('Sign in with an admin GitHub account to edit categories.', response.status);
   const result = await response.json();
   if (!response.ok) throw new ApiError(result.error || 'The request failed. Try again.', response.status);
+  if (body) document.dispatchEvent(new Event('reader:library-changed'));
   return result;
 }
 const clone = <T,>(value: T): T => structuredClone(value);

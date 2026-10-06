@@ -55,6 +55,7 @@ export default function ReaderNotes({ sourceId }: { sourceId: string }) {
       const saved = await read(await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sourceId, revision: note.revision, markdown: draft }) }));
       setNote(saved); setEditing(false); setConflict(false);
+      document.dispatchEvent(new Event('reader:library-changed'));
       try { localStorage.removeItem(key); } catch { /* Storage can be disabled. */ }
     } catch (error) { setError((error as Error).message); }
     finally { setBusy(false); }

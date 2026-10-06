@@ -1,9 +1,11 @@
 // Adapted from Vercel AI Elements message registry. See README.md.
 import { cn } from "../../lib/utils";
 import type { ComponentProps, HTMLAttributes } from "react";
-import { memo } from "react";
+import { lazy, memo, Suspense } from "react";
 import type { UIMessage } from "ai";
-import { Streamdown } from "streamdown";
+import type { Streamdown } from "streamdown";
+
+const Markdown = lazy(() => import("streamdown").then(module => ({ default: module.Streamdown })));
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage["role"];
@@ -46,13 +48,13 @@ export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
 export const MessageResponse = memo(
   ({ className, ...props }: MessageResponseProps) => (
-    <Streamdown
+    <Suspense fallback={<div className={className} style={{ whiteSpace: 'pre-wrap' }}>{props.children}</div>}><Markdown
       className={cn(
         "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
         className
       )}
       {...props}
-    />
+    /></Suspense>
   )
 );
 

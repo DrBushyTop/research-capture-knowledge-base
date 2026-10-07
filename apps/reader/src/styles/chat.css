@@ -19,7 +19,7 @@
 .chat-history h2,.chat-history-drawer h2{font-size:.8rem;font-weight:700;margin:1.2rem .6rem .3rem;color:var(--muted)}
 .chat-history ul,.chat-history-drawer ul{list-style:none;margin:0;padding:0}.chat-history li+li,.chat-history-drawer li+li{margin:0}
 .chat-history li,.chat-history-drawer li{display:flex;align-items:center;border-radius:8px;position:relative}
-.chat-history-open{flex:1;min-width:0;min-height:38px;border:0;background:transparent;text-align:left;padding:.4rem .6rem;border-radius:8px;cursor:pointer;font-size:.86rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+.chat-history-open{flex:1;min-width:0;min-height:38px;border:0;background:transparent;text-align:left;padding:.4rem .6rem;border-radius:8px;cursor:pointer;font-size:.86rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);text-decoration:none}
 .chat-history li:hover,.chat-history-drawer li:hover,.chat-history li:has([aria-current]),.chat-history-drawer li:has([aria-current]){background:var(--history-hover)}
 .chat-history-open[aria-current]{font-weight:700}
 .chat-history-delete{width:34px;height:34px;opacity:0;border-radius:8px}.chat-history-delete:hover{color:var(--chat-error);background:var(--paper)}
@@ -48,7 +48,7 @@
 .chat-user-images img{display:block;height:120px;width:auto;max-width:240px;object-fit:cover}
 .chat-assistant>div{width:100%;overflow:visible;font-size:1rem;gap:.35rem}
 .chat-markdown{font-size:1rem;line-height:1.62}
-.chat-markdown>:first-child{margin-top:0}.chat-markdown p{margin:.5rem 0}
+.chat-markdown>:first-child{margin-top:0}.chat-markdown>:last-child{margin-bottom:0}.chat-markdown p{margin:.5rem 0}
 .chat-markdown h1,.chat-markdown h2,.chat-markdown h3,.chat-markdown h4{font-family:inherit;font-size:1.08rem;font-weight:750;margin:1.1rem 0 .35rem;line-height:1.35;letter-spacing:-.005em}
 .chat-markdown ul,.chat-markdown ol{padding-left:1.35rem;margin:.5rem 0}.chat-markdown li+li{margin-top:.2rem}
 .chat-markdown strong{font-weight:700}
@@ -68,9 +68,9 @@
 .chat-citation-quote{max-height:36vh;overflow:auto;margin:.6rem 0;padding-left:.75rem;border-left:2px solid var(--blue);font-style:normal;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.88rem;line-height:1.55}
 .chat-source-links{display:flex;gap:0 1rem;flex-wrap:wrap}.chat-source-links a{min-height:36px;display:inline-flex;align-items:center;font-size:.85rem;font-weight:600}
 .chat-popover-close{position:absolute;right:.3rem;top:.3rem;width:34px;height:34px}
-.chat-answer-actions{display:flex;align-items:flex-start;gap:.25rem;margin-left:-.55rem;flex-wrap:wrap}
+.chat-answer-actions{display:flex;align-items:flex-start;gap:.25rem;margin:-.25rem 0 0 -.55rem;flex-wrap:wrap}
 .chat-sources{margin:0;font-size:.8rem;color:var(--muted)}
-.chat-sources summary{min-height:40px;display:flex;align-items:center;width:fit-content;cursor:pointer;font-weight:600;padding:0 .4rem;border-radius:8px}.chat-sources summary:hover{background:var(--ground);color:var(--ink)}
+.chat-sources summary{min-height:44px;display:flex;align-items:center;width:fit-content;cursor:pointer;font-weight:600;padding:0 .4rem;border-radius:8px}.chat-sources summary:hover{background:var(--ground);color:var(--ink)}
 .chat-sources ul{list-style:none;padding:0 .4rem;margin:.1rem 0 .4rem}.chat-sources li{display:flex;align-items:center;gap:.5rem;margin:.15rem 0;color:var(--ink)}
 .chat-sources li>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .chat-copy{width:40px;height:40px}
@@ -78,7 +78,7 @@
 .chat-live{display:flex;align-items:center;gap:.5rem;min-width:0}.chat-live>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.chat-live svg{flex-shrink:0}
 .chat-pulse{flex-shrink:0;width:7px;height:7px;border-radius:50%;background:var(--blue)}
 .chat-commentary{color:var(--ink);font-size:.95rem;line-height:1.55;margin:.1rem 0 .2rem}
-.chat-steps{font-size:.84rem;color:var(--muted);margin:0 0 .35rem;max-width:100ch}
+.chat-steps{font-size:.84rem;color:var(--muted);margin:-.45rem 0 -.2rem;max-width:100ch}
 .chat-steps summary{display:flex;align-items:center;gap:.4rem;min-height:40px;width:fit-content;max-width:100%;padding:0 .4rem;margin-left:-.4rem;border-radius:8px;cursor:pointer;list-style:none}.chat-steps summary::-webkit-details-marker{display:none}
 .chat-steps summary::after{content:'';flex-shrink:0;width:.4rem;height:.4rem;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);margin-left:.15rem}.chat-steps[open] summary::after{transform:rotate(45deg) translateY(-2px)}
 .chat-steps summary:hover{background:var(--ground);color:var(--ink)}

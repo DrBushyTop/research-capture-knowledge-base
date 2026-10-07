@@ -1,8 +1,8 @@
 ---
 version: 1
 slug: "apps-reader-src-pages-categories-astro"
-primary_target: "apps/reader/src/pages/categories.astro"
-related_targets: ["apps/reader/src/components/Categories.tsx", "apps/reader/src/styles/categories.css", "apps/reader/src/components/Layout.astro", "apps/reader/src/styles/reader.css"]
+primary_target: "apps/reader/src/components/Categories.tsx"
+related_targets: ["apps/reader/src/styles/categories.css", "apps/reader/src/app/Layout.tsx", "apps/reader/src/styles/reader.css"]
 ---
 
 # Categories admin

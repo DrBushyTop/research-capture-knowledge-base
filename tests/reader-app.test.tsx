@@ -110,6 +110,16 @@ it('keeps search and filters in the URL and searches refreshed note text', async
   expect([...host.querySelectorAll('.source-title')].map(node => node.textContent)).toEqual(['Beta']);
 });
 
+it('lists the newest saves first and removes an active filter from its label', async () => {
+  const newer = entry(ids[1], 'Beta');
+  handler = (url, init) => url.includes('library=1') ? json([entry(ids[0], 'Alpha'), { ...newer, note: { ...newer.note, source: { ...newer.note.source, capturedAt: '2099-01-01T00:00:00Z' } } }]) : api(url, init);
+  const { router } = await mount(`/sources/?type=${source.itemType}`);
+  expect([...host.querySelectorAll('.source-title')].map(node => node.textContent)).toEqual(['Beta', 'Alpha']);
+  await click(host.querySelector('.active-filters button'));
+  expect(path(router)).not.toContain('type=');
+  expect(host.querySelector('.active-filters')).toBeNull();
+});
+
 it('blocks leaving a dirty note, keeps the draft when cancelled, and refreshes the library after save', async () => {
   const { router } = await mount(`/sources/?source=${ids[0]}`);
   await click([...host.querySelectorAll('.reader-notes button')].find(button => button.textContent === 'Add notes')!);

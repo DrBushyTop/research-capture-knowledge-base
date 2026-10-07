@@ -103,6 +103,14 @@
 .reading-pane .human-section{padding:1.1rem 1.25rem;border:0;border-radius:14px;background:var(--human-wash)}
 .reading-pane .human-section .human-prose:empty::after{content:'No notes yet. Add them in Zotero.'}
 .original-section .original-text{white-space:pre-wrap;font-family:'Source Serif 4 Variable',Georgia,serif;font-size:1rem;line-height:1.7;overflow-wrap:anywhere}
+.original-section .original-text.is-markdown{white-space:normal}
+.original-text.is-markdown h1{font-size:1.5rem}
+.original-text.is-markdown h2{font-size:1.25rem}
+.original-text.is-markdown h3{font-size:1.1rem}
+.original-text.is-markdown :is(h1,h2,h3){margin:1.4rem 0 .6rem}
+.original-text.is-markdown p{margin:.7rem 0}
+.original-text.is-markdown [data-streamdown="table-wrapper"]{max-width:100%;overflow-x:auto}
+.original-text.is-markdown pre{max-width:100%;overflow-x:auto;white-space:pre}
 .original-text.is-clipped{max-height:22rem;overflow:hidden;mask-image:linear-gradient(#000 70%,transparent)}
 .original-more{margin-top:.4rem;min-height:40px;padding:0 .9rem;border:1.5px solid var(--source-ink);border-radius:999px;background:var(--paper);color:var(--source-ink);font-weight:700;font-size:.88rem;cursor:pointer}
 .original-more:hover{background:var(--source-wash)}

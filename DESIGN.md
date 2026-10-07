@@ -272,6 +272,8 @@ Source-specific chat adds a third desktop column, 360px to 430px wide. Between 7
 
 **The reading width rule.** On source detail pages, the article fills the space beside the source list with responsive side padding. Titles, section navigation, summaries, original text, and details share that width. The retained legacy note CSS has a 72ch cap but no current route. Long titles and source URLs wrap within their pane.
 
+PDF extractions with page markers render Markdown in the original-text section. Visible page labels separate pages. Headings use the existing reading typeface and a 1.5rem, 1.25rem and 1.1rem scale. Tables and code scroll within the reading pane. Legacy plain text remains literal.
+
 Source pages offer Add notes and Edit notes inline, with a labeled textarea, explicit Save and Cancel, retained local drafts, and conflict recovery that keeps the draft beside the latest saved text. Both readers share the saved notes. Internal links use TanStack Router without animated page transitions. Search reads the shared live Query cache and rebuilds its index when corpus data changes.
 
 ## Elevation & Depth

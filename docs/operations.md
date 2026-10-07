@@ -138,6 +138,18 @@ Bootstrap a clean browser image with `scripts/bootstrap-browser-sandbox.ts` unde
 
 The first live test used the language selector, declined optional cookies, selected English and captured dishes, descriptions and prices from Alternative. Coverage was partial; this does not certify the entire restaurant menu. Browser recovery does not turn menu allergen labels into dietary guarantees or infer hidden prices.
 
+## PDF text extraction
+
+The worker uses `@llamaindex/liteparse` 2.15.1 for PDFs with a native text layer. It saves Markdown with headings, paragraph breaks, tables and `<!-- PDF page N -->` markers. The reader renders this format as document text with visible page labels. Older plain-text extractions remain literal text.
+
+OCR is disabled. The parser does not download language models, extract embedded images or render form fields. Scans and sparse documents keep the review or saved-metadata fallback. Extraction still retains the original PDF and uses the existing 200-page and 60,000-character limits. Exceeding either limit sets `extraction.truncated`. A separate parser process has a 60-second parse deadline, after worker startup.
+
+The production package must include LiteParse's native addon, PDFium library and `dist/pool-worker.js`. Both deployment workflows run `node --import tsx scripts/verify-worker-pdf.mjs` after installing production dependencies. This tests actual native parsing from the package on Linux before deployment.
+
+Existing source-text records do not change when the parser code changes. Use the existing source reprocessing action for selected PDFs to create new generations and analysis from retained originals. This change does not bump the global processing version or automatically pay for another analysis of every source. The old backfill script fills missing text records, but its immutable `create` call does not replace existing records.
+
+To refresh existing development PDF fixtures without model calls, run `npx tsx scripts/refresh-pdf-text-dev.ts`. It requires `research_dev` and the local blob emulator. An optional directory argument supplies local PDFs when the emulator lacks retained originals. The script matches file hashes, skips missing PDFs and reports counts. It replaces development text and the ignored local cache, not source notes or generated analysis. It refuses a SQL connection-string override. Production must use new generations through reprocessing instead.
+
 ## Model prompt cache
 
 Model requests use stable hashed cache keys and canonical schema ordering. Stable instructions precede changing source/view/question data. Chat retains identical tool definitions when its tool budget is reached, using tool_choice=none rather than changing the tool schema. Browser planning appends observations and decisions to a bounded in-memory session; the window resets after eight turns or 100,000 non-image serialized characters. It does not persist model reasoning or browse indefinitely to preserve cache hits.

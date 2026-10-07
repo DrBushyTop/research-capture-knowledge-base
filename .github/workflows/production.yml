@@ -48,6 +48,7 @@ jobs:
         run: |
           npm run build:worker
           npm install --prefix .function-package --omit=dev
+          node --import tsx scripts/verify-worker-pdf.mjs
       - name: Deploy production worker
         uses: Azure/functions-action@v1
         with:

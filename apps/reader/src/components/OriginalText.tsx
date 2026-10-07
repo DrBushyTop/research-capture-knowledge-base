@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { sourceTextQuery } from '../lib/queries';
 import { FileText } from 'lucide-react';
+import { MessageResponse } from './ai-elements/message';
 
 type Props = { sourceId: string; artifactMime?: string | null; sourceUrl?: string | null };
 type State = { status: 'loading' } | { status: 'ready'; text: string } | { status: 'error'; message: string };
@@ -16,6 +17,7 @@ export default function OriginalText({ sourceId, artifactMime, sourceUrl }: Prop
   const text = useQuery(sourceTextQuery(sourceId));
   const state: State = text.data ? { status: 'ready', text: String(text.data.text || '') } : text.error ? { status: 'error', message: text.error.message } : { status: 'loading' };
   const long = state.status === 'ready' && state.text.length > 2400;
+  const pdfMarkdown = state.status === 'ready' && /<!-- PDF page \d+ -->/.test(state.text);
   return <>
     {kind === 'image' && (imageFailed ? <p className="original-missing">The saved image could not be loaded.</p>
       : <a className="original-image" href={documentUrl} target="_blank" rel="noreferrer"><img src={documentUrl} alt="Saved original image" loading="lazy" onError={() => setImageFailed(true)} /></a>)}
@@ -23,7 +25,12 @@ export default function OriginalText({ sourceId, artifactMime, sourceUrl }: Prop
     {state.status === 'loading' && <p className="original-missing" aria-busy="true">Loading original text…</p>}
     {state.status === 'error' && <p className="original-missing" role="alert">{state.message}</p>}
     {state.status === 'ready' && (state.text ? <>
-      <div className={`original-text${long && !expanded ? ' is-clipped' : ''}`}>{state.text}</div>
+      <div className={`original-text${pdfMarkdown ? ' is-markdown' : ''}${long && !expanded ? ' is-clipped' : ''}`}>{pdfMarkdown
+        ? <MessageResponse mode="static" controls={false} components={{
+          img: () => null,
+          a: ({ children }) => <span>{children}</span>
+        }}>{state.text.replace(/<!-- PDF page (\d+) -->/g, '\n\n**PDF page $1**\n\n')}</MessageResponse>
+        : state.text}</div>
       {long && <button type="button" className="original-more" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? 'Show less' : 'Show full text'}</button>}
     </> : <p className="original-missing">No saved text for this source.{!kind && sourceUrl && <> <a href={sourceUrl} rel="noreferrer">Open the original website</a>.</>}</p>)}
   </>;

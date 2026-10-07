@@ -3,7 +3,36 @@ import { downloadPublic, extract } from '../apps/worker/src/extraction.js';
 import { normalize } from '../shared/corpus.js';
 import { snapshot } from './fixtures.js';
 import { Zotero } from '../apps/worker/src/zotero.js';
+import { layoutPdf, pdfFixture } from './pdf-fixture.js';
 const screenshot = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+
+it('preserves PDF headings, paragraph breaks and page boundaries from retained bytes', async () => {
+  const source = normalize(structuredClone(snapshot))[0];
+  const bytes = layoutPdf();
+  const result = await extract(source, { request: async () => { throw new Error('Original unavailable'); } }, async (_hash, retained) => {
+    expect(retained).toEqual(bytes);
+  }, async () => ({ bytes, mime: 'application/pdf', retrievedAt: '2026-10-05T10:00:00Z' }));
+  expect(result.text).toContain('# Synthetic layout study');
+  expect(result.text).toContain('## Methods');
+  expect(result.text).toContain('\n\n');
+  expect(result.text).toContain('<!-- PDF page 1 -->');
+  expect(result.text).toContain('<!-- PDF page 2 -->');
+  expect(result.text.indexOf('First paragraph')).toBeLessThan(result.text.indexOf('Second paragraph'));
+  expect(result.text.indexOf('Second paragraph')).toBeLessThan(result.text.indexOf('Final paragraph'));
+  expect(result.evidence).toMatchObject({ method: 'pdf-text', status: 'text', truncated: false, artifactMime: 'application/pdf', retrievedAt: '2026-10-05T10:00:00Z' });
+});
+
+it('retains a blank PDF but reports that it needs OCR or review', async () => {
+  const source = normalize(structuredClone(snapshot))[0];
+  const bytes = pdfFixture(['']);
+  let retained = false;
+  const result = await extract(source, { request: async () => new Response(bytes) }, async () => { retained = true; });
+  expect(retained).toBe(true);
+  expect(result.text).toBe('');
+  expect(result.evidence).toMatchObject({ method: 'pdf-text', status: 'needs-review' });
+  expect(result.evidence.reason).toContain('OCR or manual review');
+  expect(result.evidence.artifactHash).toBeTruthy();
+});
 
 it('retains synced screenshot bytes and passes them to vision with an honest evidence label', async () => {
   const source = normalize(structuredClone(snapshot))[0];

@@ -8,6 +8,7 @@ import { hash, type SourceSnapshot, type Note } from '../../../shared/corpus.js'
 import type { Zotero } from './zotero.js';
 import { browserCaptureNeeded, type BrowserCapture } from './browser-capture.js';
 import { sourceImage, type SourceImage } from './image-input.js';
+import { pdfText } from './pdf-text.js';
 
 export const maxBytes = 20 * 1024 * 1024;
 export class MissingArtifact extends Error {}
@@ -114,19 +115,9 @@ export async function extract(snapshot: SourceSnapshot, zotero: Pick<Zotero, 're
   evidence.artifactMime = mime.split(';')[0];
   let text = '';
   if (mime.includes('pdf') || Buffer.from(bytes.subarray(0, 5)).toString() === '%PDF-') {
-    const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
-    const task = getDocument({ data: new Uint8Array(bytes), useSystemFonts: false, disableFontFace: true, verbosity: 0 });
-    const document = await task.promise;
-    try {
-      const pages = Math.min(document.numPages, 200);
-      for (let number = 1; number <= pages && text.length < 60_000; number++) {
-        const page = await document.getPage(number); const content = await page.getTextContent();
-        text += content.items.map(item => 'str' in item ? item.str : '').join(' ') + '\n';
-        page.cleanup();
-      }
-      evidence.truncated = document.numPages > pages || text.length > 60_000;
-      evidence.method = 'pdf-text';
-    } finally { await task.destroy(); }
+    evidence.method = 'pdf-text';
+    evidence.artifactMime = 'application/pdf';
+    ({ text, truncated: evidence.truncated } = await pdfText(bytes));
   } else if (mime.includes('html')) {
     const dom = new JSDOM(Buffer.from(bytes).toString('utf8'), { url: snapshot.source.url || 'https://example.invalid' });
     try { text = new Readability(dom.window.document).parse()?.textContent?.trim() || ''; }

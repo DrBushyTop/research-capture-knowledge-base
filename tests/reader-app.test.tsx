@@ -251,6 +251,26 @@ it('keeps capture diagnostics below reading content in a closed disclosure', asy
   expect(host.querySelector('#analysis')!.compareDocumentPosition(disclosure!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
+it('renders extracted PDF Markdown as headings and paragraphs without loading embedded HTML', async () => {
+  handler = (url, init) => url.includes('source=') ? json({ text: '<!-- PDF page 1 -->\n\n# Synthetic PDF title\n\nFirst paragraph.\n\n## Methods\n\nSecond paragraph.\n\n![Remote image](https://example.org/tracker.png)\n\n<script>window.pdfExecuted = true</script>' }) : api(url, init);
+  await mount(`/sources/?source=${ids[0]}`);
+  await settle();
+  expect(host.querySelector('.original-text h1')?.textContent).toBe('Synthetic PDF title');
+  expect(host.querySelector('.original-text h2')?.textContent).toBe('Methods');
+  expect(host.querySelector('.original-text')?.textContent).toContain('PDF page 1');
+  expect(host.querySelectorAll('.original-text p').length).toBeGreaterThanOrEqual(2);
+  expect(host.querySelector('.original-text script')).toBeNull();
+  expect(host.querySelector('.original-text img')).toBeNull();
+});
+
+it('keeps legacy extracted text literal rather than interpreting it as Markdown', async () => {
+  handler = (url, init) => url.includes('source=') ? json({ text: '# A literal source line\n\n<script>not executable</script>' }) : api(url, init);
+  await mount(`/sources/?source=${ids[0]}`);
+  expect(host.querySelector('.original-text')?.textContent).toBe('# A literal source line\n\n<script>not executable</script>');
+  expect(host.querySelector('.original-text h1')).toBeNull();
+  expect(host.querySelector('.original-text script')).toBeNull();
+});
+
 it('clears private data on authorization loss, ignores late answers, and shows sign-in recovery', async () => {
   let release!: (response: Response) => void;
   handler = (url, init) => url.includes('notes=') ? new Promise<Response>(resolve => { release = resolve; }) : api(url, init);

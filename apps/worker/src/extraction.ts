@@ -4,7 +4,7 @@ import https from 'node:https';
 import ipaddr from 'ipaddr.js';
 import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
-import { hash, type SourceSnapshot, type Note } from '../../../shared/corpus.js';
+import { hash, type SourceSnapshot, type Note, type ZoteroItem } from '../../../shared/corpus.js';
 import type { Zotero } from './zotero.js';
 import { browserCaptureNeeded, type BrowserCapture } from './browser-capture.js';
 import { sourceImage, type SourceImage } from './image-input.js';
@@ -84,35 +84,28 @@ async function boundedResponse(response: Response) {
   } finally { await reader.cancel().catch(() => undefined); }
   return Buffer.concat(chunks);
 }
-export async function extract(snapshot: SourceSnapshot, zotero: Pick<Zotero, 'request'>, retain: (hash: string, bytes: Uint8Array, mime: string) => Promise<void>, restore?: () => Promise<RetainedArtifact | undefined>, browser?: () => Promise<BrowserCapture>): Promise<Extracted> {
-  const evidence: Note['extraction'] = { status: 'metadata-only', method: 'none', reason: null, truncated: false, retrievedAt: new Date().toISOString(), artifactHash: null };
-  if (!snapshot.source.active) return { text: '', evidence: { ...evidence, reason: 'Source is no longer in the observed library.' } };
+export async function downloadAttachment(attachment: ZoteroItem, zotero: Pick<Zotero, 'request'>) {
+  let response: Response;
+  try { response = await zotero.request(`items/${attachment.key}/file`); }
+  catch { throw new MissingArtifact('The synced attachment is not available yet.'); }
   let bytes: Uint8Array; let mime: string;
-  const cached = await restore?.();
-  const artifacts = snapshot.root.data.itemType === 'attachment' ? [snapshot.root, ...snapshot.children] : snapshot.children;
-  const attachment = artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && c.data.contentType === 'application/pdf') ||
-    artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && /^(text\/|application\/json$)/.test(String(c.data.contentType))) ||
-    artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && String(c.data.contentType).startsWith('image/')) ||
-    artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && String(c.data.contentType).startsWith('video/'));
-  if (cached) {
-    bytes = cached.bytes; mime = cached.mime; evidence.retrievedAt = cached.retrievedAt;
-  } else if (attachment) {
-    let response: Response;
-    try { response = await zotero.request(`items/${attachment.key}/file`); }
-    catch { throw new MissingArtifact('The synced attachment is not available yet.'); }
-    if ([302, 303].includes(response.status)) {
-      const location = response.headers.get('location'); await response.body?.cancel();
-      if (!location || new URL(location).protocol !== 'https:') throw new Error('Invalid source-file redirect');
-      ({ bytes, mime } = await downloadPublic(location)); // No API key follows the redirect.
-    } else { bytes = await boundedResponse(response); mime = response.headers.get('content-type') || String(attachment.data.contentType); }
-    mime = String(attachment.data.contentType || mime);
-  } else if (snapshot.source.url) {
-    ({ bytes, mime } = await downloadPublic(snapshot.source.url));
-  } else return savedMetadata(snapshot, { ...evidence, reason: 'No synced attachment or retrievable source URL.' });
-  const artifactHash = hash(bytes);
-  await retain(artifactHash, bytes, mime);
-  evidence.artifactHash = artifactHash;
-  evidence.artifactMime = mime.split(';')[0];
+  if ([302, 303].includes(response.status)) {
+    const location = response.headers.get('location'); await response.body?.cancel();
+    if (!location || new URL(location).protocol !== 'https:') throw new Error('Invalid source-file redirect');
+    ({ bytes, mime } = await downloadPublic(location)); // No API key follows the redirect.
+  } else {
+    if (response.status !== 200) { await response.body?.cancel(); throw new MissingArtifact('The synced attachment is not available yet.'); }
+    bytes = await boundedResponse(response);
+    mime = response.headers.get('content-type') || String(attachment.data.contentType);
+  }
+  return { bytes, mime: String(attachment.data.contentType || mime) };
+}
+
+/** Parses one retained artifact. Selection and screenshot fallback belong to SourceArtifacts. */
+export async function extractArtifact(snapshot: SourceSnapshot, artifact: RetainedArtifact, browser?: () => Promise<BrowserCapture>): Promise<Extracted> {
+  const { bytes, mime } = artifact;
+  const evidence: Note['extraction'] = { status: 'metadata-only', method: 'none', reason: null, truncated: false,
+    retrievedAt: artifact.retrievedAt, artifactHash: hash(bytes), artifactMime: mime.split(';')[0] };
   let text = '';
   if (mime.includes('pdf') || Buffer.from(bytes.subarray(0, 5)).toString() === '%PDF-') {
     evidence.method = 'pdf-text';
@@ -144,9 +137,6 @@ export async function extract(snapshot: SourceSnapshot, zotero: Pick<Zotero, 're
   }
   text = text.slice(0, 60_000).trim();
   if (text.length < 80) {
-    // A saved screenshot can rescue an empty HTML snapshot. Do not fetch page image URLs or external resources.
-    const image = snapshot.root.data.itemType !== 'attachment' && artifacts.find(c => ['imported_file', 'imported_url'].includes(String(c.data.linkMode)) && String(c.data.contentType).startsWith('image/'));
-    if (image) return extract({ ...snapshot, children: [image] }, zotero, retain);
     return savedMetadata(snapshot, { ...evidence, status: 'needs-review', reason: evidence.method === 'html' ? 'No readable page text was extracted. The page may require sign-in or block capture. Automatic browser screenshots are not configured. Save a screenshot as a synced image attachment.' : 'No usable text layer. A scan may need OCR or manual review.' });
   }
   return { text, evidence: { ...evidence, status: 'text' } };

@@ -17,8 +17,8 @@ export function freshReader(encoded: string | null): ReaderPrincipal | null {
   if (!encoded) return null;
   readerIdentity(encoded);
   const principal = JSON.parse(Buffer.from(encoded, 'base64').toString('utf8')) as ReaderPrincipal;
-  if (!principal.userRoles.includes('library_member')) throw new ChatAccessError(403, 'Reader access required');
-  return { identityProvider: 'github', userId: principal.userId, userDetails: principal.userDetails, userRoles: ['authenticated', 'reader', 'library_member'] };
+  // Membership comes from Shelf's allowlist, independently of SWA invitations.
+  return { identityProvider: 'github', userId: principal.userId, userDetails: principal.userDetails, userRoles: ['authenticated', 'reader'] };
 }
 
 export async function readReaderSession(store: SessionStore, token: string | null, now = Date.now()): Promise<Session | undefined> {

@@ -6,7 +6,7 @@ import { freshReader, readReaderSession, readerSessionResponse, sessionLifetimeM
 class SessionStore extends MemoryStore { async remove(key: string) { this.data.delete(key); } }
 const day = 24 * 60 * 60_000;
 const now = Date.parse('2026-10-07T12:00:00Z');
-const principal = (userDetails = 'pinaatti', userId = 'user-one', userRoles = ['reader', 'library_member']) => Buffer.from(JSON.stringify({ identityProvider: 'github', userDetails, userId, userRoles })).toString('base64');
+const principal = (userDetails = 'pinaatti', userId = 'user-one', userRoles = ['anonymous', 'authenticated']) => Buffer.from(JSON.stringify({ identityProvider: 'github', userDetails, userId, userRoles })).toString('base64');
 beforeEach(() => { vi.stubEnv('READER_GITHUB_USERS', 'pinaatti,DrBushyTop'); vi.useFakeTimers(); vi.setSystemTime(now); });
 afterEach(() => { vi.unstubAllEnvs(); vi.useRealTimers(); });
 async function start(store = new SessionStore()) {
@@ -15,7 +15,40 @@ async function start(store = new SessionStore()) {
   return { store, response, token, key: `reader-sessions/${hash(token)}.json` };
 }
 
-it('creates a 30-day server session only after invited GitHub sign-in', async () => {
+it('starts a Shelf session for allowlisted pinaatti with the standard GitHub roles from production', async () => {
+  const store = new SessionStore();
+  const encoded = principal('pinaatti', '8089c951c5bb45b9a2ca845173e4bdd6', ['anonymous', 'authenticated']);
+  const response = await readerSessionResponse(store, { encoded, token: null, renew: true, start: true });
+  expect(response.jsonBody.clientPrincipal?.userDetails).toBe('pinaatti');
+  const token = response.headers['Set-Cookie'].split(';')[0].split('=')[1];
+  expect(await sessionReaderIdentity(store, null, token)).toBe(hash('github:8089c951c5bb45b9a2ca845173e4bdd6'));
+});
+
+it('keeps existing sessions working across the removal of invitation checks', async () => {
+  const { store, token, key } = await start();
+  const saved = store.data.get(key) as { clientPrincipal: { userRoles: string[] } };
+  saved.clientPrincipal.userRoles = ['authenticated', 'reader', 'library_member'];
+  expect(await sessionReaderIdentity(store, null, token)).toBe(hash('github:user-one'));
+});
+
+it('denies new and existing sessions when the membership setting is missing', async () => {
+  const { store, token } = await start();
+  vi.stubEnv('READER_GITHUB_USERS', '');
+  await expect(readerSessionResponse(store, { encoded: principal(), token: null, renew: true, start: true })).rejects.toThrow('Reader access required');
+  await expect(sessionReaderIdentity(store, null, token)).rejects.toThrow('Reader access required');
+});
+
+it('rejects malformed and non-GitHub identities even when they name an approved account', async () => {
+  const approved = { identityProvider: 'github', userId: 'user-one', userDetails: 'pinaatti', userRoles: ['authenticated'] };
+  const store = new SessionStore();
+  for (const invalid of [{ identityProvider: 'aad' }, { userId: 123 }, { userId: '' }, { userId: ' ' }, { userRoles: ['anonymous'] }, { userRoles: 'authenticated' }]) {
+    const encoded = Buffer.from(JSON.stringify({ ...approved, ...invalid })).toString('base64');
+    await expect(readerSessionResponse(store, { encoded, token: null, renew: true, start: true })).rejects.toThrow('Reader access required');
+  }
+  expect(store.data.size).toBe(0);
+});
+
+it('creates a 30-day server session only after allowlisted GitHub sign-in', async () => {
   const { store, response, token, key } = await start();
   expect(token).toMatch(/^[a-f0-9]{64}$/);
   expect(response.jsonBody.expiresAt).toBe(new Date(now + 30 * day).toISOString());
@@ -32,7 +65,7 @@ it('does not mint a session from identity headers on the public renewal endpoint
 });
 
 for (const encoded of [null, principal('someone-else'), principal('pinaatti', 'user-one', ['reader']), principal('pinaatti', 'user-one', ['library_member'])]) {
-  it(`requires both invited-reader roles and the current allowlist when starting a session with ${encoded === null ? 'no principal' : 'an invalid principal'}`, async () => {
+  it(`requires an authenticated GitHub account and the current allowlist when starting a session with ${encoded === null ? 'no principal' : 'an invalid principal'}`, async () => {
     const store = new SessionStore();
     await expect(readerSessionResponse(store, { encoded, token: null, renew: true, start: true })).rejects.toThrow('Reader access required');
     expect(store.data.size).toBe(0);

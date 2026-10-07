@@ -44,7 +44,7 @@ async function checkAccess() {
     const principal = data.clientPrincipal;
     if (principal === null) {
       heading.textContent = 'Sign in';
-      message.textContent = 'Use your invited GitHub account.';
+      message.textContent = 'Use your approved GitHub account.';
       primary.textContent = 'Sign in with GitHub';
       primary.href = login;
       switchAccount.hidden = true;
@@ -58,16 +58,16 @@ async function checkAccess() {
         location.replace(login);
         return;
       }
-      message.textContent = 'GitHub did not complete sign-in. Try again with your invited account.';
+      message.textContent = 'GitHub did not complete sign-in. Try again with your approved account.';
       primary.hidden = false;
     } else {
       if (typeof principal.userDetails !== 'string' || !Array.isArray(principal.userRoles)) throw new Error('Invalid identity response');
       const authorized = !sessionDenied && principal.identityProvider === 'github'
-        && principal.userRoles.includes('reader') && principal.userRoles.includes('library_member');
+        && principal.userRoles.includes('reader');
       heading.textContent = authorized ? 'Open the library' : 'Signed in, access unavailable';
       message.textContent = authorized
         ? `Signed in as ${principal.userDetails}. Opening the library...`
-        : `Signed in as ${principal.userDetails}, but this session does not have the required reader access. A recent invitation or role change may not be reflected yet. Refresh your sign-in, then sign in again.`;
+        : `Signed in as ${principal.userDetails}, but Shelf could not grant access. Ask the owner to check that this GitHub account is on Shelf's allowed account list. You can also switch accounts.`;
       primary.textContent = authorized ? 'Open library' : 'Refresh sign-in';
       primary.href = authorized ? destination : logout;
       primary.hidden = false;

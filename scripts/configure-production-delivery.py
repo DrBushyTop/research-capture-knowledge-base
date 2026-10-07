@@ -43,7 +43,9 @@ if not key:
 url = 'https://management.azure.com' + reader['id'] + '/config/appsettings?api-version=2024-04-01'
 current = json_output('az', 'rest', '--method', 'post', '--url', 'https://management.azure.com' + reader['id'] + '/listAppSettings?api-version=2024-04-01', '-o', 'json')
 properties = current.get('properties', {})
-properties.update({'CHAT_BACKEND_URL': 'https://' + WORKER + '.azurewebsites.net/api/chat', 'CHAT_BACKEND_KEY': key, 'READER_ORIGIN': origin, 'READER_ORIGINS': ','.join(origins), 'READER_GITHUB_USERS': 'pinaatti,DrBushyTop'})
+# Membership is configured on the worker through readerGithubUsers in Bicep.
+properties.pop('READER_GITHUB_USERS', None)
+properties.update({'CHAT_BACKEND_URL': 'https://' + WORKER + '.azurewebsites.net/api/chat', 'CHAT_BACKEND_KEY': key, 'READER_ORIGIN': origin, 'READER_ORIGINS': ','.join(origins)})
 # Azure CLI stdin body uses @-; results are suppressed so settings stay private.
 subprocess.run(['az', 'rest', '--method', 'put', '--url', url, '--body', '@-', '-o', 'none'], input=json.dumps({'properties': properties}), text=True, check=True)
 print(json.dumps({'productionReader': origin, 'readerOrigins': origins, 'workflowEnvironment': 'production', 'proxyConfigured': True, 'zoteroSecretsCopied': False}))

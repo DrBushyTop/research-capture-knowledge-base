@@ -18,8 +18,8 @@ export function readerIdentity(encoded: string | null, allowed = readerAllowlist
   try {
     if (!encoded || encoded.length > 8192 || !allowed.size) throw new Error();
     const user = JSON.parse(Buffer.from(encoded, 'base64').toString('utf8')) as { identityProvider: string; userId: string; userDetails: string; userRoles: string[] };
-    if (user.identityProvider !== 'github' || !user.userId || typeof user.userDetails !== 'string' || !allowed.has(user.userDetails.toLowerCase())
-      || !Array.isArray(user.userRoles) || !user.userRoles.includes('reader')) throw new Error();
+    if (user.identityProvider !== 'github' || typeof user.userId !== 'string' || !user.userId.trim() || typeof user.userDetails !== 'string' || !allowed.has(user.userDetails.toLowerCase())
+      || !Array.isArray(user.userRoles) || !user.userRoles.includes('authenticated')) throw new Error();
     return hash(`${user.identityProvider}:${user.userId}`);
   } catch { throw new ChatAccessError(403, 'Reader access required'); }
 }

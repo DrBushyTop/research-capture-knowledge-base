@@ -34,16 +34,17 @@ it('automatically starts GitHub sign-in when the session is signed out', async (
   expect(calls[0].options.cache).toBe('no-store');
   dom.window.close();
 });
-it('explains missing session roles without claiming sign-in or invitation failed', async () => {
+it('explains denied access without treating a GitHub identity as a Shelf session', async () => {
   const { dom, document } = await render({ identityProvider: 'github', userDetails: '<DrBushyTop>', userRoles: ['authenticated'] });
   expect(document.querySelector('h1')?.textContent).toBe('Signed in, access unavailable');
   expect(document.querySelector('#message')?.textContent).toContain('<DrBushyTop>');
+  expect(document.querySelector('#message')?.textContent).toContain("Shelf's allowed account list");
   expect(document.querySelector('#message')?.innerHTML).toContain('&lt;DrBushyTop&gt;');
   expect(document.querySelector('#primary')?.getAttribute('href')).toBe('/logout.html?returnTo=%2Flogin.html%3FreturnTo%3D%252F');
   expect(document.querySelector('#switch')?.hasAttribute('hidden')).toBe(false);
   dom.window.close();
 });
-const authorized = { identityProvider: 'github', userDetails: 'DrBushyTop', userRoles: ['reader', 'library_member'] };
+const authorized = { identityProvider: 'github', userDetails: 'DrBushyTop', userRoles: ['authenticated', 'reader'] };
 it('automatically opens the requested source for an authorized session', async () => {
   const { dom, redirects } = await render(authorized, undefined, 'https://reader.invalid/sources/?source=abc');
   expect(redirects).toEqual(['/sources/?source=abc']);

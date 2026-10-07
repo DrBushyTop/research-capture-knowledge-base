@@ -93,7 +93,7 @@ Readers can paste, drop or attach up to four PNG, JPEG or WebP screenshots per m
 
 Deleting a chat checks ownership, writes a tombstone beside the conversation, cancels its pending or running answer and removes saved answers, job files and uploads. A running answer checks the tombstone before saving, so it cannot recreate the chat.
 
-Access requires the `reader` role plus a GitHub login listed in `READER_GITHUB_USERS` (comma separated, currently `pinaatti,DrBushyTop`). The SWA proxy and the Functions gateway both check it and fail closed when the setting is missing.
+Access requires a Shelf server session for a GitHub login listed in the worker's `READER_GITHUB_USERS` setting, comma separated and currently `pinaatti,DrBushyTop`. Azure verifies GitHub sign-in and the worker checks membership before starting the session. Each private request rechecks the allowlist. Missing configuration denies access.
 
 After the first Functions deployment, configure SWA server settings `CHAT_BACKEND_URL`, `CHAT_BACKEND_KEY` and `READER_ORIGIN`. Generate a function-level key named `swa-proxy` for `chatGateway`; do not use a host master key. Pass the key directly to SWA application settings without printing it or committing it. Bicep provisions the queues, group-scoped worker role, runtime settings and Blob lifecycle rule. Conversations and their saved answers remain until the reader deletes them. Message-job and temporary-file APIs expire after 24 hours from creation. Blob lifecycle removes old jobs, temporary files, cancellation flags and quota records after a day, subject to its asynchronous sweep and the account's seven-day soft-delete retention. It excludes conversations and their deletion tombstones. Earlier uploaded screenshots or rendered pages can therefore expire while the conversation text remains. Sol receives an explicit notice when a replayed screenshot is unavailable. Git notes and archived source artifacts keep their existing retention.
 
@@ -102,7 +102,7 @@ The private reading view uses `GET /api/chat?source=<sourceId>` for saved origin
 
 ## Categories and document updates
 
-Only `pinaatti` and `DrBushyTop` have private reader and admin access. `READER_GITHUB_USERS=pinaatti,DrBushyTop` must be present on both the Functions app and the Static Web Apps API. Missing configuration denies API access. Static routes require the new invitation-assigned `library_member` role. Assign `reader,library_member` only to these two GitHub accounts. Older invitations assigning just `reader` cannot open the deployed static corpus. API routes additionally check the two-account allowlist.
+Only `pinaatti` and `DrBushyTop` have private reader and admin access. `READER_GITHUB_USERS=pinaatti,DrBushyTop` must be present on the Functions worker. Configure it through the Bicep `readerGithubUsers` parameter. Azure invitations and `reader,library_member` role assignments are unnecessary. The public build contains app code only; the backend checks private data access through Shelf's SQL-backed session. See [reader authentication](authentication.md).
 
 `categories/current.json` stores the current registry in the pipeline container. Immutable revisions are under `categories/templates/{categoryId}/{revision}.json`. These settings have no chat retention rule. Conditional writes and the registry lease reject stale edits. Existing notes retain their original headings and template revision; schema-version-1 research notes remain readable.
 
@@ -124,7 +124,7 @@ When a page or post has no readable text, the worker can use an available Zotero
 
 The frontend is a React SPA built with Vite. TanStack Router owns canonical navigation and URL state; TanStack Query owns fetched data and invalidation. The static build contains application assets only, not a private corpus or search index. Authorized route rewrites serve index.html; API, auth and static asset paths are excluded from the app rewrite. There is no navigationFallback because Azure does not apply route authorization to that fallback.
 
-The login page checks the current session and explains missing roles separately from sign-in. Refresh sign-in signs out and returns to the page before another explicit login. A new invitation does not guarantee that every browser session immediately reports its roles. Clearing this app's cookies resolved the reported Zen session on 2026-10-06; the underlying Azure behavior was not independently established. Do not weaken the library_member or API account checks to work around it.
+The login page exchanges Azure sign-in for a Shelf session and explains access denial separately from sign-in failure. It directs a signed-in user without access to have the owner check the allowed account list. Switching accounts signs out and returns to the login page. Clearing cookies resolved the earlier Zen report on 2026-10-06, but production later showed that the duplicated invitation requirement could reject an already allowlisted account. Shelf now uses one membership rule and retains Azure authentication at session creation. See [the incident and regression coverage](authentication.md#missing-invitation-roles-on-2026-10-07).
 
 ## Interactive webpage recovery
 

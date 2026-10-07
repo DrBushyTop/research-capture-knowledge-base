@@ -24,16 +24,16 @@ async function store(state = new MemoryStore()) {
   await state.create(`chat/corpora/${revision}.json`, { revision, sources: [] }); return state;
 }
 const insufficient = async () => ({ answer: { answer: 'No evidence.', insufficientEvidence: true, citations: [] }, evidence: [] });
-it('requires the private reader role and prevents cross-reader job access', async () => {
+it('requires an allowlisted authenticated GitHub account and prevents cross-reader job access', async () => {
   const allowed = new Set(['pinaatti', 'drbushytop']);
   expect(() => readerIdentity(null, allowed)).toThrow('Reader access required');
   const principal = (roles: string[], userDetails = 'DrBushyTop', identityProvider = 'github') => Buffer.from(JSON.stringify({ identityProvider, userId: 'test-user', userDetails, userRoles: roles })).toString('base64');
-  expect(() => readerIdentity(principal(['authenticated']), allowed)).toThrow();
+  expect(() => readerIdentity(principal(['anonymous']), allowed)).toThrow('Reader access required');
   expect(() => readerIdentity(principal(['authenticated', 'reader'], 'someone-else'), allowed)).toThrow('Reader access required');
-  expect(() => readerIdentity(principal(['reader'], 'DrBushyTop', 'aad'), allowed)).toThrow('Reader access required');
-  expect(() => readerIdentity(principal(['reader']), new Set())).toThrow('Reader access required');
-  expect(readerIdentity(principal(['reader'], 'pinaatti'), allowed)).toMatch(/^[a-f0-9]{64}$/);
-  const owner = readerIdentity(principal(['reader']), allowed);
+  expect(() => readerIdentity(principal(['authenticated'], 'DrBushyTop', 'aad'), allowed)).toThrow('Reader access required');
+  expect(() => readerIdentity(principal(['authenticated']), new Set())).toThrow('Reader access required');
+  expect(readerIdentity(principal(['anonymous', 'authenticated'], 'pinaatti'), allowed)).toMatch(/^[a-f0-9]{64}$/);
+  const owner = readerIdentity(principal(['authenticated']), allowed);
   const state = await store(); const job = await submitChat(state, owner, { question: 'What is saved?' }, async () => undefined);
   await expect(chatStatus(state, 'someone-else', job.id)).rejects.toMatchObject({ status: 404 });
   expect((await chatStatus(state, owner, job.id)).status).toBe('pending');

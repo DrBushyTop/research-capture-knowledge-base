@@ -38,7 +38,7 @@ function useAccess(): Access {
         const principal = data?.clientPrincipal;
         if (disposed) return;
         const roles: unknown = principal?.userRoles;
-        if (principal?.identityProvider !== 'github' || !Array.isArray(roles) || !roles.includes('reader') || !roles.includes('library_member')) {
+        if (principal?.identityProvider !== 'github' || !Array.isArray(roles) || !roles.includes('reader')) {
           forgetPrivateData(queryClient);
           setAccess('unavailable');
         }

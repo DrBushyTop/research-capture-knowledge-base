@@ -38,7 +38,7 @@ it.skipIf(!process.env.TEST_SQL)('reader sessions survive worker restarts, renew
   const first = new SqlStore('devstoreaccount1'), second = new SqlStore('devstoreaccount1');
   const userDetails = (process.env.READER_GITHUB_USERS || '').split(',')[0];
   expect(userDetails).toBeTruthy();
-  const encoded = Buffer.from(JSON.stringify({ identityProvider: 'github', userId: randomUUID(), userDetails, userRoles: ['reader', 'library_member'] })).toString('base64');
+  const encoded = Buffer.from(JSON.stringify({ identityProvider: 'github', userId: randomUUID(), userDetails, userRoles: ['anonymous', 'authenticated'] })).toString('base64');
   const response = await readerSessionResponse(first, { encoded, token: null, renew: true, start: true });
   const token = response.headers['Set-Cookie'].split(';')[0].split('=')[1];
   const key = `reader-sessions/${hash(token)}.json`;

@@ -52,9 +52,9 @@ it('hosting serves the app shell while protecting session creation and preservin
     expect(rule(pathname).allowedRoles).toEqual(['anonymous']);
     expect(rule(pathname).rewrite).toBeUndefined();
   }
-  expect(rule('/api/session-start', 'POST').allowedRoles).toEqual(['library_member']);
+  expect(rule('/api/session-start', 'POST').allowedRoles).toEqual(['authenticated']);
   expect(rule('/api/session-start', 'POST').rewrite).toBeUndefined();
-  expect(rule('/missing.css').allowedRoles).toEqual(['library_member']);
+  expect(rule('/missing.css').statusCode).toBe(404);
   expect(rule('/missing.css').rewrite).toBeUndefined();
   for (const pathname of ['/index.html', '/login.html', '/access.css', '/access.js', '/logout.html', '/logout.js', '/.auth/me', '/manifest.webmanifest', '/pwa.js', '/sw.js', '/offline.html', '/icons/shelf-192.png']) {
     expect(rule(pathname).allowedRoles).toEqual(['anonymous']);

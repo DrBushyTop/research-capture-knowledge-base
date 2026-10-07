@@ -63,7 +63,7 @@
     {
       "route": "/api/session-start",
       "methods": ["POST"],
-      "allowedRoles": ["library_member"]
+      "allowedRoles": ["authenticated"]
     },
     {
       "route": "/api/*",
@@ -82,9 +82,7 @@
     },
     {
       "route": "/*.{html,js,css,json,map,woff,woff2,ttf,otf,png,jpg,jpeg,gif,svg,webp,ico,pdf,txt,xml}",
-      "allowedRoles": [
-        "library_member"
-      ]
+      "statusCode": 404
     },
     {
       "route": "/*",

@@ -1,4 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { readFile } from 'node:fs/promises';
+import { readerSessionResponse, sessionReaderIdentity } from '../apps/worker/src/reader-session.js';
+import { ChatAccessError } from '../apps/worker/src/chat-service.js';
+import { MemoryStore } from './fixtures.js';
+import { hash } from '../shared/corpus.js';
 // @ts-expect-error The independently packaged proxy is plain JavaScript.
 import { handler, sessionHandler } from '../apps/chat-proxy/proxy.js';
 
@@ -13,7 +18,7 @@ const handlers = new Map<string, Handler>([['chat', handler(false)], ['categorie
 
 const shelf = 'https://shelf.huuhka.net';
 const azure = 'https://orange-ground-01b0c6a03.3.azurestaticapps.net';
-const principal = Buffer.from(JSON.stringify({ identityProvider: 'github', userId: 'test-user', userDetails: 'pinaatti', userRoles: ['reader', 'library_member'] })).toString('base64');
+const principal = Buffer.from(JSON.stringify({ identityProvider: 'github', userId: 'test-user', userDetails: 'pinaatti', userRoles: ['anonymous', 'authenticated'] })).toString('base64');
 const session = 'a'.repeat(64);
 let backend: ReturnType<typeof vi.fn>;
 beforeEach(() => {
@@ -48,7 +53,7 @@ for (const name of ['chat', 'categories']) {
     });
   }
 }
-it('requires an invited reader even on the approved custom domain', async () => {
+it('requires a server session even on the approved custom domain', async () => {
   const input = request(shelf); input.headers.delete('cookie');
   expect((await handlers.get('chat')!(input)).status).toBe(403);
   expect(backend).not.toHaveBeenCalled();
@@ -63,6 +68,41 @@ it('passes a fresh principal only through the separate session start endpoint', 
   await sessionHandler(false, true)(input);
   expect(backend.mock.calls[0][0].searchParams.get('session')).toBe('start');
   expect(backend.mock.calls[0][1].headers['x-ms-client-principal']).toBe(principal);
+});
+it('exchanges a standard GitHub sign-in for a private Shelf session without invitations', async () => {
+  const config = JSON.parse(await readFile('apps/reader/staticwebapp.config.json', 'utf8'));
+  const startRoute = config.routes.find((route: { route: string }) => route.route === '/api/session-start');
+  expect(startRoute.allowedRoles).toEqual(['authenticated']);
+  class SessionStore extends MemoryStore { async remove(key: string) { this.data.delete(key); } }
+  const store = new SessionStore();
+  backend.mockImplementation(async (url: URL, options: RequestInit) => {
+    const headers = new Headers(options.headers);
+    try {
+      if (url.searchParams.has('session')) {
+        const result = await readerSessionResponse(store, {
+          encoded: headers.get('x-ms-client-principal'), token: headers.get('x-reader-session'), renew: true,
+          start: url.searchParams.get('session') === 'start'
+        });
+        return new Response(JSON.stringify(result.jsonBody), { status: result.status, headers: { ...result.headers, 'Content-Type': 'application/json' } });
+      }
+      const owner = await sessionReaderIdentity(store, headers.get('x-ms-client-principal'), headers.get('x-reader-session'));
+      return new Response(JSON.stringify({ owner }), { headers: { 'Content-Type': 'application/json' } });
+    } catch (error) {
+      if (!(error instanceof ChatAccessError)) throw error;
+      return new Response(JSON.stringify({ error: error.message }), { status: error.status, headers: { 'Content-Type': 'application/json' } });
+    }
+  });
+  const input = request(shelf); input.headers.delete('cookie');
+  const started = await sessionHandler(false, true)(input);
+  expect(started.status).toBe(200);
+  expect(JSON.parse(started.body).clientPrincipal).toMatchObject({ userDetails: 'pinaatti', userRoles: ['authenticated', 'reader'] });
+  input.headers.set('cookie', started.headers['Set-Cookie'].split(';')[0]);
+  input.headers.delete('x-ms-client-principal');
+  const privateResponse = await handler(false)(input);
+  expect(privateResponse.status).toBe(200);
+  expect(JSON.parse(privateResponse.body).owner).toBe(hash('github:test-user'));
+  vi.stubEnv('READER_GITHUB_USERS', 'DrBushyTop');
+  expect((await handler(false)(input)).status).toBe(403);
 });
 it('does not pass a client-supplied principal into session renewal', async () => {
   await sessionHandler(false)(request(shelf));

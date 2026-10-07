@@ -37,7 +37,7 @@ export const handler = admin => async request => {
   const headers = { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json' };
   const error = (status, message) => ({ status, jsonBody: { error: message }, headers });
   // Identity headers never grant access here. The worker validates the opaque
-  // session against SQL; only the role-protected start endpoint can mint one.
+  // session against SQL; only the Azure-authenticated start endpoint can mint one.
   if (!sessionToken(request)) return error(403, 'Reader access required');
   if (request.method === 'POST' && !origins().includes(request.headers.get('origin'))) return error(403, 'Open the app to make changes');
   if (!process.env.CHAT_BACKEND_URL || !process.env.CHAT_BACKEND_KEY) return error(503, 'The service is temporarily unavailable');

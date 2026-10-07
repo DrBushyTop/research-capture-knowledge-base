@@ -31,7 +31,7 @@ The named sections and extraction instructions used to analyse sources in a cate
 _Avoid_: Category, source note
 
 **Analysis input**
-The source text and retained image bytes prepared for one source generation. Processing and template preview use the same pinned evidence. Saved captions remain separate from image bytes.
+The source text and retained image bytes prepared for one source generation. Saved captions remain separate from image bytes.
 
 **Topic**:
 A subject associated with a source, such as astronomy, cooking, or architecture. A source can have several topics independently of its category.

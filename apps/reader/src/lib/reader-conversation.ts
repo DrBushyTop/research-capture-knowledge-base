@@ -191,11 +191,13 @@ export function useReaderConversation(location: ConversationLocation, dependenci
     try {
       const created = await ask.mutateAsync({ question: submitted, ...(images.length ? { images: images.map(image => image.id) } : {}),
         ...(conversationId ? { conversationId } : source ? { sourceId: source.sourceId } : {}) });
-      if (!current(token)) return false;
-      submission.jobId = created.id;
       const next = { ...created, question: submitted, images };
+      // An accepted job keeps running after navigation. Keep its original recovery keys even if the view moved.
+      // postJson has already rejected responses from an expired authentication session.
       write(storage.session, activeKey, JSON.stringify(next));
       remember(created.conversationId);
+      if (!mounted.current || selection.current.key !== token.key) return false;
+      submission.jobId = created.id;
       setState(previous => ({ ...previous, active: next, announcement: 'Answering',
         question: !preserveDraft && previous.question === question ? '' : previous.question,
         local: [...previous.local, { conversationId: created.conversationId, jobId: created.id, question: submitted, images }] }));

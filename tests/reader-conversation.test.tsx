@@ -247,23 +247,67 @@ it.each(['standalone', 'source'] as const)('creates one %s question, keeps uploa
   expect(view.context).toEqual(kind === 'source' ? sourceA : undefined);
 });
 
-it('ignores a submission response after navigating to another conversation', async () => {
+it.each(['standalone', 'source'] as const)('retains an accepted %s submission after navigation and resumes it on return', async kind => {
   const script = new ScriptedConversation();
   const late = deferred<{ id: string; conversationId: string }>();
   script.submit.mockImplementation(() => late.promise);
-  await mount('standalone', script);
+  if (kind === 'source') storage.local!.setItem(localKey(kind, sourceB), b);
+  await mount(kind, script);
   await act(async () => view.setQuestion('Old submission'));
   let submission!: Promise<boolean>;
   await act(async () => { submission = view.submit(); });
-  await move('standalone', b);
+  await move(kind, b);
   await act(async () => late.resolve({ id: 'job-a', conversationId: a }));
   expect(await submission).toBe(false);
   await flush();
   expect(view.conversationId).toBe(b);
   expect(view.turns).toEqual([]);
   expect(opened).toEqual([]);
-  expect(storage.session!.getItem(activeKey('standalone'))).toBeNull();
+  expect(JSON.parse(storage.session!.getItem(activeKey(kind))!)).toMatchObject({ id: 'job-a', conversationId: a, question: 'Old submission' });
+  if (kind === 'source') expect(storage.session!.getItem(activeKey(kind, sourceB))).toBeNull();
   expect(client.getQueryData(keys.conversation(a))).toBeUndefined();
+  await move(kind, a, sourceA);
+  expect(view.activeJobId).toBe('job-a');
+  expect(view.turns[0].question).toBe('Old submission');
+  await act(async () => view.cancel());
+  expect(script.cancel).toHaveBeenCalledWith('job-a');
+});
+
+it.each(['standalone', 'source'] as const)('recovers an accepted %s submission after unmount', async kind => {
+  const script = new ScriptedConversation();
+  const late = deferred<{ id: string; conversationId: string }>();
+  script.submit.mockImplementation(() => late.promise);
+  await mount(kind, script);
+  await act(async () => view.setQuestion('Question left running'));
+  let submission!: Promise<boolean>;
+  await act(async () => { submission = view.submit(); });
+  await act(async () => root!.unmount()); root = undefined;
+  await act(async () => late.resolve({ id: 'job-a', conversationId: a }));
+  expect(await submission).toBe(false);
+  expect(opened).toEqual([]);
+  await mount(kind, script);
+  expect(view.conversationId).toBe(a);
+  expect(view.activeJobId).toBe('job-a');
+  expect(view.turns[0].question).toBe('Question left running');
+});
+
+it.each(['standalone', 'source'] as const)('accepts the %s job when navigation returns before its response', async kind => {
+  const script = new ScriptedConversation();
+  const late = deferred<{ id: string; conversationId: string }>();
+  script.submit.mockImplementation(() => late.promise);
+  storage.local!.setItem(localKey(kind), a);
+  if (kind === 'source') storage.local!.setItem(localKey(kind, sourceB), b);
+  await mount(kind, script, a);
+  await act(async () => view.setQuestion('Question while navigating'));
+  let submission!: Promise<boolean>;
+  await act(async () => { submission = view.submit(); });
+  await move(kind, b);
+  await move(kind, a, sourceA);
+  await act(async () => late.resolve({ id: 'job-a', conversationId: a }));
+  expect(await submission).toBe(true);
+  await flush();
+  expect(view.activeJobId).toBe('job-a');
+  expect(view.turns[0].question).toBe('Question while navigating');
 });
 
 it('preserves HTTP auth generation fencing for a late submission after private data is forgotten', async () => {

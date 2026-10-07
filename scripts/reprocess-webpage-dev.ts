@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { SqlStore } from '../apps/worker/src/sql-store.js';
 import { sqlPool, closeSql } from '../apps/worker/src/sql-connection.js';
 import { hash, noteSchema, type SourceSnapshot } from '../shared/corpus.js';
-import { extract } from '../apps/worker/src/extraction.js';
+import { SourceArtifacts } from '../apps/worker/src/source-artifacts.js';
 import { recoverWebpage } from '../apps/worker/src/browser-sandbox.js';
 import { enrich, classifySource, enrichTemplate, licenseEvidence } from '../apps/worker/src/enrichment.js';
 import { categoryRegistry } from '../apps/worker/src/category-registry.js';
@@ -52,7 +52,7 @@ try {
   const endpoint = process.env.FOUNDRY_ENDPOINT!; const deployment = process.env.FOUNDRY_DEPLOYMENT!;
   await processJob(store, id, {
     version: 'browser-1', model: deployment,
-    extract: source => extract(source, { request: async () => { throw new Error('No Zotero request in webpage-only dev rerun'); } }, (key, bytes, mime) => store.retainSource(source.source.fingerprint, key, bytes, mime), undefined, () => recoverWebpage(source, store, store.leaseSignal || AbortSignal.timeout(180_000))),
+    extract: source => new SourceArtifacts(store).extract(source, { request: async () => { throw new Error('No Zotero request in webpage-only dev rerun'); } }, () => recoverWebpage(source, store, store.leaseSignal || AbortSignal.timeout(180_000))),
     enrich: (text, signal, images) => enrich(text, endpoint, deployment, signal, images),
     classify: (source, text, registry, signal, images) => classifySource(source, text, registry, endpoint, deployment, signal, images),
     analyzeTemplate: (text, template, signal, source, images) => enrichTemplate(text, template, endpoint, deployment, signal, source, images),

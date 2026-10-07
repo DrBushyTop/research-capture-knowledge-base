@@ -25,8 +25,8 @@ type Receipt = z.infer<typeof receiptSchema>;
 function mimeFor(bytes: Uint8Array, mime: string) {
   const value = mime.split(';')[0].trim().toLowerCase();
   if (!value || value.length > 100) throw new Error('Invalid retained source MIME');
-  // Existing PDF records can have an octet-stream header. Extraction has always recognized their signature.
-  if (value === 'application/octet-stream' && Buffer.from(bytes.subarray(0, 5)).toString() === '%PDF-') return 'application/pdf';
+  // Historical PDF headers differ. Normalize the supported aliases only after checking the bytes.
+  if (['application/octet-stream', 'application/x-pdf'].includes(value) && Buffer.from(bytes.subarray(0, 5)).toString() === '%PDF-') return 'application/pdf';
   return value;
 }
 
@@ -94,14 +94,19 @@ export class SourceArtifacts {
       : { kind: 'url', url: snapshot.source.url! };
     const key = `artifact-inputs/${snapshot.source.fingerprint}/${hash(canonical(location))}.json`;
     const cached = await this.receipt(key, snapshot.source);
-    if (cached) return { receipt: cached, artifact: await this.restore(cached) };
+    if (cached) {
+      const raw = await this.store.readArtifact(cached.hash);
+      if (raw) return { receipt: cached, artifact: this.checked(raw, cached) };
+    }
     const input = attachment ? await downloadAttachment(attachment, zotero) : await downloadPublic(snapshot.source.url!);
     if (input.bytes.length > maxBytes) throw new Error('Source exceeds byte limit');
     const mime = Buffer.from(input.bytes.subarray(0, 5)).toString() === '%PDF-' ? 'application/pdf' : mimeFor(input.bytes, input.mime);
-    const receipt = receiptSchema.parse({ hash: hash(input.bytes), mime, retrievedAt: new Date().toISOString(),
+    const receipt = cached ?? receiptSchema.parse({ hash: hash(input.bytes), mime, retrievedAt: new Date().toISOString(),
       sourceId: snapshot.source.id, fingerprint: snapshot.source.fingerprint, origin: location });
-    await this.store.retain(receipt.hash, input.bytes, receipt.mime);
+    if (hash(input.bytes) !== receipt.hash) throw new MissingArtifact('Downloaded source does not match its receipt.');
+    // The receipt must survive an interrupted Blob upload. A retry repairs missing bytes only by hash.
     await this.store.create(key, receipt);
+    await this.store.retain(receipt.hash, input.bytes, receipt.mime);
     await this.store.create(`artifacts/${snapshot.source.fingerprint}.json`, { hash: receipt.hash, mime: receipt.mime, retrievedAt: receipt.retrievedAt });
     // A concurrent immutable create may have won. Use its bytes and retrieval time consistently.
     const retained = (await this.receipt(key, snapshot.source))!;

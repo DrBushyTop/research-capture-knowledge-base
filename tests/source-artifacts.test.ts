@@ -91,12 +91,12 @@ for (const [adapter, makeStore] of [['memory', () => new MemorySourceArtifactSto
       expect(store.files.size).toBe(1);
     });
 
-    it('replays a legacy PDF with an octet-stream header through LiteParse', async () => {
+    it.each(['application/octet-stream', 'application/x-pdf'])('replays a legacy PDF with a %s header through LiteParse', async mime => {
       const source = normalize(structuredClone(snapshot))[0];
       const bytes = layoutPdf();
       const store = makeStore();
-      await store.retain(hash(bytes), bytes, 'application/octet-stream');
-      await store.create(`artifacts/${source.source.fingerprint}.json`, { hash: hash(bytes), mime: 'application/octet-stream', retrievedAt: '2026-10-05T10:00:00Z' });
+      await store.retain(hash(bytes), bytes, mime);
+      await store.create(`artifacts/${source.source.fingerprint}.json`, { hash: hash(bytes), mime, retrievedAt: '2026-10-05T10:00:00Z' });
       const result = await new SourceArtifacts(store).extract(source, offline);
       expect(result.evidence).toMatchObject({ status: 'text', method: 'pdf-text', artifactMime: 'application/pdf' });
       expect(result.text).toContain('# Synthetic layout study');
@@ -118,6 +118,41 @@ for (const [adapter, makeStore] of [['memory', () => new MemorySourceArtifactSto
       const recovered = await new SourceArtifacts(store).extract(source, { request: retry });
       expect(recovered.evidence.method).toBe('image-vision');
       expect(retry).toHaveBeenCalledTimes(1);
+      expect((await new SourceArtifacts(store).extract(source, offline)).images?.[0].bytes).toEqual(screenshot);
+    });
+
+    it('records screenshot provenance before retaining its bytes and replays after an interrupted acknowledgement', async () => {
+      const source = sourceWithFallback();
+      const store = makeStore();
+      const retain = store.retain.bind(store);
+      const interrupted = vi.spyOn(store, 'retain').mockImplementation(async (id, bytes, mime) => {
+        await retain(id, bytes, mime);
+        if (id === hash(screenshot)) {
+          expect([...store.data.values()]).toContainEqual(expect.objectContaining({ hash: id, origin: { kind: 'attachment', key: 'BBBBBB11', version: 1 } }));
+          throw new Error('Upload acknowledgement lost');
+        }
+      });
+      await expect(new SourceArtifacts(store).extract(source, { request: async path => new Response(path.includes('AAAAAA11') ? emptyHtml : screenshot) })).rejects.toThrow('Upload acknowledgement lost');
+      interrupted.mockRestore();
+      offline.request.mockClear();
+      expect((await new SourceArtifacts(store).extract(source, offline)).images?.[0].bytes).toEqual(screenshot);
+      expect(offline.request).not.toHaveBeenCalled();
+    });
+
+    it('repairs an incomplete receipt only with bytes matching its pinned hash', async () => {
+      const source = sourceWithFallback();
+      const store = makeStore();
+      const retain = store.retain.bind(store);
+      const interrupted = vi.spyOn(store, 'retain').mockImplementation(async (id, bytes, mime) => {
+        if (id === hash(screenshot)) throw new Error('Upload interrupted');
+        await retain(id, bytes, mime);
+      });
+      await expect(new SourceArtifacts(store).extract(source, { request: async path => new Response(path.includes('AAAAAA11') ? emptyHtml : screenshot) })).rejects.toThrow('Upload interrupted');
+      interrupted.mockRestore();
+      await expect(new SourceArtifacts(store).extract(source, { request: async () => new Response('A changed original') })).rejects.toThrow('does not match its receipt');
+      const request = vi.fn(async (path: string) => { expect(path).toBe('items/BBBBBB11/file'); return new Response(screenshot); });
+      expect((await new SourceArtifacts(store).extract(source, { request })).images?.[0].bytes).toEqual(screenshot);
+      expect(request).toHaveBeenCalledTimes(1);
       expect((await new SourceArtifacts(store).extract(source, offline)).images?.[0].bytes).toEqual(screenshot);
     });
 

@@ -9,6 +9,7 @@ import type { Zotero } from './zotero.js';
 export interface SourceArtifactStore extends Pick<PipelineStore, 'read' | 'create'> {
   retain(hash: string, bytes: Uint8Array, mime: string): Promise<void>;
   readArtifact(hash: string): Promise<{ bytes: Uint8Array; mime: string } | undefined>;
+  source?(id: string): Promise<{ note: Pick<Note, 'source' | 'generationId' | 'extraction'> } | undefined>;
 }
 
 const artifactHash = z.string().regex(/^[a-f0-9]{64}$/);
@@ -63,6 +64,17 @@ export class SourceArtifacts {
     return value ? { ...legacyArtifact.parse(value), sourceId: source.id, fingerprint: source.fingerprint, origin: { kind: 'legacy' } } : undefined;
   }
 
+  private async published(source: SourceSnapshot['source']) {
+    const note = (await this.store.source?.(source.id))?.note;
+    if (!note || note.source.id !== source.id || note.source.fingerprint !== source.fingerprint || !note.extraction.artifactHash) return undefined;
+    // Older captures recorded only their first input. The published note identifies the successful evidence.
+    const artifact = await this.readForNote(note);
+    if (!artifact) return undefined;
+    const receipt = receiptSchema.parse({ hash: note.extraction.artifactHash, mime: artifact.mime, retrievedAt: artifact.retrievedAt,
+      sourceId: source.id, fingerprint: source.fingerprint, origin: { kind: 'legacy' } });
+    return { receipt, artifact };
+  }
+
   private checked(artifact: { bytes: Uint8Array; mime: string }, receipt: Pick<Receipt, 'hash' | 'mime' | 'retrievedAt'>): RetainedArtifact {
     if (artifact.bytes.length > maxBytes) throw new Error('Source exceeds byte limit');
     if (hash(artifact.bytes) !== receipt.hash) throw new Error('Retained source hash does not match its record');
@@ -101,11 +113,12 @@ export class SourceArtifacts {
       retrievedAt: new Date().toISOString(), artifactHash: null };
     if (!snapshot.source.active) return { text: '', evidence: { ...unavailable, reason: 'Source is no longer in the observed library.' } };
     const selected = await this.receipt(this.selectionKey(snapshot.source.fingerprint), snapshot.source);
-    const cached = selected || await this.legacy(snapshot.source);
+    const published = selected ? undefined : await this.published(snapshot.source);
+    const cached = selected || published?.receipt || await this.legacy(snapshot.source);
     const items = attachments(snapshot);
     const attachment = preferred(items);
     if (!cached && !attachment && !snapshot.source.url) return savedMetadata(snapshot, { ...unavailable, reason: 'No synced attachment or retrievable source URL.' });
-    let input = cached ? { receipt: cached, artifact: await this.restore(cached) } : await this.acquire(snapshot, attachment, zotero);
+    let input = published || (cached ? { receipt: cached, artifact: await this.restore(cached) } : await this.acquire(snapshot, attachment, zotero));
     let result = await extractArtifact(snapshot, input.artifact, browser);
     // One synced screenshot can rescue an unusable text layer. Never recurse or fetch page image URLs.
     const image = snapshot.root.data.itemType !== 'attachment' && items.find(item => String(item.data.contentType).startsWith('image/'));

@@ -134,6 +134,42 @@ for (const [adapter, makeStore] of [['memory', () => new MemorySourceArtifactSto
       expect((await extractArtifact(source, artifact!)).evidence.artifactHash).toBe(hash(screenshot));
     });
 
+    it('replays an existing published screenshot without fetching its missing original', async () => {
+      const source = sourceWithFallback();
+      const store = makeStore();
+      await store.retain(hash(emptyHtml), Buffer.from(emptyHtml), 'text/html');
+      await store.retain(hash(screenshot), screenshot, 'image/png');
+      const legacy = { hash: hash(emptyHtml), mime: 'text/html', retrievedAt: '2026-10-05T10:00:00Z' };
+      await store.create(`artifacts/${source.source.fingerprint}.json`, legacy);
+      const evidence: Note['extraction'] = { artifactHash: hash(screenshot), artifactMime: 'image/png', retrievedAt: '2026-10-05T10:01:00Z',
+        status: 'image', method: 'image-vision', reason: null, truncated: false };
+      const published = Object.assign(store, { source: async () => ({ note: pinned(source.source, evidence) }) });
+      offline.request.mockClear();
+      const replay = await new SourceArtifacts(published).extract(source, offline);
+      expect(replay.images?.[0].bytes).toEqual(screenshot);
+      expect(replay.evidence).toMatchObject({ method: 'image-vision', artifactHash: hash(screenshot), retrievedAt: evidence.retrievedAt });
+      expect(offline.request).not.toHaveBeenCalled();
+      expect(store.data.get(`artifacts/${source.source.fingerprint}.json`)).toEqual(legacy);
+      delete (published as Partial<typeof published>).source;
+      expect((await new SourceArtifacts(store).extract(source, offline)).images?.[0].bytes).toEqual(screenshot);
+    });
+
+    it('does not replay published evidence from a different source capture', async () => {
+      const source = sourceWithFallback();
+      const store = makeStore();
+      await store.retain(hash(readableText), Buffer.from(readableText), 'text/plain');
+      await store.create(`artifacts/${source.source.fingerprint}.json`, { hash: hash(readableText), mime: 'text/plain', retrievedAt: '2026-10-05T10:00:00Z' });
+      const evidence: Note['extraction'] = { artifactHash: hash(screenshot), artifactMime: 'image/png', retrievedAt: '2026-10-05T10:01:00Z',
+        status: 'image', method: 'image-vision', reason: null, truncated: false };
+      await store.retain(hash(screenshot), screenshot, 'image/png');
+      for (const different of [{ ...source.source, fingerprint: hash('another capture') }, { ...source.source, id: 'zotero-users-12345-OTHER123' }]) {
+        const published = Object.assign(store, { source: async () => ({ note: pinned(different, evidence) }) });
+        const replay = await new SourceArtifacts(published).extract(source, offline);
+        expect(replay.text).toBe(readableText);
+        expect(replay.images).toBeUndefined();
+      }
+    });
+
     it('reads an older pinned artifact even after a different artifact becomes the replay selection', async () => {
       const source = sourceWithFallback();
       const store = makeStore();

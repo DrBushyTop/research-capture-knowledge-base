@@ -333,6 +333,95 @@ it.each([['standalone', true], ['source', true], ['standalone', false], ['source
   expect(script.cancel).toHaveBeenCalledWith('job-a');
 });
 
+it.each(['standalone', 'source'] as const)('adopts an accepted %s job after remount when storage refuses access', async kind => {
+  const denied = { getItem() { throw new Error('Denied'); }, setItem() { throw new Error('Denied'); }, removeItem() { throw new Error('Denied'); } };
+  storage = { local: denied, session: denied };
+  const script = new ScriptedConversation();
+  const late = deferred<{ id: string; conversationId: string }>();
+  script.submit.mockImplementation(() => late.promise);
+  await mount(kind, script);
+  await act(async () => view.setQuestion('Question with denied storage'));
+  let submission!: Promise<boolean>;
+  await act(async () => { submission = view.submit(); });
+  await act(async () => root!.unmount()); root = undefined;
+  await mount(kind, script);
+  await act(async () => late.resolve({ id: 'job-a', conversationId: a }));
+  expect(await submission).toBe(false);
+  await flush();
+  expect(view.conversationId).toBe(a);
+  expect(view.activeJobId).toBe('job-a');
+  expect(view.busy).toBe(true);
+  expect(view.turns[0].question).toBe('Question with denied storage');
+  await act(async () => view.cancel());
+  expect(script.cancel).toHaveBeenCalledWith('job-a');
+});
+
+it.each(['standalone', 'source'] as const)('keeps the newer %s job when an older submission acknowledges after remount', async kind => {
+  const script = new ScriptedConversation();
+  const late = deferred<{ id: string; conversationId: string }>();
+  script.submit.mockImplementationOnce(() => late.promise).mockResolvedValue({ id: 'job-b', conversationId: a });
+  storage.local!.setItem(localKey(kind), a);
+  await mount(kind, script, a);
+  await act(async () => view.setQuestion('First question'));
+  let first!: Promise<boolean>;
+  await act(async () => { first = view.submit(); });
+  await act(async () => root!.unmount()); root = undefined;
+  script.jobs.set('job-a', { status: 'complete', result });
+  await mount(kind, script, a);
+  await act(async () => view.setQuestion('Newer question'));
+  await act(async () => { expect(await view.submit()).toBe(true); });
+  await act(async () => late.resolve({ id: 'job-a', conversationId: a }));
+  expect(await first).toBe(false);
+  await flush();
+  expect(view.activeJobId).toBe('job-b');
+  expect(view.busy).toBe(true);
+  expect(JSON.parse(storage.session!.getItem(activeKey(kind))!)).toMatchObject({ id: 'job-b', question: 'Newer question' });
+  await act(async () => view.cancel());
+  expect(script.cancel).toHaveBeenCalledWith('job-b');
+});
+
+it.each(['standalone', 'source'] as const)('recovers the older accepted %s job when the newer submission is refused', async kind => {
+  const script = new ScriptedConversation();
+  const late = deferred<{ id: string; conversationId: string }>();
+  script.submit.mockImplementationOnce(() => late.promise).mockRejectedValue(new ApiError('Question already running', 429));
+  storage.local!.setItem(localKey(kind), a);
+  await mount(kind, script, a);
+  await act(async () => view.setQuestion('Accepted question'));
+  let first!: Promise<boolean>;
+  await act(async () => { first = view.submit(); });
+  await act(async () => root!.unmount()); root = undefined;
+  await mount(kind, script, a);
+  await act(async () => view.setQuestion('Refused question'));
+  await act(async () => { expect(await view.submit()).toBe(false); });
+  await act(async () => late.resolve({ id: 'job-a', conversationId: a }));
+  expect(await first).toBe(false);
+  await flush();
+  expect(view.activeJobId).toBe('job-a');
+  expect(view.question).toBe('Refused question');
+  expect(JSON.parse(storage.session!.getItem(activeKey(kind))!)).toMatchObject({ id: 'job-a', question: 'Accepted question' });
+});
+
+it.each(['standalone', 'source'] as const)('cleans accepted %s deletion after the initiating view unmounts', async kind => {
+  const script = new ScriptedConversation();
+  const late = deferred<{}>();
+  script.delete.mockImplementation(async id => { await late.promise; script.details.delete(id); return {}; });
+  remember(kind);
+  await mount(kind, script, a);
+  const originalClient = client;
+  let deletion!: Promise<void>;
+  await act(async () => { deletion = view.deleteConversation(a); });
+  await act(async () => root!.unmount()); root = undefined;
+  await act(async () => late.resolve({}));
+  await deletion;
+  expect(originalClient.getQueryData(keys.conversation(a))).toBeUndefined();
+  expect(originalClient.getQueryData<{ id: string }[]>(keys.conversations)?.some(item => item.id === a)).not.toBe(true);
+  expect(storage.local!.getItem(localKey(kind))).toBeNull();
+  expect(storage.session!.getItem(activeKey(kind))).toBeNull();
+  await mount(kind, script, undefined, originalClient);
+  expect(view.conversationId).toBeUndefined();
+  expect(view.turns).toEqual([]);
+});
+
 it('preserves HTTP auth generation fencing for a late submission after private data is forgotten', async () => {
   const late = deferred<Response>();
   vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => init?.method === 'POST' ? late.promise : new Response('[]', { headers: { 'Content-Type': 'application/json' } })));

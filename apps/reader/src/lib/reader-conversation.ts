@@ -46,6 +46,9 @@ type BrowserStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 export type ConversationStorage = { local?: BrowserStorage; session?: BrowserStorage };
 // A POST can outlive its hook. The remounted hook needs the accepted job without another navigation.
 const recoveryListeners = new Set<{ instance: object; key: string; storage?: BrowserStorage; accepted: (active: Active) => void }>();
+const unavailableStorage = {};
+const acceptedSubmissions = new WeakMap<object, Map<string, number>>();
+let submissionOrder = 0;
 function browserStorage(): ConversationStorage {
   const storage: ConversationStorage = {};
   try { storage.local = window.localStorage; } catch { /* Storage can be disabled. */ }
@@ -113,11 +116,14 @@ export function useReaderConversation(location: ConversationLocation, dependenci
   const forgetActive = (id: string) => { if (readActive(storage.session, activeKey)?.id === id) write(storage.session, activeKey); };
   const patch = (jobId: string, change: Partial<ConversationTurn>) => setState(previous => previous.scope === scope ? { ...previous,
     local: previous.local.map(turn => turn.jobId === jobId ? { ...turn, ...change } : turn) } : previous);
+  const adopt = (pending: Active) => setState(previous => previous.scope === scope ? { ...previous, active: pending,
+    local: previous.local.some(turn => turn.jobId === pending.id) ? previous.local : [...previous.local,
+      { conversationId: pending.conversationId, jobId: pending.id, question: pending.question, images: pending.images }] } : previous);
   const finish = (id: string) => {
     forgetActive(id);
     if (submitting.current?.jobId === id) submitting.current = undefined;
     if (cancelling.current === id) cancelling.current = undefined;
-    setState(previous => previous.scope === scope ? { ...previous, active: previous.active?.id === id ? undefined : previous.active,
+    if (mounted.current) setState(previous => previous.scope === scope ? { ...previous, active: previous.active?.id === id ? undefined : previous.active,
       stopping: previous.stopping === id ? undefined : previous.stopping } : previous);
     client.removeQueries({ queryKey: keys.job(id) });
   };
@@ -145,13 +151,11 @@ export function useReaderConversation(location: ConversationLocation, dependenci
 
   useEffect(() => {
     const listener = { instance, key: activeKey, storage: storage.session, accepted: (pending: Active) => {
+      if (conversationId && pending.conversationId !== conversationId) return;
+      adopt(pending);
       if (!conversationId) {
         if (embedded) update({ panelId: pending.conversationId });
         else if (location.kind === 'standalone') location.open(pending.conversationId, true);
-      } else if (pending.conversationId === conversationId) {
-        setState(previous => previous.scope === scope ? { ...previous, active: pending,
-          local: previous.local.some(turn => turn.jobId === pending.id) ? previous.local : [...previous.local,
-            { conversationId: pending.conversationId, jobId: pending.id, question: pending.question, images: pending.images }] } : previous);
       }
     } };
     recoveryListeners.add(listener);
@@ -165,8 +169,7 @@ export function useReaderConversation(location: ConversationLocation, dependenci
   useEffect(() => {
     const pending = readActive(storage.session, activeKey);
     if (pending && pending.conversationId === conversationId) {
-      setState(previous => previous.scope === scope ? { ...previous, active: pending,
-        local: previous.local.some(turn => turn.jobId === pending.id) ? previous.local : [...previous.local, { conversationId: pending.conversationId, jobId: pending.id, question: pending.question, images: pending.images }] } : previous);
+      adopt(pending);
     } else if (state.active && state.active.conversationId !== conversationId) update({ active: undefined });
     update({ error: '', announcement: '' });
   }, [scope, conversationId]);
@@ -204,11 +207,18 @@ export function useReaderConversation(location: ConversationLocation, dependenci
     if (busy || submitting.current?.token === selection.current || unavailable || (!submitted && !images.length)) return false;
     const token = selection.current;
     const submission = { token, jobId: undefined as string | undefined };
+    const order = ++submissionOrder;
     submitting.current = submission;
     reportError('');
     try {
       const created = await ask.mutateAsync({ question: submitted, ...(images.length ? { images: images.map(image => image.id) } : {}),
         ...(conversationId ? { conversationId } : source ? { sourceId: source.sourceId } : {}) });
+      // Compare accepted submissions across mounts. A failed newer POST must not hide an older accepted job.
+      const owner = storage.session ?? unavailableStorage;
+      const accepted = acceptedSubmissions.get(owner) ?? new Map<string, number>();
+      if (order < (accepted.get(activeKey) ?? 0)) return false;
+      accepted.set(activeKey, order);
+      acceptedSubmissions.set(owner, accepted);
       const next = { ...created, question: submitted, images };
       // An accepted job keeps running after navigation. Keep its original recovery keys even if the view moved.
       // postJson has already rejected responses from an expired authentication session.
@@ -260,13 +270,13 @@ export function useReaderConversation(location: ConversationLocation, dependenci
     reportError('');
     try {
       await remove.mutateAsync(id);
-      if (!mounted.current) return;
       client.setQueryData<HistoryItem[]>(keys.conversations, previous => previous?.filter(item => item.id !== id));
       client.removeQueries({ queryKey: keys.conversation(id) });
       const pending = readActive(storage.session, activeKey);
       if (pending?.conversationId === id) finish(pending.id);
-      setState(previous => previous.scope === scope ? { ...previous, local: previous.local.filter(turn => turn.conversationId !== id) } : previous);
       if (read(storage.local, recentKey) === id) forget();
+      if (!mounted.current) return;
+      setState(previous => previous.scope === scope ? { ...previous, local: previous.local.filter(turn => turn.conversationId !== id) } : previous);
       if (current(token)) {
         if (id === conversationId) {
           if (embedded) update({ panelId: undefined }); else location.open(undefined, true);

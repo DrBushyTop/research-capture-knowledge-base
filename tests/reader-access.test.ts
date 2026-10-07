@@ -34,6 +34,19 @@ it('automatically starts GitHub sign-in when the session is signed out', async (
   expect(calls[0].options.cache).toBe('no-store');
   dom.window.close();
 });
+it('stays on the login page after deliberate sign-out until the user chooses to sign in', async () => {
+  const { dom, calls, document, redirects } = await render(null, undefined, 'https://shelf.huuhka.net/login.html?signedOut=1&returnTo=%2Fsources%2F');
+  expect(redirects).toEqual([]);
+  expect(calls).toHaveLength(0);
+  expect(document.querySelector('h1')?.textContent).toBe("You're signed out");
+  expect(document.querySelector('#primary')?.hasAttribute('hidden')).toBe(false);
+  expect(document.querySelector('#primary')?.textContent).toBe('Sign in with GitHub');
+  const login = new URL(document.querySelector('#primary')!.getAttribute('href')!, dom.window.location.href);
+  expect(login.pathname).toBe('/.auth/login/github');
+  expect(login.searchParams.get('post_login_redirect_uri')).toBe('/login.html?returnTo=%2Fsources%2F&signIn=returned');
+  expect(document.querySelector('#switch')?.hasAttribute('hidden')).toBe(true);
+  dom.window.close();
+});
 it('explains denied access without treating a GitHub identity as a Shelf session', async () => {
   const { dom, document } = await render({ identityProvider: 'github', userDetails: '<DrBushyTop>', userRoles: ['authenticated'] });
   expect(document.querySelector('h1')?.textContent).toBe('Signed in, access unavailable');

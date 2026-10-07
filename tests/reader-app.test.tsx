@@ -70,6 +70,18 @@ const type = async (element: HTMLTextAreaElement | HTMLInputElement, value: stri
 };
 const path = (router: ReturnType<typeof createAppRouter>) => router.state.location.href;
 
+it('opens the logout page from the menu and clears private data before navigating', async () => {
+  const { client } = await mount('/sources/');
+  const clear = vi.spyOn(client, 'clear');
+  await click(host.querySelector('button[aria-label="More"]'));
+  const signOut = document.querySelector<HTMLAnchorElement>('.masthead-menu a[href="/logout.html"]');
+  expect(signOut?.textContent).toBe('Sign out');
+  expect(document.querySelector('.masthead-menu form')).toBeNull();
+  signOut!.addEventListener('click', event => event.preventDefault());
+  await click(signOut);
+  expect(clear).toHaveBeenCalledOnce();
+});
+
 it('opens the reader on refresh and in a new tab without waiting for session renewal', async () => {
   vi.stubEnv('DEV', false);
   handler = (url, init) => url === '/api/session' ? new Promise<Response>(() => {}) : api(url, init);

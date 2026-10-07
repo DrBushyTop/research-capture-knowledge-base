@@ -126,7 +126,7 @@ function MoreMenu({ categories, signOut }: { categories: boolean; signOut: () =>
     </Popover.Trigger>
     <Popover.Portal><Popover.Content className="masthead-menu" align="end" sideOffset={6} collisionPadding={8}>
       <Link to="/categories/" aria-current={categories ? 'page' : undefined} onClick={() => setOpen(false)}><Tags size={18} aria-hidden="true" />Categories</Link>
-      <form action="/api/logout" method="POST" onSubmit={signOut}><button type="submit"><LogOut size={18} aria-hidden="true" />Sign out</button></form>
+      <a href="/logout.html" onClick={signOut}><LogOut size={18} aria-hidden="true" />Sign out</a>
     </Popover.Content></Popover.Portal>
   </Popover.Root>;
 }

@@ -120,7 +120,34 @@ it('revokes the app session before redirecting through Azure logout', async () =
   const result = await sessionHandler(true)(input);
   expect(backend.mock.calls[0][0].searchParams.get('logout')).toBe('1');
   expect(result.status).toBe(303);
-  expect(result.headers.Location).toBe('/.auth/logout?post_logout_redirect_uri=%2Flogin.html');
+  expect(result.headers.Location).toBe('/.auth/logout?post_logout_redirect_uri=%2Flogin.html%3FsignedOut%3D1');
+});
+it('returns directly to the signed-out login screen when the Azure cookie has already expired', async () => {
+  const input = request(shelf); input.headers.delete('x-ms-client-principal');
+  const result = await sessionHandler(true)(input);
+  expect(backend.mock.calls[0][0].searchParams.get('logout')).toBe('1');
+  expect(result.status).toBe(303);
+  expect(result.headers.Location).toBe('/login.html?signedOut=1');
+});
+it('preserves the requested reader return path without restarting login after logout', async () => {
+  const input = request(shelf); input.query.set('returnTo', '/login.html?returnTo=%2Fsources%2F&signIn=returned');
+  const result = await sessionHandler(true)(input);
+  const target = new URL(result.headers.Location, shelf).searchParams.get('post_logout_redirect_uri');
+  expect(target).toBe('/login.html?returnTo=%2Fsources%2F&signedOut=1');
+});
+it('returns a failed form logout to a retryable screen without claiming the session ended', async () => {
+  backend.mockResolvedValueOnce(new Response('{"error":"Unavailable"}', { status: 503, headers: { 'Content-Type': 'application/json' } }));
+  const input = request(shelf); input.headers.set('sec-fetch-mode', 'navigate');
+  const result = await sessionHandler(true)(input);
+  expect(result.status).toBe(303);
+  expect(result.headers.Location).toBe('/logout.html?failed=1');
+});
+it('rejects a null-Origin logout form without revoking a session or creating a retry loop', async () => {
+  const input = request('null'); input.headers.set('sec-fetch-mode', 'navigate');
+  const result = await sessionHandler(true)(input);
+  expect(backend).not.toHaveBeenCalled();
+  expect(result.status).toBe(303);
+  expect(result.headers.Location).toBe('/logout.html?failed=1');
 });
 it('rejects cross-origin session renewal, session creation and logout', async () => {
   for (const action of [sessionHandler(false), sessionHandler(false, true), sessionHandler(true)]) {

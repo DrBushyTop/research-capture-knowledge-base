@@ -105,4 +105,13 @@ async function checkAccess() {
   }
 }
 
-void checkAccess();
+if (new URLSearchParams(location.search).get('signedOut') === '1') {
+  heading.textContent = "You're signed out";
+  message.textContent = 'Sign in with GitHub to open Shelf.';
+  primary.textContent = 'Sign in with GitHub';
+  primary.href = login;
+  primary.hidden = false;
+  switchAccount.hidden = true;
+} else {
+  void checkAccess();
+}

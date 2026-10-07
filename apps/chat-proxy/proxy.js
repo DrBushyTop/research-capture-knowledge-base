@@ -12,7 +12,14 @@ const backendHeaders = (request, fresh = false) => ({
 
 export const sessionHandler = (logout, start = false) => async request => {
   const headers = { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json' };
-  const error = (status, message) => ({ status, jsonBody: { error: message }, headers });
+  const error = (status, message) => {
+    if (logout && (request.headers.get('sec-fetch-mode') === 'navigate' || request.headers.get('accept')?.includes('text/html'))) {
+      const requested = request.query.get('returnTo');
+      headers.Location = '/logout.html?failed=1' + (requested ? '&returnTo=' + encodeURIComponent(requested) : '');
+      return { status: 303, headers };
+    }
+    return { status, jsonBody: { error: message }, headers };
+  };
   if (request.method === 'POST' && !origins().includes(request.headers.get('origin'))) return error(403, 'Open the app to make changes');
   if (!process.env.CHAT_BACKEND_URL || !process.env.CHAT_BACKEND_KEY) return error(503, 'The service is temporarily unavailable');
   const url = new URL(process.env.CHAT_BACKEND_URL);
@@ -22,11 +29,20 @@ export const sessionHandler = (logout, start = false) => async request => {
     const response = await fetch(url, { method: request.method, redirect: 'error', signal: AbortSignal.timeout(30_000), headers: backendHeaders(request, start) });
     if (!response.headers.get('content-type')?.includes('application/json')) return error(503, 'The service is temporarily unavailable');
     if (response.headers.get('set-cookie')) headers['Set-Cookie'] = response.headers.get('set-cookie');
-    if (logout && response.ok) {
+    if (logout) {
+      if (!response.ok) return error(response.status, 'Sign-out could not be confirmed. Try again.');
       const requested = request.query.get('returnTo') || '/login.html';
       // Logout always returns to the public access page on the current host.
-      const target = requested === '/login.html' || requested.startsWith('/login.html?') ? requested : '/login.html';
-      headers.Location = '/.auth/logout?post_logout_redirect_uri=' + encodeURIComponent(target);
+      const target = new URL(requested === '/login.html' || requested.startsWith('/login.html?') ? requested : '/login.html', 'https://shelf.invalid');
+      target.searchParams.delete('signIn');
+      target.searchParams.set('signedOut', '1');
+      const destination = target.pathname + target.search;
+      let azureSignedIn = false;
+      try {
+        const principal = JSON.parse(Buffer.from(request.headers.get('x-ms-client-principal') || '', 'base64').toString('utf8'));
+        azureSignedIn = Array.isArray(principal.userRoles) && principal.userRoles.includes('authenticated');
+      } catch { /* An expired Azure cookie still allows revoking the Shelf session. */ }
+      headers.Location = azureSignedIn ? '/.auth/logout?post_logout_redirect_uri=' + encodeURIComponent(destination) : destination;
       return { status: 303, headers };
     }
     return { status: response.status, body: await response.text(), headers };

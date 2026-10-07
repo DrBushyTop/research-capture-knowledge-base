@@ -134,7 +134,10 @@ app.storageQueue('processCapture', {
       const state = store();
       const analyzeTemplate = (text: string, template: import('../../../shared/categories.js').Template, signal?: AbortSignal, source?: import('../../../shared/corpus.js').Note['source'], images?: import('./image-input.js').SourceImage[]) => enrichTemplate(text, template, required('FOUNDRY_ENDPOINT'), required('FOUNDRY_DEPLOYMENT'), signal, source, images);
       if (id.startsWith('b_')) { await dispatchBatch(state, id, next => state.send(next)); return; }
-      if (id.startsWith('p_')) { await processPreview(state, id, analyzeTemplate); return; }
+      if (id.startsWith('p_')) {
+        const { SourceArtifacts } = await import('./source-artifacts.js');
+        await processPreview(state, id, analyzeTemplate, new SourceArtifacts(state)); return;
+      }
       // Parsing and browser capture are processing-only dependencies, not part of reader API startup.
       const [{ SourceArtifacts }, { recoverWebpage }, { processJob }] = await Promise.all([
         import('./source-artifacts.js'), import('./browser-sandbox.js'), import('./processing.js')

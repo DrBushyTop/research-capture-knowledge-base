@@ -44,6 +44,8 @@ const browserAdapter: ConversationAdapter = {
 };
 type BrowserStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 export type ConversationStorage = { local?: BrowserStorage; session?: BrowserStorage };
+// A POST can outlive its hook. The remounted hook needs the accepted job without another navigation.
+const recoveryListeners = new Set<{ instance: object; key: string; storage?: BrowserStorage; accepted: (active: Active) => void }>();
 function browserStorage(): ConversationStorage {
   const storage: ConversationStorage = {};
   try { storage.local = window.localStorage; } catch { /* Storage can be disabled. */ }
@@ -82,6 +84,7 @@ export function useReaderConversation(location: ConversationLocation, dependenci
   const client = useQueryClient();
   const adapter = dependencies.adapter ?? browserAdapter;
   const storage = useRef(dependencies.storage ?? browserStorage()).current;
+  const instance = useRef({}).current;
   const source = location.source;
   const embedded = location.kind === 'source';
   const scope = `${embedded ? 'source' : 'standalone'}:${source?.sourceId ?? ''}`;
@@ -138,6 +141,21 @@ export function useReaderConversation(location: ConversationLocation, dependenci
     if (location.conversationId) return;
     const id = readActive(storage.session, activeKey)?.conversationId || read(storage.local, recentKey);
     if (id && idPattern.test(id)) location.open(id, true);
+  }, [scope, conversationId]);
+
+  useEffect(() => {
+    const listener = { instance, key: activeKey, storage: storage.session, accepted: (pending: Active) => {
+      if (!conversationId) {
+        if (embedded) update({ panelId: pending.conversationId });
+        else if (location.kind === 'standalone') location.open(pending.conversationId, true);
+      } else if (pending.conversationId === conversationId) {
+        setState(previous => previous.scope === scope ? { ...previous, active: pending,
+          local: previous.local.some(turn => turn.jobId === pending.id) ? previous.local : [...previous.local,
+            { conversationId: pending.conversationId, jobId: pending.id, question: pending.question, images: pending.images }] } : previous);
+      }
+    } };
+    recoveryListeners.add(listener);
+    return () => { recoveryListeners.delete(listener); };
   }, [scope, conversationId]);
   useEffect(() => {
     if (!conversationId) return;
@@ -196,6 +214,9 @@ export function useReaderConversation(location: ConversationLocation, dependenci
       // postJson has already rejected responses from an expired authentication session.
       write(storage.session, activeKey, JSON.stringify(next));
       remember(created.conversationId);
+      for (const listener of recoveryListeners) {
+        if (listener.instance !== instance && listener.key === activeKey && listener.storage === storage.session) listener.accepted(next);
+      }
       if (!mounted.current || selection.current.key !== token.key) return false;
       submission.jobId = created.id;
       setState(previous => ({ ...previous, active: next, announcement: 'Answering',

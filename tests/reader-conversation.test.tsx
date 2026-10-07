@@ -310,6 +310,29 @@ it.each(['standalone', 'source'] as const)('accepts the %s job when navigation r
   expect(view.turns[0].question).toBe('Question while navigating');
 });
 
+it.each([['standalone', true], ['source', true], ['standalone', false], ['source', false]] as const)('resumes the accepted %s job when remount precedes acknowledgement, existing conversation %s', async (kind, existing) => {
+  const script = new ScriptedConversation();
+  const late = deferred<{ id: string; conversationId: string }>();
+  script.submit.mockImplementation(() => late.promise);
+  if (existing) storage.local!.setItem(localKey(kind), a);
+  await mount(kind, script, existing ? a : undefined);
+  await act(async () => view.setQuestion('Question before remount'));
+  let submission!: Promise<boolean>;
+  await act(async () => { submission = view.submit([screenshot]); });
+  await act(async () => root!.unmount()); root = undefined;
+  await mount(kind, script, existing ? a : undefined);
+  await act(async () => late.resolve({ id: 'job-a', conversationId: a }));
+  expect(await submission).toBe(false);
+  await flush();
+  expect(view.conversationId).toBe(a);
+  expect(view.activeJobId).toBe('job-a');
+  expect(view.busy).toBe(true);
+  expect(view.turns[0]).toMatchObject({ question: 'Question before remount', images: [screenshot] });
+  expect(script.readJob).toHaveBeenCalledWith('job-a', expect.any(AbortSignal));
+  await act(async () => view.cancel());
+  expect(script.cancel).toHaveBeenCalledWith('job-a');
+});
+
 it('preserves HTTP auth generation fencing for a late submission after private data is forgotten', async () => {
   const late = deferred<Response>();
   vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => init?.method === 'POST' ? late.promise : new Response('[]', { headers: { 'Content-Type': 'application/json' } })));

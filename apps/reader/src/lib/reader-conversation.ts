@@ -45,9 +45,10 @@ const browserAdapter: ConversationAdapter = {
 type BrowserStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 export type ConversationStorage = { local?: BrowserStorage; session?: BrowserStorage };
 // A POST can outlive its hook. The remounted hook needs the accepted job without another navigation.
-const recoveryListeners = new Set<{ instance: object; key: string; storage?: BrowserStorage; accepted: (active: Active) => void }>();
+const recoveryListeners = new Set<{ instance: object; key: string; storage?: BrowserStorage; accepted: (active: Active) => void; deleted: (id: string) => void }>();
 const unavailableStorage = {};
 const acceptedSubmissions = new WeakMap<object, Map<string, number>>();
+const deletedConversations = new WeakMap<object, Set<string>>();
 let submissionOrder = 0;
 function browserStorage(): ConversationStorage {
   const storage: ConversationStorage = {};
@@ -104,6 +105,7 @@ export function useReaderConversation(location: ConversationLocation, dependenci
   const selection = useRef({ key: selectionKey });
   if (selection.current.key !== selectionKey) selection.current = { key: selectionKey };
   const submitting = useRef<{ token: typeof selection.current; jobId?: string } | undefined>(undefined);
+  const deferredRecovery = useRef<{ key: string; active: Active } | undefined>(undefined);
   const cancelling = useRef<string | undefined>(undefined);
   const deleting = useRef<string | undefined>(undefined);
   const mounted = useRef(true);
@@ -119,6 +121,15 @@ export function useReaderConversation(location: ConversationLocation, dependenci
   const adopt = (pending: Active) => setState(previous => previous.scope === scope ? { ...previous, active: pending,
     local: previous.local.some(turn => turn.jobId === pending.id) ? previous.local : [...previous.local,
       { conversationId: pending.conversationId, jobId: pending.id, question: pending.question, images: pending.images }] } : previous);
+  const recover = (pending: Active) => {
+    if (deletedConversations.get(storage.session ?? unavailableStorage)?.has(pending.conversationId)) return;
+    if (conversationId && pending.conversationId !== conversationId) return;
+    adopt(pending);
+    if (!conversationId) {
+      if (embedded) update({ panelId: pending.conversationId });
+      else if (location.kind === 'standalone') location.open(pending.conversationId, true);
+    }
+  };
   const finish = (id: string) => {
     forgetActive(id);
     if (submitting.current?.jobId === id) submitting.current = undefined;
@@ -151,11 +162,22 @@ export function useReaderConversation(location: ConversationLocation, dependenci
 
   useEffect(() => {
     const listener = { instance, key: activeKey, storage: storage.session, accepted: (pending: Active) => {
-      if (conversationId && pending.conversationId !== conversationId) return;
-      adopt(pending);
-      if (!conversationId) {
-        if (embedded) update({ panelId: pending.conversationId });
-        else if (location.kind === 'standalone') location.open(pending.conversationId, true);
+      if (submitting.current && !submitting.current.jobId && submitting.current.token.key === selection.current.key) {
+        deferredRecovery.current = { key: activeKey, active: pending };
+        return;
+      }
+      recover(pending);
+    }, deleted: (id: string) => {
+      if (deferredRecovery.current?.active.conversationId === id) deferredRecovery.current = undefined;
+      const pending = readActive(storage.session, activeKey);
+      if (pending?.conversationId === id) finish(pending.id);
+      if (read(storage.local, recentKey) === id) forget();
+      setState(previous => previous.scope === scope ? { ...previous,
+        active: previous.active?.conversationId === id ? undefined : previous.active,
+        local: previous.local.filter(turn => turn.conversationId !== id) } : previous);
+      if (conversationId === id) {
+        if (embedded) update({ panelId: undefined });
+        else if (location.kind === 'standalone') location.open(undefined, true);
       }
     } };
     recoveryListeners.add(listener);
@@ -215,10 +237,12 @@ export function useReaderConversation(location: ConversationLocation, dependenci
         ...(conversationId ? { conversationId } : source ? { sourceId: source.sourceId } : {}) });
       // Compare accepted submissions across mounts. A failed newer POST must not hide an older accepted job.
       const owner = storage.session ?? unavailableStorage;
+      if (deletedConversations.get(owner)?.has(created.conversationId)) return false;
       const accepted = acceptedSubmissions.get(owner) ?? new Map<string, number>();
       if (order < (accepted.get(activeKey) ?? 0)) return false;
       accepted.set(activeKey, order);
       acceptedSubmissions.set(owner, accepted);
+      deferredRecovery.current = undefined;
       const next = { ...created, question: submitted, images };
       // An accepted job keeps running after navigation. Keep its original recovery keys even if the view moved.
       // postJson has already rejected responses from an expired authentication session.
@@ -241,7 +265,14 @@ export function useReaderConversation(location: ConversationLocation, dependenci
     } catch (failure) {
       if (current(token)) reportError((failure as Error).message);
       return false;
-    } finally { if (!submission.jobId && submitting.current === submission) submitting.current = undefined; }
+    } finally {
+      if (!submission.jobId && submitting.current === submission) {
+        submitting.current = undefined;
+        const pending = deferredRecovery.current;
+        deferredRecovery.current = undefined;
+        if (pending?.key === activeKey && mounted.current && selection.current.key === token.key) recover(pending.active);
+      }
+    }
   };
   const cancel = async () => {
     if (!active || cancelling.current === active.id || state.stopping === active.id) return;
@@ -270,6 +301,13 @@ export function useReaderConversation(location: ConversationLocation, dependenci
     reportError('');
     try {
       await remove.mutateAsync(id);
+      const owner = storage.session ?? unavailableStorage;
+      const deleted = deletedConversations.get(owner) ?? new Set<string>();
+      deleted.add(id);
+      deletedConversations.set(owner, deleted);
+      for (const listener of recoveryListeners) {
+        if (listener.instance !== instance && listener.storage === storage.session) listener.deleted(id);
+      }
       client.setQueryData<HistoryItem[]>(keys.conversations, previous => previous?.filter(item => item.id !== id));
       client.removeQueries({ queryKey: keys.conversation(id) });
       const pending = readActive(storage.session, activeKey);

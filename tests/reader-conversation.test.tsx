@@ -401,6 +401,63 @@ it.each(['standalone', 'source'] as const)('recovers the older accepted %s job w
   expect(JSON.parse(storage.session!.getItem(activeKey(kind))!)).toMatchObject({ id: 'job-a', question: 'Accepted question' });
 });
 
+it.each([['standalone', false], ['source', false], ['standalone', true], ['source', true]] as const)('defers old %s recovery during a newer submission, refusal %s', async (kind, refused) => {
+  const script = new ScriptedConversation();
+  const old = deferred<{ id: string; conversationId: string }>();
+  const newer = deferred<{ id: string; conversationId: string }>();
+  script.submit.mockImplementationOnce(() => old.promise).mockImplementationOnce(async () => {
+    const created = await newer.promise;
+    if (refused) throw new ApiError('Question already running', 429);
+    return created;
+  });
+  await mount(kind, script);
+  await act(async () => view.setQuestion('Older question'));
+  let first!: Promise<boolean>;
+  await act(async () => { first = view.submit(); });
+  await act(async () => root!.unmount()); root = undefined;
+  await mount(kind, script);
+  await act(async () => view.setQuestion('Newer question'));
+  let second!: Promise<boolean>;
+  await act(async () => { second = view.submit(); });
+  await act(async () => old.resolve({ id: 'job-a', conversationId: a }));
+  expect(await first).toBe(false);
+  await flush();
+  expect(view.conversationId).toBeUndefined();
+  expect(view.busy).toBe(true);
+  expect(view.question).toBe('Newer question');
+  await act(async () => newer.resolve({ id: 'job-b', conversationId: b }));
+  expect(await second).toBe(!refused);
+  await flush();
+  expect(view.conversationId).toBe(refused ? a : b);
+  expect(view.activeJobId).toBe(refused ? 'job-a' : 'job-b');
+  expect(view.busy).toBe(true);
+  expect(JSON.parse(storage.session!.getItem(activeKey(kind))!).id).toBe(refused ? 'job-a' : 'job-b');
+});
+
+it.each(['standalone', 'source'] as const)('discards an accepted %s acknowledgement after its conversation was deleted', async kind => {
+  const script = new ScriptedConversation();
+  const late = deferred<{ id: string; conversationId: string }>();
+  script.submit.mockImplementation(() => late.promise);
+  storage.local!.setItem(localKey(kind), a);
+  await mount(kind, script, a);
+  await act(async () => view.setQuestion('Question before deletion'));
+  let submission!: Promise<boolean>;
+  await act(async () => { submission = view.submit(); });
+  await act(async () => root!.unmount()); root = undefined;
+  await mount(kind, script, a);
+  await act(async () => view.deleteConversation(a));
+  await flush();
+  await act(async () => view.setQuestion('Fresh composer'));
+  await act(async () => late.resolve({ id: 'job-a', conversationId: a }));
+  expect(await submission).toBe(false);
+  await flush();
+  expect(view.conversationId).toBeUndefined();
+  expect(view.activeJobId).toBeUndefined();
+  expect(view.question).toBe('Fresh composer');
+  expect(storage.local!.getItem(localKey(kind))).toBeNull();
+  expect(storage.session!.getItem(activeKey(kind))).toBeNull();
+});
+
 it.each(['standalone', 'source'] as const)('cleans accepted %s deletion after the initiating view unmounts', async kind => {
   const script = new ScriptedConversation();
   const late = deferred<{}>();
@@ -411,13 +468,14 @@ it.each(['standalone', 'source'] as const)('cleans accepted %s deletion after th
   let deletion!: Promise<void>;
   await act(async () => { deletion = view.deleteConversation(a); });
   await act(async () => root!.unmount()); root = undefined;
+  await mount(kind, script, a, originalClient);
   await act(async () => late.resolve({}));
   await deletion;
+  await flush();
   expect(originalClient.getQueryData(keys.conversation(a))).toBeUndefined();
   expect(originalClient.getQueryData<{ id: string }[]>(keys.conversations)?.some(item => item.id === a)).not.toBe(true);
   expect(storage.local!.getItem(localKey(kind))).toBeNull();
   expect(storage.session!.getItem(activeKey(kind))).toBeNull();
-  await mount(kind, script, undefined, originalClient);
   expect(view.conversationId).toBeUndefined();
   expect(view.turns).toEqual([]);
 });

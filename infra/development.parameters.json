@@ -1,0 +1,18 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environment": { "value": "dev" },
+    "location": { "value": "swedencentral" },
+    "suffix": { "value": "16681c6a" },
+    "vaultName": { "value": "kv-research-dev-16681c6a" },
+    "bootstrapPrincipalId": { "value": "ea69e00a-4127-45a8-808b-e795a75dad51" },
+    "sqlServer": { "value": "sql-research-dev-16681c6a.database.windows.net" },
+    "sqlDatabase": { "value": "research" },
+    "captureEnabled": { "value": true },
+    "modelCapacity": { "value": 1000 },
+    "sandboxSnapshot": { "value": "4daeeb76-0b95-4d8b-9c36-32ea7167fcde" },
+    "browserSandboxSnapshot": { "value": "7a826ed2-1373-4ef5-ac45-2e29272acbe5" },
+    "browserAssetHosts": { "value": "d35vozid5pezr8.cloudfront.net,diegovitaglianosantalucia.tidelizio.app" }
+  }
+}

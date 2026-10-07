@@ -49,6 +49,16 @@ it('preserves an explicit safe return target through login', async () => {
   expect(redirects).toEqual(['/chat/abc/']);
   dom.window.close();
 });
+it('keeps custom-domain sign-in and return paths on the custom domain', async () => {
+  const { dom, calls, document } = await render(null, undefined, 'https://shelf.huuhka.net/sources/?source=abc');
+  const login = new URL(document.querySelector('#primary')!.getAttribute('href')!, dom.window.location.href);
+  expect(login.origin).toBe('https://shelf.huuhka.net');
+  expect(login.pathname).toBe('/.auth/login/github');
+  expect(login.searchParams.get('post_login_redirect_uri')).toBe('/sources/?source=abc');
+  expect(calls[0].path).toBe('/.auth/me');
+  expect(calls[0].options.credentials).toBe('same-origin');
+  dom.window.close();
+});
 it('does not redirect an authorized identity when the protected page still returns 403', async () => {
   const { dom, redirects, document } = await render(authorized, undefined, 'https://reader.invalid/login.html', true);
   expect(redirects).toEqual([]);

@@ -14,6 +14,9 @@
     "vaultName": {
       "value": "kv-research-prod-16681c6"
     },
+    "readerCustomDomain": {
+      "value": "shelf.huuhka.net"
+    },
     "bootstrapPrincipalId": {
       "value": "ea69e00a-4127-45a8-808b-e795a75dad51"
     },
@@ -24,7 +27,7 @@
       "value": "research"
     },
     "captureEnabled": {
-      "value": false
+      "value": true
     },
     "modelCapacity": {
       "value": 100

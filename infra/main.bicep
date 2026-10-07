@@ -8,6 +8,7 @@ param vaultName string = 'kv-research-dev-16681c6a'
 param bootstrapPrincipalId string
 param processingVersion string = '2'
 param readerGithubUsers string = 'pinaatti,DrBushyTop'
+param readerCustomDomain string = ''
 param sqlServer string = 'sql-research-dev-16681c6a.database.windows.net'
 param sqlDatabase string = 'research'
 param browserSandboxSnapshot string = ''
@@ -20,6 +21,8 @@ var blobContributor = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var queueContributor = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
 var tableContributor = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
 var secretUser = '4633458b-17de-408a-b874-0445c86b69e6'
+var foundryName = 'foundry-research-${environment}-${suffix}'
+var foundryEndpoint = 'https://${foundryName}.services.ai.azure.com'
 
 resource workerIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = { name: 'id-research-worker-${environment}', location: location, tags: tags }
 resource ciIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = { name: 'id-research-ci-${environment}', location: location, tags: tags }
@@ -109,12 +112,13 @@ resource secretRoles 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for
   properties: { principalId: workerIdentity.properties.principalId, principalType: 'ServicePrincipal', roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', secretUser) }
 }]
 resource ai 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
-  name: 'ai-research-${environment}-${suffix}'
+  name: foundryName
   location: location
   tags: tags
-  kind: 'OpenAI'
+  kind: 'AIServices'
   sku: { name: 'S0' }
-  properties: { customSubDomainName: 'ai-research-${environment}-${suffix}', disableLocalAuth: true, publicNetworkAccess: 'Enabled' }
+  identity: { type: 'SystemAssigned' }
+  properties: { customSubDomainName: foundryName, allowProjectManagement: true, disableLocalAuth: true, publicNetworkAccess: 'Enabled' }
 }
 resource model 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
   parent: ai
@@ -184,7 +188,7 @@ resource settings 'Microsoft.Web/sites/config@2024-04-01' = {
     SQL_DATABASE: sqlDatabase
     AZURE_CLIENT_ID: workerIdentity.properties.clientId
     KEY_VAULT_URI: vault.properties.vaultUri
-    FOUNDRY_ENDPOINT: 'https://${ai.name}.openai.azure.com'
+    FOUNDRY_ENDPOINT: foundryEndpoint
     FOUNDRY_DEPLOYMENT: model.name
     APPLICATIONINSIGHTS_CONNECTION_STRING: insights.properties.ConnectionString
     APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'ClientId=${workerIdentity.properties.clientId};Authorization=AAD'
@@ -211,12 +215,17 @@ resource reader 'Microsoft.Web/staticSites@2024-04-01' = {
   sku: { name: 'Free', tier: 'Free' }
   properties: { stagingEnvironmentPolicy: 'Disabled', allowConfigFileUpdates: true }
 }
+resource readerDomain 'Microsoft.Web/staticSites/customDomains@2024-04-01' = if (!empty(readerCustomDomain)) {
+  parent: reader
+  name: readerCustomDomain
+  properties: { validationMethod: 'cname-delegation' }
+}
 output storageAccount string = storage.name
 output functionApp string = worker.name
-output readerUrl string = 'https://${reader.properties.defaultHostname}'
+output readerUrl string = empty(readerCustomDomain) ? 'https://${reader.properties.defaultHostname}' : 'https://${readerCustomDomain}'
 output ciClientId string = ciIdentity.properties.clientId
 output tenantId string = subscription().tenantId
-output foundryEndpoint string = 'https://${ai.name}.openai.azure.com'
+output foundryEndpoint string = foundryEndpoint
 output foundryDeployment string = model.name
 
 output workerClientId string = workerIdentity.properties.clientId

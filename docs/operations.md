@@ -8,16 +8,20 @@ The GitHub map is the canonical plan and ticket tracker. This file explains how 
 
 ## Deployment and identity
 
-Development resources use `rg-research-kb-dev` in Sweden Central in the selected Microsoft Azure Sponsorship subscription. `infra/main.bicep` creates private Storage containers and queues, on-demand Functions Flex, a consumption-based Foundry/OpenAI deployment, capped diagnostics, managed identities, GitHub federation and Static Web Apps Free. The pre-existing vault is `kv-research-dev-16681c6a`.
+Development resources use `rg-research-kb-dev` in Sweden Central in the selected Microsoft Azure Sponsorship subscription. `infra/main.bicep` creates private Storage containers and queues, on-demand Functions Flex, a Microsoft Foundry resource with a consumption-based model deployment, capped diagnostics, managed identities, GitHub federation and Static Web Apps Free. The pre-existing vault is `kv-research-dev-16681c6a`.
 
 ```sh
 az deployment group create \
   --resource-group rg-research-kb-dev \
   --template-file infra/main.bicep \
-  --parameters bootstrapPrincipalId=YOUR_AZURE_OBJECT_ID
+  --parameters @infra/development.parameters.json
 ```
 
 Run provisioning with the intended Azure subscription selected. The initial deployment used subscription `ede0939c-80c4-4dfe-bf3d-84521f3f6d1f`. Bicep deployment output gives resource names and GitHub identity values. The workflow variables are `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, `STORAGE_ACCOUNT` and `FUNCTION_APP`. `SWA_DEPLOYMENT_TOKEN` is a GitHub Actions secret; retrieve it through Azure CLI and pass it directly to `gh secret set`, without printing or writing it into repository files.
+
+The Foundry account is `foundry-research-dev-16681c6a`, with kind `AIServices` and project management enabled. Key authentication is disabled. The worker and operator have account-scoped Cognitive Services OpenAI User permissions for inference. `FOUNDRY_ENDPOINT` is the account root, `https://foundry-research-dev-16681c6a.services.ai.azure.com`; the clients append `/openai/v1/chat/completions` or `/openai/v1/responses`. `FOUNDRY_DEPLOYMENT` remains `research-sol`. Foundry supports these [OpenAI v1 endpoint routes](https://learn.microsoft.com/en-us/azure/ai-studio/ai-services/concepts/endpoints). The former `ai-research-dev-16681c6a` OpenAI account was deleted and purged on 2026-10-07. Incremental Bicep deployments do not delete resources omitted from the template.
+
+The development parameter file records the cloud worker's SQL database, model capacity and browser sandbox settings. Local development uses the separate `research_dev` database described in [SQL setup](sql.md#local-development).
 
 The worker identity reads only `zotero-account-id` and `zotero-api-key` in Key Vault. It has private storage and inference access. It cannot read the account password or the separate development test-data write key. The importer identity can access the pipeline and deployment containers and deploy the Function App; it has no raw-container, Zotero or vault permissions. Repository writes use the job's scoped GitHub workflow token. Federation trusts master in this private repository with GitHub's immutable owner/repository ID subject. See [GitHub OIDC subjects](https://docs.github.com/en/actions/reference/security/oidc). The githubSubject Bicep parameter must match the workflow token; PR checks have no cloud login or deployment secrets.
 

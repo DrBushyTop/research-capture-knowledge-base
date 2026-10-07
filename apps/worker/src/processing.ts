@@ -87,13 +87,13 @@ export async function processJob(store: PipelineStore, id: string, processor: Pr
             await store.write(`jobs/${id}.json`, { ...job, retryAt: new Date(Date.now() + 10 * 60_000).toISOString(), error: 'Transient inference failure' });
             return;
           }
-          extracted.evidence.status = 'needs-review'; extracted.evidence.reason = 'Machine analysis unavailable or invalid; source retained privately for reprocessing.';
+          input.extraction.status = 'needs-review'; input.extraction.reason = 'Machine analysis unavailable or invalid; source retained privately for reprocessing.';
         }
       }
       if (job.categoryPlan?.preserveExisting && !analysis) {
         await store.write(`jobs/${id}.json`, { ...job, status: 'failed', error: 'Analysis could not be generated. The existing note is still available. Retry this document.' }); return;
       }
-      note = noteSchema.parse({ schemaVersion: category ? 2 : 1, ...(category ? { category } : {}), generationId: id, source: snapshot.source, extraction: extracted.evidence, analysis,
+      note = noteSchema.parse({ schemaVersion: category ? 2 : 1, ...(category ? { category } : {}), generationId: id, source: snapshot.source, extraction: input.extraction, analysis,
         processing: { version: processor.version, model: input.available ? processor.model : null, processedAt: new Date().toISOString() },
         rightsEvidence: await processor.rights(snapshot.source.doi) });
       await store.create(`analysis/${id}.json`, note);

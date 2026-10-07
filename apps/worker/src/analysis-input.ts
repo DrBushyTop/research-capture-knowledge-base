@@ -1,5 +1,5 @@
 import { hash, noteSchema, type Note } from '../../../shared/corpus.js';
-import { matchedSourceText, sourceText } from '../../../shared/source-text.js';
+import { matchedSourceText, sourceText, sourceTextSchema } from '../../../shared/source-text.js';
 import { sourceImage, sourceImageLimits, type SourceImage } from './image-input.js';
 import type { PipelineStore } from './pipeline.js';
 import type { SourceArtifacts } from './source-artifacts.js';
@@ -26,6 +26,7 @@ export class AnalysisInputs {
       if (note.extraction.artifactMime && checked.mime !== note.extraction.artifactMime.split(';')[0].trim().toLowerCase()) throw new Error('Analysis image MIME does not match the pinned artifact');
       return checked;
     });
+    if (note.extraction.method === 'image-vision' && !images?.length) throw new Error('Pinned image evidence is unavailable');
     return { text: input.text, images, available: !!input.text.trim() || !!images?.length };
   }
 
@@ -35,11 +36,18 @@ export class AnalysisInputs {
     if (checked.text) {
       await this.store.create(key, sourceText(note, checked.text));
     }
-    // An interrupted attempt may already have recorded text. Analyze that same immutable evidence.
+    // Text and extraction provenance share one immutable record, including interrupted attempts.
     const cached = await this.store.read(key);
-    if (cached !== undefined) checked.text = matchedSourceText(note, cached);
-    checked.available = !!checked.text.trim() || !!checked.images?.length;
-    return checked;
+    if (cached !== undefined) {
+      const saved = sourceTextSchema.parse(cached);
+      // Legacy records lack extraction details. Changed text cannot safely borrow fresh provenance.
+      if (!saved.extraction && saved.text !== checked.text) throw new Error('Retained text extraction provenance is unavailable; reprocess this source');
+      const extraction = saved.extraction || note.extraction;
+      const pinned = { ...note, extraction };
+      const text = matchedSourceText(pinned, saved);
+      return { ...this.checked(pinned, { text, images: extraction.method === 'image-vision' ? checked.images : undefined }), extraction };
+    }
+    return { ...checked, extraction: note.extraction };
   }
 
   async read(sourceId: string, generationId: string) {
@@ -56,6 +64,6 @@ export class AnalysisInputs {
     }
     const input = this.checked(note, { text, images });
     if (!input.available) throw new Error('No readable text or supported image evidence is available');
-    return { ...input, source: note.source };
+    return { ...input, extraction: note.extraction, source: note.source };
   }
 }

@@ -6,6 +6,7 @@ import { categoryRegistry } from '../apps/worker/src/category-registry.js';
 import { SourceArtifacts } from '../apps/worker/src/source-artifacts.js';
 import { hash, normalize, type Note } from '../shared/corpus.js';
 import { AnalysisInputs } from '../apps/worker/src/analysis-input.js';
+import { TransientInference } from '../apps/worker/src/enrichment.js';
 import { sourceText } from '../shared/source-text.js';
 import { type Template, type TemplateAnalysis } from '../shared/categories.js';
 import { MemoryStore, snapshot } from './fixtures.js';
@@ -60,6 +61,55 @@ for (const [adapter, makeArtifacts] of [['memory', () => new MemorySourceArtifac
       expect(originals.request).not.toHaveBeenCalled();
       expect(store.publishNote).not.toHaveBeenCalled();
       expect(await store.list('source-text/')).toHaveLength(caption ? 1 : 0);
+    });
+
+    it('keeps caption provenance when a retry recovers browser text after transient inference failure', async () => {
+      const raw = makeArtifacts();
+      const store = Object.assign(new MemoryStore(), { retain: raw.retain.bind(raw), readArtifact: raw.readArtifact.bind(raw),
+        publishNote: vi.fn(async (_note: Note) => {}) });
+      const saved = structuredClone(snapshot);
+      saved.items[1].data.contentType = 'text/html';
+      saved.items[0].data.abstractNote = '<p>Saved caption before browser recovery</p>';
+      const artifacts = new SourceArtifacts(store);
+      const originals = { request: vi.fn(async () => new Response('<html><body>Choose your language</body></html>')) };
+      const browser = vi.fn(async () => ({ version: 'browser-1', sourceUrl: 'https://example.com/article',
+        retrievedAt: '2026-10-07T12:00:00Z', text: 'Recovered article content and evidence. '.repeat(8),
+        views: [{ url: 'https://example.com/article', title: 'Article', text: 'Article content and evidence. '.repeat(8), controls: [], blockedRequests: 0 }],
+        actions: [], complete: true, stopReason: 'complete', coverage: 'Recovered article coverage' }))
+        .mockRejectedValueOnce(new Error('Browser unavailable on first attempt'));
+      const registry = await categoryRegistry(store);
+      const analyzeTemplate = vi.fn(analyze).mockRejectedValueOnce(new TransientInference('Retry inference'));
+      const processor: Processor = { version: 'retry-evidence-test', model: 'test',
+        extract: source => artifacts.extract(source, originals, browser),
+        classify: async () => ({ categoryId: 'other', reason: 'Saved source' }), analyzeTemplate,
+        enrich: async () => { throw new Error('Use template analysis'); }, rights: async () => [] };
+      await discover(store, saved, processor.version, undefined, registry);
+      const job = (await store.read<Job>((await store.list('jobs/'))[0]))!;
+      await processJob(store, job.id, processor);
+      expect(store.publishNote).not.toHaveBeenCalled();
+      const pending = (await store.read<Job>(`jobs/${job.id}.json`))!;
+      expect(pending).toMatchObject({ status: 'pending', attempts: 1, error: 'Transient inference failure' });
+      await store.write(`jobs/${job.id}.json`, { ...pending, retryAt: undefined });
+      await processJob(store, job.id, processor);
+      expect(browser).toHaveBeenCalledTimes(2);
+      const note = (await store.read<Note>(`analysis/${job.id}.json`))!;
+      expect(analyzeTemplate.mock.calls.map(call => call[0])).toEqual([
+        'Saved caption before browser recovery', 'Saved caption before browser recovery'
+      ]);
+      expect(note.extraction).toMatchObject({ method: 'zotero-metadata', status: 'metadata-only', truncated: false });
+      expect(note.extraction.reason).toContain('original document or post text was unavailable');
+      expect(await store.read(`source-text/${job.id}.json`)).toMatchObject({ extraction: note.extraction });
+      expect(store.publishNote).toHaveBeenCalledExactlyOnceWith(note);
+      const revision = hash('retry corpus');
+      await store.write('chat/current.json', { revision });
+      await store.create(`chat/corpora/${revision}.json`, { revision, sources: [{ note, humanMarkdown: '' }] });
+      const template = registry.categories.find(category => category.id === 'other')!;
+      const preview = await startPreview(store, 'admin-a', note.source.id, template, async () => {});
+      const previewAnalysis = vi.fn(analyze);
+      await processPreview(store, preview.id, previewAnalysis, artifacts);
+      expect(await getPreview(store, 'admin-a', preview.id)).toMatchObject({ status: 'complete' });
+      expect(previewAnalysis.mock.calls[0][0]).toBe('Saved caption before browser recovery');
+      expect(previewAnalysis.mock.calls[0].at(-1)).toBeUndefined();
     });
 
     it('uses the preview generation after a newer capture becomes current', async () => {
@@ -142,6 +192,9 @@ it.each(['browser', 'zotero-metadata'] as const)('replays pinned %s text without
   const processing = await inputs.retain(note, { text });
   await store.create(`analysis/${note.generationId}.json`, note);
   expect(await inputs.read(note.source.id, note.generationId)).toEqual({ ...processing, source: note.source });
+  const { extraction: _extraction, ...legacyText } = sourceText(note, text);
+  await store.write(`source-text/${note.generationId}.json`, legacyText);
+  expect(await inputs.read(note.source.id, note.generationId)).toEqual({ ...processing, source: note.source });
   expect(artifacts.readForNote).not.toHaveBeenCalled();
   store.data.delete(`source-text/${note.generationId}.json`);
   await expect(inputs.read(note.source.id, note.generationId)).rejects.toThrow('No readable text');
@@ -155,6 +208,27 @@ it('uses previously retained text after an interrupted attempt produces changed 
   for (const text of ['Later changed browser evidence', '']) {
     expect(await inputs.retain(note, { text })).toMatchObject({ text: 'First retained browser evidence', available: true });
   }
+});
+
+it('rejects changed legacy text during processing when its extraction provenance is unknown', async () => {
+  const store = new MemoryStore();
+  const note = textNote('browser');
+  const { extraction: _extraction, ...legacyText } = sourceText(note, 'Previously retained browser text');
+  await store.create(`source-text/${note.generationId}.json`, legacyText);
+  const inputs = new AnalysisInputs(store);
+  expect(await inputs.retain(note, { text: legacyText.text })).toMatchObject({ text: legacyText.text, extraction: note.extraction });
+  await expect(inputs.retain(note, { text: 'Different extraction cannot describe the old text' })).rejects.toThrow('provenance is unavailable');
+});
+
+it('keeps the retained caption and its provenance when a retry selects new image evidence', async () => {
+  const store = new MemoryStore();
+  const note = textNote('zotero-metadata');
+  const inputs = new AnalysisInputs(store);
+  await inputs.retain(note, { text: 'Previously retained caption' });
+  const newer = { ...note, extraction: { ...note.extraction, status: 'image' as const, method: 'image-vision' as const,
+    artifactHash: hash(screenshot), artifactMime: 'image/png' } };
+  expect(await inputs.retain(newer, { text: 'Changed caption', images: [{ bytes: screenshot, mime: 'image/png' }] }))
+    .toEqual({ text: 'Previously retained caption', images: undefined, available: true, extraction: note.extraction });
 });
 
 it('rejects mismatched fresh image evidence before classification or analysis', async () => {

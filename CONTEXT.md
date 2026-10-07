@@ -30,6 +30,9 @@ _Avoid_: Topic, file format, Zotero item type
 The named sections and extraction instructions used to analyse sources in a category. A template revision records the particular definition used for an analysis.
 _Avoid_: Category, source note
 
+**Analysis input**
+The source text and retained image bytes prepared for one source generation. Saved captions remain separate from image bytes.
+
 **Topic**:
 A subject associated with a source, such as astronomy, cooking, or architecture. A source can have several topics independently of its category.
 _Avoid_: Category

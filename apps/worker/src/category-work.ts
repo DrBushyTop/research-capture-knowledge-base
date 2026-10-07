@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
-import { hash, noteSchema, sourceId, type Note } from '../../../shared/corpus.js';
+import { hash, sourceId, type Note } from '../../../shared/corpus.js';
 import { assignmentSchema, categoryId, templateSchema, type CategoryAssignment, type Registry, type Template, type TemplateAnalysis } from '../../../shared/categories.js';
 import { chatCorpusSchema, type ChatCorpus } from '../../../shared/chat.js';
-import { matchedSourceText } from '../../../shared/source-text.js';
+import { AnalysisInputs } from './analysis-input.js';
+import type { SourceArtifacts } from './source-artifacts.js';
+import type { SourceImage } from './image-input.js';
 import type { Job, PipelineStore, SourceState } from './pipeline.js';
 import { categoryRegistry, CategoryError } from './category-registry.js';
 import { SourceGenerations } from './source-generations.js';
@@ -139,7 +141,7 @@ export async function getPreview(store: PipelineStore, owner: string, id: string
   if (!preview || preview.owner !== owner) throw new CategoryError(404, 'Preview not found');
   return { id, status: preview.status, result: preview.result, error: preview.error };
 }
-export async function processPreview(store: PipelineStore, id: string, analyze: (text: string, template: Template, signal?: AbortSignal, source?: Note['source']) => Promise<TemplateAnalysis>) {
+export async function processPreview(store: PipelineStore, id: string, analyze: (text: string, template: Template, signal?: AbortSignal, source?: Note['source'], images?: SourceImage[]) => Promise<TemplateAnalysis>, artifacts?: Pick<SourceArtifacts, 'readForNote'>) {
   const key = previewKey(id);
   await store.withLease(`category-preview-${id}`, async () => {
     const preview = await store.read<Preview>(key);
@@ -150,16 +152,12 @@ export async function processPreview(store: PipelineStore, id: string, analyze: 
     preview.attempts++;
     await store.write(key, preview);
     try {
-      const note = noteSchema.parse(await store.read<Note>(`analysis/${preview.generationId}.json`));
-      const input = await store.read(`source-text/${preview.generationId}.json`);
-      if (!input) throw new Error('No source text available');
-      const text = matchedSourceText(note, input);
-      if (!text.trim()) throw new Error('No source text available');
-      const result = await analyze(text, preview.template, store.leaseSignal, note.source);
+      const input = await new AnalysisInputs(store, artifacts).read(preview.sourceId, preview.generationId);
+      const result = await analyze(input.text, preview.template, store.leaseSignal, input.source, input.images);
       await store.write(key, { ...preview, status: 'complete', result });
     } catch {
       store.leaseSignal?.throwIfAborted();
-      await store.write(key, { ...preview, status: 'failed', error: 'Preview unavailable. Check that this document has readable source text, then try again.' });
+      await store.write(key, { ...preview, status: 'failed', error: 'Preview unavailable. Check that this document has readable text or a retained PNG, JPEG or WebP image, then try again.' });
     }
   });
 }

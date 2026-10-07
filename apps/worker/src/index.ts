@@ -5,12 +5,9 @@ import { processingVersion } from '../../../shared/corpus.js';
 import { createStore } from './sql-store.js';
 import { Zotero } from './zotero.js';
 import { discover, reconcile } from './pipeline.js';
-import { extract } from './extraction.js';
-import { recoverWebpage } from './browser-sandbox.js';
 import { enrich, classifySource, enrichTemplate, licenseEvidence } from './enrichment.js';
 import { categoryRegistry, CategoryError, saveCategory } from './category-registry.js';
 import { categoryOverview, startBatch, dispatchBatch, changeBatch, recoverCategoryWork, startPreview, getPreview, processPreview } from './category-work.js';
-import { processJob } from './processing.js';
 import { ChatAccessError, cancelChat, chatStatus, deleteConversation, getConversation, listConversations, processChatJob, readerIdentity, reconcileChat, submitChat } from './chat-service.js';
 import { sandboxClient } from './chat-sandbox.js';
 import { deleteExpiredWorkspaces } from './sandbox-lifecycle.js';
@@ -138,6 +135,10 @@ app.storageQueue('processCapture', {
       const analyzeTemplate = (text: string, template: import('../../../shared/categories.js').Template, signal?: AbortSignal, source?: import('../../../shared/corpus.js').Note['source'], images?: import('./image-input.js').SourceImage[]) => enrichTemplate(text, template, required('FOUNDRY_ENDPOINT'), required('FOUNDRY_DEPLOYMENT'), signal, source, images);
       if (id.startsWith('b_')) { await dispatchBatch(state, id, next => state.send(next)); return; }
       if (id.startsWith('p_')) { await processPreview(state, id, analyzeTemplate); return; }
+      // Parsing and browser capture are processing-only dependencies, not part of reader API startup.
+      const [{ extract }, { recoverWebpage }, { processJob }] = await Promise.all([
+        import('./extraction.js'), import('./browser-sandbox.js'), import('./processing.js')
+      ]);
       await processJob(state, id, { version: process.env.PROCESSING_VERSION || processingVersion, model: required('FOUNDRY_DEPLOYMENT'),
         extract: async snapshot => extract(snapshot, { request: async (...args) => (await zotero()).request(...args) }, (hash, bytes, mime) => state.retainSource(snapshot.source.fingerprint, hash, bytes, mime), () => state.restoreSource(snapshot.source.fingerprint), process.env.BROWSER_SANDBOX_SNAPSHOT ? () => recoverWebpage(snapshot, state, state.leaseSignal || AbortSignal.timeout(180_000)) : undefined),
         enrich: (text, signal, images) => enrich(text, required('FOUNDRY_ENDPOINT'), required('FOUNDRY_DEPLOYMENT'), signal, images),

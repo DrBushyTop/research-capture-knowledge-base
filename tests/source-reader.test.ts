@@ -49,3 +49,21 @@ it('bounds downloads before reading large raw files', async () => {
   await expect(readSourceDocument(files, note.source.id)).rejects.toMatchObject({ status: 413 });
   expect(download).not.toHaveBeenCalled();
 });
+
+it('reads one current SQL source without building or loading the chat retrieval snapshot', async () => {
+  const { state, note } = await saved();
+  const source = vi.fn(async () => ({ note, humanMarkdown: '' }));
+  const read = vi.spyOn(state, 'read');
+  const store = { source, read: state.read.bind(state) };
+  expect((await readSourceText(store, note.source.id)).text).toBe('Original saved text.');
+  expect(source).toHaveBeenCalledExactlyOnceWith(note.source.id);
+  expect(read).toHaveBeenCalledExactlyOnceWith(`source-text/${note.generationId}.json`);
+});
+
+it('rejects inactive or unknown SQL sources without falling back to a stale chat snapshot', async () => {
+  const { state, note } = await saved();
+  const source = vi.fn(async () => undefined);
+  const read = vi.spyOn(state, 'read');
+  await expect(readSourceText({ source, read: state.read.bind(state) }, note.source.id)).rejects.toMatchObject({ status: 404 });
+  expect(read).not.toHaveBeenCalled();
+});

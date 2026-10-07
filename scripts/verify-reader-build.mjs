@@ -14,11 +14,12 @@ if (config.navigationFallback) throw new Error('Unguarded navigation fallback in
 if (config.routes.at(-1)?.rewrite !== '/index.html' || !config.routes.at(-1)?.allowedRoles?.includes('anonymous')) throw new Error('Reader app shell must load so the backend can validate the rolling session');
 const sessionStart = config.routes.find(route => route.route === '/api/session-start');
 if (sessionStart?.methods?.length !== 1 || sessionStart.methods[0] !== 'POST' || sessionStart.allowedRoles?.length !== 1 || sessionStart.allowedRoles[0] !== 'library_member' || config.routes.indexOf(sessionStart) >= config.routes.findIndex(route => route.route === '/api/*')) throw new Error('Session creation must retain the Azure edge role check before the public API route');
+if (config.routes.find(route => route.route === '/assets/*')?.headers?.['Cache-Control'] !== 'public, max-age=31536000, immutable') throw new Error('Versioned public assets must remain browser-cacheable');
 const index = await readFile(join(root, 'index.html'), 'utf8');
 if (!index.includes('id="root"') || !index.includes('/assets/')) throw new Error('React entrypoint or built assets missing');
 if (index.includes('astro-island') || index.includes('/_astro/')) throw new Error('Astro entrypoint still present');
 const manifest = JSON.parse(await readFile(join(root, 'manifest.webmanifest'), 'utf8'));
-if (manifest.id !== '/' || manifest.scope !== '/' || manifest.start_url !== '/login.html' || manifest.display !== 'standalone') throw new Error('PWA must launch through the sign-in gate in standalone mode');
+if (manifest.id !== '/' || manifest.scope !== '/' || manifest.start_url !== '/' || manifest.display !== 'standalone') throw new Error('PWA must open the reader directly in standalone mode');
 for (const icon of manifest.icons) {
   const png = await readFile(join(root, icon.src.slice(1)));
   const size = Number(icon.sizes.split('x')[0]);

@@ -5,8 +5,15 @@ import { ChatAccessError } from './chat-service.js';
 import type { PipelineStore } from './pipeline.js';
 import type { BlobStore } from './storage.js';
 
-async function currentNote(store: Pick<PipelineStore, 'read'>, id: string): Promise<Note> {
+type SourceStore = Pick<PipelineStore, 'read'> & { source?(id: string): Promise<{ note: Note } | undefined> };
+
+async function currentNote(store: SourceStore, id: string): Promise<Note> {
   if (!sourceId.safeParse(id).success) throw new ChatAccessError(404, 'Document not found');
+  if (store.source) {
+    const source = await store.source(id);
+    if (!source?.note.source.active || source.note.source.id !== id) throw new ChatAccessError(404, 'Document not found');
+    return source.note;
+  }
   const current = await store.read<{ revision: string }>('chat/current.json');
   if (!current) throw new ChatAccessError(503, 'The dataset is not ready yet');
   const corpus = chatCorpusSchema.parse(await store.read(`chat/corpora/${current.revision}.json`));
@@ -16,7 +23,7 @@ async function currentNote(store: Pick<PipelineStore, 'read'>, id: string): Prom
 }
 
 /** Read only text matched to the generation currently deployed in the private reader. */
-export async function readSourceText(store: Pick<PipelineStore, 'read'>, id: string) {
+export async function readSourceText(store: SourceStore, id: string) {
   const note = await currentNote(store, id);
   const saved = await store.read(`source-text/${note.generationId}.json`);
   return { sourceId: id, title: note.source.title, generationId: note.generationId,
@@ -24,7 +31,7 @@ export async function readSourceText(store: Pick<PipelineStore, 'read'>, id: str
 }
 
 /** Original PDF/image access uses corpus membership; arbitrary raw blobs cannot be requested. */
-export async function readSourceDocument(store: Pick<BlobStore, 'read' | 'raw'>, id: string) {
+export async function readSourceDocument(store: SourceStore & Pick<BlobStore, 'raw'>, id: string) {
   const note = await currentNote(store, id);
   const artifact = note.extraction.artifactHash;
   const mime = note.extraction.artifactMime || (note.extraction.method === 'pdf-text' ? 'application/pdf' : '');

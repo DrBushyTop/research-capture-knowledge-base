@@ -4,7 +4,7 @@
   "short_name": "Shelf",
   "description": "A private library for saved sources and research chat.",
   "lang": "en",
-  "start_url": "/login.html",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#edf1f5",

@@ -69,6 +69,22 @@ it('does not prolong a session on read-only status or private API access', async
   expect((store.data.get(key) as { expiresAt: string }).expiresAt).toBe(response.jsonBody.expiresAt);
 });
 
+it('reuses a recently renewed session across tabs without another SQL lease or write', async () => {
+  const { store, token, response } = await start();
+  const lease = vi.spyOn(store, 'withLease'), write = vi.spyOn(store, 'write');
+  vi.setSystemTime(now + 9 * 60_000);
+  const resumed = await readerSessionResponse(store, { encoded: null, token, renew: true });
+  expect(resumed.jsonBody).toEqual(response.jsonBody);
+  expect(resumed.headers['Set-Cookie']).toBeUndefined();
+  expect(lease).not.toHaveBeenCalled();
+  expect(write).not.toHaveBeenCalled();
+  vi.setSystemTime(now + 10 * 60_000);
+  const renewed = await readerSessionResponse(store, { encoded: null, token, renew: true });
+  expect(renewed.jsonBody.expiresAt).toBe(new Date(now + 10 * 60_000 + sessionLifetimeMs).toISOString());
+  expect(lease).toHaveBeenCalledTimes(1);
+  expect(write).toHaveBeenCalledTimes(1);
+});
+
 it('revokes logout on the server so a copied cookie cannot be replayed', async () => {
   const { store, token } = await start();
   const response = await readerSessionResponse(store, { encoded: null, token, renew: false, logout: true });
@@ -79,6 +95,7 @@ it('revokes logout on the server so a copied cookie cannot be replayed', async (
 
 it('does not resurrect a session when logout wins the renewal lease', async () => {
   const { store, token, key } = await start();
+  vi.setSystemTime(now + 10 * 60_000);
   store.withLease = async (_key, action) => { await store.remove(key); return action(); };
   const response = await readerSessionResponse(store, { encoded: null, token, renew: true });
   expect(response.jsonBody.clientPrincipal).toBeNull();

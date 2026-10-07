@@ -66,4 +66,8 @@ it('hosting serves the app shell while protecting session creation and preservin
   expect(config.navigationFallback).toBeUndefined();
   expect(config.responseOverrides['403']).toEqual({ rewrite: '/login.html', statusCode: 403 });
   expect(config.globalHeaders['Cache-Control']).toBe('private, no-store');
+  expect(rule('/assets/main.js').headers['Cache-Control']).toBe('public, max-age=31536000, immutable');
+  for (const pathname of ['/api/chat', '/api/session', '/login.html', '/index.html', '/sources/', '/sw.js']) {
+    expect(rule(pathname).headers?.['Cache-Control'] ?? config.globalHeaders['Cache-Control']).toBe('private, no-store');
+  }
 });

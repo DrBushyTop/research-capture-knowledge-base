@@ -145,6 +145,12 @@ export class SqlStore extends BlobStore {
     const result = await (await this.request()).query('SELECT note_json,human_markdown FROM dbo.Sources WHERE active=1 ORDER BY captured_at DESC,source_id');
     return result.recordset.map(row => ({ note: noteSchema.parse(JSON.parse(row.note_json)), humanMarkdown: row.human_markdown }));
   }
+  async source(id: string): Promise<ChatCorpus['sources'][number] | undefined> {
+    const result = await (await this.request()).input('id', sql.NVarChar(100), id)
+      .query('SELECT note_json,human_markdown FROM dbo.Sources WHERE source_id=@id AND active=1');
+    const row = result.recordset[0];
+    return row ? { note: noteSchema.parse(JSON.parse(row.note_json)), humanMarkdown: row.human_markdown } : undefined;
+  }
   async sourceInputs() {
     const result = await (await this.request()).query(`SELECT s.source_id,t.document AS source_text,n.document AS reader_note
       FROM dbo.Sources s

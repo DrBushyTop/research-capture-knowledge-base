@@ -6,11 +6,12 @@ import { Ellipsis, LogOut, Tags } from 'lucide-react';
 import { accessStore, forgetPrivateData } from '../lib/api';
 import { MastheadSlots } from './masthead';
 
-type Access = 'checking' | 'allowed' | 'unavailable';
+type Access = 'allowed' | 'unavailable';
 
-/** The app session renews on visits and while the reader is visible. Local dev has no hosted authentication. */
+/** The browser retains the HttpOnly cookie. Renewal must not block the reader; each private API validates the session. */
 function useAccess(): Access {
-  const [access, setAccess] = useState<Access>(import.meta.env.DEV ? 'allowed' : 'checking');
+  const queryClient = useQueryClient();
+  const [access, setAccess] = useState<Access>('allowed');
   useEffect(() => {
     if (import.meta.env.DEV) return;
     const controller = new AbortController();
@@ -22,18 +23,27 @@ function useAccess(): Access {
       try {
         const options: RequestInit = { method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)]) };
         let response = await fetch('/api/session', options);
-        let data = response.ok && response.headers.get('content-type')?.includes('application/json') ? await response.json() : undefined;
+        const readSession = async (response: Response) => {
+          if (response.status === 401 || response.status === 403) return { clientPrincipal: null };
+          if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw new Error('Session service unavailable');
+          const data = await response.json();
+          if (!data || !Object.hasOwn(data, 'clientPrincipal')) throw new Error('Invalid session response');
+          return data;
+        };
+        let data = await readSession(response);
         if (response.ok && data?.clientPrincipal === null) {
           response = await fetch('/api/session-start', options);
-          data = response.ok && response.headers.get('content-type')?.includes('application/json') ? await response.json() : undefined;
+          data = await readSession(response);
         }
-        if (!response.ok && response.status !== 401 && response.status !== 403) throw new Error('Session service unavailable');
         const principal = data?.clientPrincipal;
         if (disposed) return;
         const roles: unknown = principal?.userRoles;
-        setAccess(principal?.identityProvider === 'github' && Array.isArray(roles) && roles.includes('reader') && roles.includes('library_member') ? 'allowed' : 'unavailable');
+        if (principal?.identityProvider !== 'github' || !Array.isArray(roles) || !roles.includes('reader') || !roles.includes('library_member')) {
+          forgetPrivateData(queryClient);
+          setAccess('unavailable');
+        }
       } catch {
-        if (!disposed) setAccess(previous => previous === 'checking' ? 'unavailable' : previous);
+        // A failed renewal does not revoke a session. Private APIs still check its expiry and allowlist.
       } finally { pending = false; }
     };
     const whenVisible = () => { if (document.visibilityState === 'visible') void refresh(); };
@@ -46,12 +56,11 @@ function useAccess(): Access {
       document.removeEventListener('visibilitychange', whenVisible);
       window.removeEventListener('focus', whenVisible);
     };
-  }, []);
+  }, [queryClient]);
   return access;
 }
 
-function AccessProblem({ checking }: { checking?: boolean }) {
-  if (checking) return <main id="main" className="app-state" tabIndex={-1}><p role="status">Checking your sign-in…</p></main>;
+function AccessProblem() {
   return <main id="main" className="app-state" tabIndex={-1}>
     <h1>Access unavailable</h1>
     <p>This session cannot open the private library. Private data on this page has been cleared.</p>
@@ -104,7 +113,7 @@ export default function Layout() {
       <div><strong>Add Shelf to your phone</strong><p className="install-message">Open the library from your home screen.</p></div>
       <div className="install-actions"><button className="install-app" type="button">Add to home screen</button><button className="dismiss-install" type="button">Not now</button></div>
     </aside>}
-    {lost || access === 'unavailable' ? <AccessProblem /> : access === 'checking' ? <AccessProblem checking /> : <Outlet />}
+    {lost || access === 'unavailable' ? <AccessProblem /> : <Outlet />}
   </MastheadSlots.Provider>;
 }
 

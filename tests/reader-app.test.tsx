@@ -51,13 +51,14 @@ beforeEach(() => {
 });
 afterEach(async () => {
   await act(async () => root?.unmount()); root = undefined;
-  host.remove(); vi.unstubAllGlobals(); vi.restoreAllMocks();
+  host.remove(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks();
 });
 
 async function settle() { for (let i = 0; i < 5; i++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); }); }
 async function mount(url: string, client: QueryClient = createQueryClient()) {
   const router = createAppRouter(createMemoryHistory({ initialEntries: [url] }));
   root = createRoot(host);
+  await router.load();
   await act(async () => root!.render(<QueryClientProvider client={client}><RouterProvider router={router} /></QueryClientProvider>));
   await settle();
   return { router, client };
@@ -68,6 +69,61 @@ const type = async (element: HTMLTextAreaElement | HTMLInputElement, value: stri
   await act(async () => { setter.call(element, value); element.dispatchEvent(new Event('input', { bubbles: true })); }); await settle();
 };
 const path = (router: ReturnType<typeof createAppRouter>) => router.state.location.href;
+
+it('opens the reader on refresh and in a new tab without waiting for session renewal', async () => {
+  vi.stubEnv('DEV', false);
+  handler = (url, init) => url === '/api/session' ? new Promise<Response>(() => {}) : api(url, init);
+  for (const visit of ['first visit', 'page refresh', 'new tab']) {
+    const { client } = await mount('/sources/');
+    expect(host.querySelector('.sources-shell'), visit).toBeTruthy();
+    expect(host.textContent, visit).not.toContain('Checking your sign-in');
+    expect(client.getQueryData(keys.library), visit).toBeTruthy();
+    await act(async () => root!.unmount()); root = undefined;
+    host.replaceChildren();
+  }
+  expect(calls.filter(call => call === 'POST /api/session')).toHaveLength(3);
+  expect(calls.filter(call => call.includes('library=1'))).toHaveLength(3);
+});
+
+for (const failure of ['network', 'server', 'html', 'malformed'] as const) {
+  it(`keeps an authenticated reader usable when background renewal has a ${failure} failure`, async () => {
+    vi.stubEnv('DEV', false);
+    handler = (url, init) => {
+      if (url !== '/api/session') return api(url, init);
+      if (failure === 'network') throw new Error('offline');
+      if (failure === 'server') return json({ error: 'Unavailable' }, 503);
+      if (failure === 'html') return new Response('<html>Unavailable</html>', { headers: { 'Content-Type': 'text/html' } });
+      return json({});
+    };
+    await mount('/sources/');
+    expect(host.querySelector('.sources-shell')).toBeTruthy();
+    expect(host.textContent).toContain('Alpha');
+    expect(host.textContent).not.toContain('Checking your sign-in');
+    expect(accessStore.get()).toBe(false);
+    expect(calls).not.toContain('POST /api/session-start');
+  });
+}
+
+it('renews on focus and visibility without blocking the reader or duplicating pending requests', async () => {
+  vi.stubEnv('DEV', false);
+  let release!: (response: Response) => void;
+  handler = (url, init) => url === '/api/session' ? new Promise<Response>(resolve => { release = resolve; }) : api(url, init);
+  await mount('/sources/');
+  const wake = async () => {
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await settle();
+  };
+  await wake();
+  expect(calls.filter(call => call === 'POST /api/session')).toHaveLength(1);
+  await act(async () => release(json({ clientPrincipal: { identityProvider: 'github', userRoles: ['reader', 'library_member'] } })));
+  await wake();
+  expect(calls.filter(call => call === 'POST /api/session')).toHaveLength(2);
+  expect(host.querySelector('.sources-shell')).toBeTruthy();
+  expect(host.textContent).not.toContain('Checking your sign-in');
+});
 
 it('parses only well-formed source search values', () => {
   expect(parseSourcesSearch({ source: ids[0], q: 'heart', year: 2024, type: '', topic: ['x'], extra: 'y' })).toEqual({ source: ids[0], q: 'heart', year: '2024' });

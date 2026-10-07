@@ -4,6 +4,7 @@ import { ChatAccessError, readerIdentity } from './chat-service.js';
 import type { PipelineStore } from './pipeline.js';
 
 export const sessionLifetimeMs = 30 * 24 * 60 * 60_000;
+const renewalIntervalMs = 10 * 60_000;
 export const sessionCookieName = '__Host-ShelfSession';
 type SessionStore = Pick<PipelineStore, 'read' | 'create' | 'write' | 'withLease'> & { remove(key: string): Promise<void> };
 export interface ReaderPrincipal { identityProvider: 'github'; userId: string; userDetails: string; userRoles: string[] }
@@ -52,6 +53,10 @@ export async function readerSessionResponse(store: SessionStore, { encoded, toke
   const saved = await readReaderSession(store, token, now);
   if (!renew) return { status: 200, jsonBody: { clientPrincipal: saved?.clientPrincipal ?? fresh, expiresAt: saved?.expiresAt ?? null }, headers };
   if (saved && key && (!fresh || fresh.userId === saved.clientPrincipal.userId)) {
+    // Tabs share one cookie. A recent renewal needs only validation, not another SQL lease and write.
+    if (!start && Date.parse(saved.expiresAt) - now > sessionLifetimeMs - renewalIntervalMs) {
+      return { status: 200, jsonBody: { clientPrincipal: saved.clientPrincipal, expiresAt: saved.expiresAt }, headers };
+    }
     return store.withLease(key, async () => {
       // Re-read inside the lease so concurrent logout cannot resurrect a session.
       const current = await readReaderSession(store, token, now);

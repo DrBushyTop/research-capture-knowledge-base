@@ -1,11 +1,12 @@
 import { build } from 'esbuild';
-import { mkdir, readFile, writeFile, copyFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, copyFile, rm } from 'node:fs/promises';
 const destination = '.function-package';
+await rm(destination + '/dist', { recursive: true, force: true });
 await mkdir(destination + '/dist', { recursive: true });
 await mkdir(destination + '/sandbox', { recursive: true });
 await copyFile('apps/worker/sandbox/evidence.py', destination + '/sandbox/evidence.py');
 await copyFile('apps/worker/sandbox/browser.py', destination + '/sandbox/browser.py');
-await build({ entryPoints: ['apps/worker/src/index.ts'], bundle: true, platform: 'node', target: 'node22', format: 'esm', packages: 'external', outfile: destination + '/dist/index.js', sourcemap: false });
+await build({ entryPoints: ['apps/worker/src/index.ts'], bundle: true, splitting: true, platform: 'node', target: 'node22', format: 'esm', packages: 'external', outdir: destination + '/dist', sourcemap: false });
 const pkg = JSON.parse(await readFile('package.json', 'utf8'));
 const dependencies = Object.fromEntries(Object.entries(pkg.dependencies).filter(([name]) => name.startsWith('@azure/') || ['@mozilla/readability', '@llamaindex/liteparse', 'jsdom', 'ipaddr.js', 'zod', 'minisearch', 'mssql', 'marked', 'sanitize-html'].includes(name)));
 await writeFile(destination + '/package.json', JSON.stringify({ name: 'research-worker', private: true, type: 'module', main: 'dist/index.js', dependencies }, null, 2));

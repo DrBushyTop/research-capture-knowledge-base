@@ -8,6 +8,11 @@ const installScript = await readFile('apps/reader/public/pwa.js', 'utf8');
 const loginHtml = await readFile('apps/reader/public/login.html', 'utf8');
 const offlineResponse = () => new Response('<h1>You are offline</h1>', { headers: { 'Content-Type': 'text/html' } });
 
+it('opens the reader directly when launching an installed app', async () => {
+  const manifest = JSON.parse(await readFile('apps/reader/public/manifest.webmanifest', 'utf8'));
+  expect(manifest.start_url).toBe('/');
+});
+
 function worker() {
   const listeners = new Map<string, (event: object) => void>();
   const storage = new Map<string, Map<string, Response>>();

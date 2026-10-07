@@ -1,7 +1,10 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import * as Popover from '@radix-ui/react-popover';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet, useMatches, useRouterState } from '@tanstack/react-router';
+import { Ellipsis, LogOut, Tags } from 'lucide-react';
 import { accessStore, forgetPrivateData } from '../lib/api';
+import { MastheadSlots } from './masthead';
 
 type Access = 'checking' | 'allowed' | 'unavailable';
 
@@ -79,22 +82,42 @@ export default function Layout() {
       location.replace('/login.html?returnTo=' + encodeURIComponent(destination));
     }
   }, [lost, access]);
+  const [start, setStart] = useState<HTMLElement | null>(null);
+  const [end, setEnd] = useState<HTMLElement | null>(null);
+  const slots = useMemo(() => ({ start, end }), [start, end]);
   const current = (active: boolean) => active ? 'page' as const : undefined;
-  return <>
+  return <MastheadSlots.Provider value={slots}>
     <a className="skip-link" href="#main">Skip to content</a>
     <header className="masthead">
-      <Link to="/">Research library</Link>
+      <Link className="masthead-brand" to="/">Research library</Link>
+      <div className="masthead-start" ref={setStart} />
       <nav aria-label="Library">
         <Link to="/" aria-current={current(path === '/' || path.startsWith('/chat/'))}>Chat</Link>
         <Link to="/sources/" aria-current={current(path.startsWith('/sources/'))}>Sources</Link>
-        <Link to="/categories/" aria-current={current(path.startsWith('/categories/'))}>Categories</Link>
       </nav>
-      <form className="sign-out" action="/api/logout" method="POST" onSubmit={() => forgetPrivateData(queryClient, false)}><button type="submit">Sign out</button></form>
+      <div className="masthead-actions">
+        <div className="masthead-end" ref={setEnd} />
+        <MoreMenu categories={path.startsWith('/categories/')} signOut={() => forgetPrivateData(queryClient, false)} />
+      </div>
     </header>
     {!lost && access === 'allowed' && <aside className="install-recommendation" aria-label="Install Shelf" hidden>
       <div><strong>Add Shelf to your phone</strong><p className="install-message">Open the library from your home screen.</p></div>
       <div className="install-actions"><button className="install-app" type="button">Add to home screen</button><button className="dismiss-install" type="button">Not now</button></div>
     </aside>}
     {lost || access === 'unavailable' ? <AccessProblem /> : access === 'checking' ? <AccessProblem checking /> : <Outlet />}
-  </>;
+  </MastheadSlots.Provider>;
+}
+
+/** Categories is a rarely used admin page and sign-out is rarer still, so both live behind one menu. */
+function MoreMenu({ categories, signOut }: { categories: boolean; signOut: () => void }) {
+  const [open, setOpen] = useState(false);
+  return <Popover.Root open={open} onOpenChange={setOpen}>
+    <Popover.Trigger className="masthead-tool masthead-more" aria-label={categories ? 'More, Categories open' : 'More'} data-current={categories || undefined}>
+      <Ellipsis size={22} aria-hidden="true" />
+    </Popover.Trigger>
+    <Popover.Portal><Popover.Content className="masthead-menu" align="end" sideOffset={6} collisionPadding={8}>
+      <Link to="/categories/" aria-current={categories ? 'page' : undefined} onClick={() => setOpen(false)}><Tags size={18} aria-hidden="true" />Categories</Link>
+      <form action="/api/logout" method="POST" onSubmit={signOut}><button type="submit"><LogOut size={18} aria-hidden="true" />Sign out</button></form>
+    </Popover.Content></Popover.Portal>
+  </Popover.Root>;
 }

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Popover from '@radix-ui/react-popover';
 import { ArrowUp, BookOpen, Check, ChartColumn, Copy, ExternalLink, Eye, FileSearch, FileText, GitCompare, History, ImagePlus, Link, MessageSquareText, Minus, NotebookPen, PenLine, Plus, RotateCcw, Search, SearchCheck, Square, SquarePen, Trash2, X } from 'lucide-react';
@@ -12,6 +13,8 @@ import { Link as RouterLink, useNavigate, useParams } from '@tanstack/react-rout
 import { ApiError, postBlob, postJson } from '../lib/api';
 import { conversationQuery, conversationsQuery, jobQuery, keys, terminalJob, type Conversation as SavedConversation, type HistoryItem, type SourceContext } from '../lib/queries';
 import { conversationIdPattern, sourceHref } from '../app/router';
+import { MastheadSlots } from '../app/masthead';
+import { usePhone } from '../lib/usePhone';
 import '../styles/chat.css';
 
 type Result = NonNullable<ChatJob['result']>;
@@ -61,17 +64,6 @@ async function prepareImage(file: Blob): Promise<Blob> {
   if (!blob || blob.size > 4.5 * 1024 * 1024) blob = await encode('image/jpeg', 0.9);
   if (!blob || blob.size > 5 * 1024 * 1024) throw new Error('Images must be 5 MB or smaller.');
   return blob;
-}
-
-function usePhone() {
-  const [phone, setPhone] = useState(false);
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 720px)');
-    const update = () => setPhone(media.matches);
-    update(); media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
-  return phone;
 }
 
 const labelOf = (cite: Citation) => cite.label || citationLabel({ title: cite.title, authors: [], url: cite.sourceUrl || null });
@@ -300,6 +292,7 @@ type Props = {
 
 export default function Chat({ source, embedded = false, onClose }: Props = {}) {
   const phone = usePhone();
+  const slots = useContext(MastheadSlots);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const recentKey = source ? `research-chat-source:${source.sourceId}` : 'research-chat';
@@ -518,7 +511,7 @@ export default function Chat({ source, embedded = false, onClose }: Props = {}) 
         <input ref={picker} type="file" accept={imageTypes.join(',')} multiple hidden onChange={event => { addImages([...(event.target.files || [])]); event.target.value = ''; }} />
         <button type="button" className="chat-icon-button chat-attach" aria-label="Attach images" disabled={drafts.length >= maxMessageImages} onClick={() => picker.current?.click()}><ImagePlus size={20} /></button>
         <label className="chat-sr-only" htmlFor="chat-message">Message</label>
-        <textarea ref={input} id="chat-message" rows={1} maxLength={8000} value={question} placeholder={source ? 'Ask about this or other sources' : 'Ask about saved sources or paste a screenshot'} onChange={event => setQuestion(event.target.value)}
+        <textarea ref={input} id="chat-message" rows={1} maxLength={8000} value={question} placeholder={source ? 'Ask about this source' : 'Ask your library'} onChange={event => setQuestion(event.target.value)}
           onPaste={event => { const files = [...event.clipboardData.files]; if (files.some(file => file.type.startsWith('image/'))) { event.preventDefault(); addImages(files); } }}
           onKeyDown={event => { if (!phone && event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); } }} />
         {active ? <button className="chat-send" type="button" aria-label={stopping ? 'Stopping' : 'Stop'} disabled={stopping} onClick={() => { if (active && !stopping) stop.mutate(active.id); }}><Square size={15} fill="currentColor" /></button>
@@ -529,16 +522,22 @@ export default function Chat({ source, embedded = false, onClose }: Props = {}) 
 
   const empty = !turns.length && !loading && !unavailable;
   const Main = embedded ? 'section' : 'main';
+  // Phones put History and New chat in the masthead rather than spending a second bar on them.
+  const inMasthead = phone && !embedded && !!slots.start && !!slots.end;
+  const tool = inMasthead ? 'masthead-tool' : 'chat-icon-button';
+  const historyButton = !embedded && <button type="button" className={inMasthead ? tool : `${tool} chat-history-toggle`} aria-label="History" disabled={busy} onClick={() => { void history.refetch(); setHistoryOpen(true); }}><History size={20} /></button>;
+  const newButton = <button type="button" className={tool} aria-label="New chat" disabled={busy && !unavailable} onClick={startNew}><SquarePen size={19} /></button>;
   const contextLine = context && <p className="chat-context"><FileText size={15} aria-hidden="true" /><span>{embedded && context.sourceId === source?.sourceId ? 'Started from this source' : <>Started from <RouterLink to="/sources/" search={{ source: context.sourceId }}>{context.title}</RouterLink></>}</span></p>;
   return <div ref={root} className={`discussion-chat${embedded ? ' is-embedded' : ''}`}>
     {!embedded && <aside className="chat-history" aria-label="Chat history">{historyList}</aside>}
     <Main {...(embedded ? { 'aria-label': 'Ask about this source' } : { id: 'main', tabIndex: -1 })} className={`chat-main${empty ? ' is-empty' : ''}`}>
-      <header className="chat-toolbar">{embedded ? <h2>Ask</h2> : <h1>Chat</h1>}<div>
-        {!embedded && <button type="button" className="chat-icon-button chat-history-toggle" aria-label="History" disabled={busy} onClick={() => { void history.refetch(); setHistoryOpen(true); }}><History size={20} /></button>}
+      {inMasthead ? <><h1 className="chat-sr-only">Chat</h1>{createPortal(historyButton, slots.start!)}{createPortal(newButton, slots.end!)}</>
+        : <header className="chat-toolbar">{embedded ? <h2>Ask</h2> : <h1>Chat</h1>}<div>
+        {historyButton}
         {embedded && conversationId && <RouterLink className="chat-icon-button" to="/chat/$conversationId/" params={{ conversationId }} aria-label="Continue in Chat" title="Continue in Chat"><ExternalLink size={18} /></RouterLink>}
-        <button type="button" className="chat-icon-button" aria-label="New chat" disabled={busy && !unavailable} onClick={startNew}><SquarePen size={19} /></button>
+        {newButton}
         {onClose && <button type="button" className="chat-icon-button" aria-label="Close" onClick={onClose}><X size={20} /></button>}
-      </div></header>
+      </div></header>}
       {!empty && !unavailable && contextLine}
       {unavailable ? <section className="chat-start" aria-label="Conversation unavailable">
         <p className="chat-error" role="alert">{validId ? detail.error?.message || 'This conversation could not be opened.' : 'This chat address is not valid.'} It may have been deleted. Start a new chat or pick one from history.</p>

@@ -1,9 +1,44 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-06T08:17:32.153Z",
+  "generatedAt": "2026-10-07T11:48:53Z",
   "title": "Design System: Research library",
   "extensions": {
     "colorMeta": {
+      "navy": {
+        "role": "primary",
+        "displayName": "Masthead navy",
+        "tonalRamp": ["oklch(15% 0.051 263)", "oklch(26.43% 0.051 263)", "oklch(37.86% 0.051 263)", "oklch(49.29% 0.051 263)", "oklch(60.71% 0.051 263)", "oklch(72.14% 0.051 263)", "oklch(83.57% 0.051 263)", "oklch(95% 0.051 263)"]
+      },
+      "masthead-link": {
+        "role": "neutral",
+        "displayName": "Pale masthead link",
+        "tonalRamp": ["oklch(15% 0.027 257)", "oklch(26.43% 0.027 257)", "oklch(37.86% 0.027 257)", "oklch(49.29% 0.027 257)", "oklch(60.71% 0.027 257)", "oklch(72.14% 0.027 257)", "oklch(83.57% 0.027 257)", "oklch(95% 0.027 257)"]
+      },
+      "masthead-focus": {
+        "role": "primary",
+        "displayName": "Masthead focus blue",
+        "tonalRamp": ["oklch(15% 0.095 260)", "oklch(26.43% 0.095 260)", "oklch(37.86% 0.095 260)", "oklch(49.29% 0.095 260)", "oklch(60.71% 0.095 260)", "oklch(72.14% 0.095 260)", "oklch(83.57% 0.095 260)", "oklch(95% 0.095 260)"]
+      },
+      "human-wash": {
+        "role": "secondary",
+        "displayName": "Human notes wash",
+        "tonalRamp": ["oklch(15% 0.017 88)", "oklch(26.43% 0.017 88)", "oklch(37.86% 0.017 88)", "oklch(49.29% 0.017 88)", "oklch(60.71% 0.017 88)", "oklch(72.14% 0.017 88)", "oklch(83.57% 0.017 88)", "oklch(95% 0.017 88)"]
+      },
+      "human-ink": {
+        "role": "secondary",
+        "displayName": "Human notes ink",
+        "tonalRamp": ["oklch(15% 0.094 72)", "oklch(26.43% 0.094 72)", "oklch(37.86% 0.094 72)", "oklch(49.29% 0.094 72)", "oklch(60.71% 0.094 72)", "oklch(72.14% 0.094 72)", "oklch(83.57% 0.094 72)", "oklch(95% 0.094 72)"]
+      },
+      "source-wash": {
+        "role": "secondary",
+        "displayName": "Original source wash",
+        "tonalRamp": ["oklch(15% 0.009 168)", "oklch(26.43% 0.009 168)", "oklch(37.86% 0.009 168)", "oklch(49.29% 0.009 168)", "oklch(60.71% 0.009 168)", "oklch(72.14% 0.009 168)", "oklch(83.57% 0.009 168)", "oklch(95% 0.009 168)"]
+      },
+      "source-ink": {
+        "role": "secondary",
+        "displayName": "Original source ink",
+        "tonalRamp": ["oklch(15% 0.072 174)", "oklch(26.43% 0.072 174)", "oklch(37.86% 0.072 174)", "oklch(49.29% 0.072 174)", "oklch(60.71% 0.072 174)", "oklch(72.14% 0.072 174)", "oklch(83.57% 0.072 174)", "oklch(95% 0.072 174)"]
+      },
       "ink": {
         "role": "neutral",
         "displayName": "Reading ink",
@@ -232,7 +267,7 @@
     "typographyMeta": {
       "display": {
         "displayName": "Research note title",
-        "purpose": "Serif title at the start of a research note. Mobile uses 2rem."
+        "purpose": "Serif title in the Sources reading pane. Mobile uses 1.75rem."
       },
       "headline": {
         "displayName": "Evidence section heading",
@@ -240,7 +275,7 @@
       },
       "title": {
         "displayName": "Saved source title",
-        "purpose": "Serif title in a source row. Mobile uses 1.35rem."
+        "purpose": "Compact serif source-list title, clamped to two lines."
       },
       "body": {
         "displayName": "Facts and interpretation",
@@ -252,7 +287,7 @@
       },
       "label": {
         "displayName": "Visible field label",
-        "purpose": "Semibold sans serif labels above search and filters."
+        "purpose": "Bold visible desktop Sources filter labels. Phone sheet labels use 0.85rem; search has a visually hidden label."
       },
       "status": {
         "displayName": "Review state",
@@ -266,15 +301,115 @@
     "shadows": [
       {
         "name": "chat-evidence-popover",
-        "value": "0 8px 28px rgb(32 45 61 / .2)",
-        "purpose": "Desktop chat evidence popovers only. Library rows and research notes remain flat."
+        "value": "0 10px 30px rgb(32 45 61 / .18)",
+        "purpose": "Desktop chat evidence popover."
+      },
+      {
+        "name": "masthead-menu",
+        "value": "0 12px 28px -6px rgb(20 33 58 / .28)",
+        "purpose": "More popover with Categories and Sign out."
+      },
+      {
+        "name": "selected-source",
+        "value": "0 1px 3px rgb(32 45 61 / .12), inset 0 0 0 1.5px var(--blue)",
+        "purpose": "Current source row only."
+      },
+      {
+        "name": "chat-composer",
+        "value": "0 2px 10px rgb(32 45 61 / .07)",
+        "purpose": "Local shadow beneath the composer."
+      },
+      {
+        "name": "chat-scroll-control",
+        "value": "0 2px 8px rgb(32 45 61 / .12)",
+        "purpose": "Scroll-to-latest control over the discussion."
+      },
+      {
+        "name": "source-ask-button",
+        "value": "0 2px 6px rgb(35 86 165 / .25)",
+        "purpose": "Desktop Ask about this source button."
+      },
+      {
+        "name": "source-ask-phone",
+        "value": "0 6px 18px rgb(20 33 58 / .3)",
+        "purpose": "Phone floating Ask control."
+      },
+      {
+        "name": "source-ask-panel",
+        "value": "-8px 0 28px rgb(20 33 58 / .18)",
+        "purpose": "Fixed source-chat panel between 721px and 1199px."
+      },
+      {
+        "name": "category-editor",
+        "value": "0 1px 2px rgb(20 33 58 / .06), 0 8px 24px -12px rgb(20 33 58 / .18)",
+        "purpose": "Category template editor panel."
+      },
+      {
+        "name": "category-tabs",
+        "value": "0 1px 2px rgb(20 33 58 / .08)",
+        "purpose": "Categories tab container."
+      },
+      {
+        "name": "category-batch",
+        "value": "0 1px 2px rgb(20 33 58 / .06)",
+        "purpose": "Update batch card."
+      },
+      {
+        "name": "category-savebar",
+        "value": "0 -10px 24px -14px rgb(20 33 58 / .35)",
+        "purpose": "Sticky save bar while the template is dirty."
+      },
+      {
+        "name": "category-actionbar",
+        "value": "0 12px 32px -10px rgb(20 33 58 / .55)",
+        "purpose": "Sticky navy selected-document action bar."
       }
     ],
     "motion": [
       {
         "name": "link-color",
         "value": "color 0.15s ease-out",
-        "purpose": "Source rows and note-section links, only when prefers-reduced-motion is no-preference."
+        "purpose": "Retained legacy source-register and note-margin links, only when prefers-reduced-motion is no-preference."
+      },
+      {
+        "name": "control-color",
+        "value": "background-color .12s ease-out, color .12s ease-out",
+        "purpose": "Masthead, chat citations, suggestions and history, only when reduced motion is not requested."
+      },
+      {
+        "name": "source-control-color",
+        "value": "background-color .12s ease-out, color .12s ease-out, box-shadow .12s ease-out",
+        "purpose": "Sources rows and section links, only when reduced motion is not requested."
+      },
+      {
+        "name": "filter-sheet-entrance",
+        "value": "filter-sheet-open .2s cubic-bezier(.16,1,.3,1)",
+        "purpose": "Phone filter sheet enters from a 24px vertical offset, only when reduced motion is not requested."
+      },
+      {
+        "name": "phone-ask-size",
+        "value": ".24s cubic-bezier(.16,1,.3,1)",
+        "purpose": "Phone Ask clip-path between the full label and its 52px icon circle while scrolling. Only when reduced motion is not requested."
+      },
+      {
+        "name": "source-chat-entrance",
+        "value": "ask-open .22s cubic-bezier(.16,1,.3,1)",
+        "purpose": "Source-chat panel entrance, only when reduced motion is not requested."
+      },
+      {
+        "name": "category-control-color",
+        "value": "background-color .15s ease-out, color .15s ease-out, border-color .15s ease-out",
+        "purpose": "Category tabs, buttons, template rail and format radios, only when reduced motion is not requested."
+      },
+      {
+        "name": "category-progress",
+        "value": "width .4s cubic-bezier(.16,1,.3,1)",
+        "purpose": "Category batch progress segments. The current CSS does not gate this transition on reduced motion."
+      },
+      {
+        "name": "live-indicator",
+        "value": "1.4s ease-in-out infinite",
+        "purpose": "Chat pulse and Categories loading shimmer, only when reduced motion is not requested."
       },
       {
         "name": "chat-evidence-sheet",
@@ -286,49 +421,57 @@
       {
         "name": "single-column",
         "value": "720px"
+      },
+      {
+        "name": "category-picker",
+        "value": "860px"
+      },
+      {
+        "name": "source-chat-overlay",
+        "value": "1199px"
       }
     ]
   },
   "components": [
     {
-      "name": "Library search",
+      "name": "Sources search",
       "kind": "input",
       "refersTo": "search-field",
-      "description": "A visible search label above a full-width native search field.",
-      "html": "<div class=\"ds-search\"><label for=\"ds-search-input\">Search your research</label><input id=\"ds-search-input\" type=\"search\" placeholder=\"A topic, finding, or title\"></div>",
-      "css": ".ds-search{font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;line-height:1.6;color:var(--ink,#202d3d)}.ds-search label{display:block;margin-top:.8rem;margin-bottom:.35rem;font-size:.85rem;font-weight:600}.ds-search input{font-family:inherit;color:inherit;min-width:0;width:100%;min-height:44px;border:1px solid #a8b5c5;border-radius:6px;background:var(--paper,#fff);padding:.55rem .65rem;font-size:.92rem;line-height:1.6;caret-color:var(--blue,#2356a5)}.ds-search input::placeholder{color:#627083}.ds-search input:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}"
+      "description": "Native Sources search with a visually hidden label and a blue focus ring.",
+      "html": "<div class=\"ds-search\"><label for=\"ds-search-input\">Search sources</label><input id=\"ds-search-input\" type=\"search\" placeholder=\"Search sources\"></div>",
+      "css": ".ds-search{font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;color:var(--ink,#202d3d)}.ds-search label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}.ds-search input{font:inherit;color:inherit;width:100%;min-height:42px;border:1.5px solid var(--field-line,#a8b5c5);border-radius:10px;background:var(--paper,#fff);padding:.45rem .7rem;font-size:.92rem;caret-color:var(--blue,#2356a5)}.ds-search input::placeholder{color:#627083}.ds-search input:focus{border-color:var(--blue,#2356a5);outline:0;box-shadow:0 0 0 3px var(--blue-wash,#eaf1fc)}@media(max-width:720px){.ds-search input{font-size:16px;min-height:44px}}"
     },
     {
-      "name": "Library filter",
+      "name": "Sources filter",
       "kind": "input",
       "refersTo": "filter-select",
-      "description": "A labeled native select for topic, source type, or publication year.",
+      "description": "A visible label and compact native select for category, topic, source type, or year.",
       "html": "<div class=\"ds-filter\"><label for=\"ds-filter-type\">Source type</label><select id=\"ds-filter-type\"><option>All types</option><option>Journal article</option><option>Webpage</option></select></div>",
-      "css": ".ds-filter{font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;line-height:1.6;color:var(--ink,#202d3d)}.ds-filter label{display:block;margin-top:.8rem;margin-bottom:.35rem;font-size:.85rem;font-weight:600}.ds-filter select{font-family:inherit;color:inherit;min-width:0;width:100%;min-height:44px;border:1px solid #a8b5c5;border-radius:6px;background:var(--paper,#fff);padding:.55rem .65rem;font-size:.92rem;line-height:1.6}.ds-filter select:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}@media(max-width:720px){.ds-filter label{font-size:.75rem}.ds-filter select{font-size:.8rem;padding:.5rem .35rem}}"
+      "css": ".ds-filter{font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;line-height:1.6;color:var(--ink,#202d3d)}.ds-filter label{display:block;margin:0 0 .15rem;font-size:.74rem;font-weight:700;color:var(--muted,#546476)}.ds-filter select{font:inherit;color:inherit;min-width:0;width:100%;min-height:36px;border:1px solid var(--field-line,#a8b5c5);border-radius:8px;background:var(--paper,#fff);padding:.25rem .4rem;font-size:.84rem;caret-color:var(--blue,#2356a5)}.ds-filter select:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}@media(max-width:720px){.ds-filter label{margin:0 0 .3rem;font-size:.85rem;color:var(--ink,#202d3d)}.ds-filter select{font-size:16px;min-height:48px;border-width:1.5px;border-radius:10px;padding:0 .7rem}}"
     },
     {
       "name": "Source row",
       "kind": "custom",
       "refersTo": "source-row",
-      "description": "A full-row source link with metadata, serif title, a short summary, and a review label.",
-      "html": "<div class=\"ds-source-row\"><a href=\"#research-note\"><span class=\"ds-source-kind\">Journal article · 2004</span><h3>Management of Fibromyalgia Syndrome</h3><p>A saved clinical review with its source facts and machine interpretation kept separate.</p><span class=\"ds-source-status\">Machine analysis · not reviewed</span></a></div>",
-      "css": ".ds-source-row{font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;line-height:1.6;border-bottom:1px solid var(--line,#d6dee7)}.ds-source-row a{display:block;padding:1.5rem 0;text-decoration:none;color:var(--ink,#202d3d)}.ds-source-kind{font-size:.8rem;color:var(--muted,#546476)}.ds-source-row h3{font-family:'Source Serif 4 Variable',Georgia,serif;font-size:1.5rem;font-weight:700;line-height:1.4;margin:.4rem 0 .7rem;overflow-wrap:anywhere}.ds-source-row p{margin:0;font-size:.93rem;color:var(--muted,#546476);max-width:70ch;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.ds-source-status{display:inline-flex;font-size:.78rem;padding:.2rem .5rem;color:#284e81;background:var(--blue-wash,#eaf1fc);border-radius:4px;margin-top:.9rem}.ds-source-row a:hover h3{color:var(--blue,#2356a5);text-decoration:underline;text-underline-offset:.2em}.ds-source-row a:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}@media(max-width:720px){.ds-source-row h3{font-size:1.35rem}}@media(prefers-reduced-motion:no-preference){.ds-source-row a{transition:color .15s ease-out}}"
+      "description": "A compact source link with serif title, two-line summary, saved date, and optional review text.",
+      "html": "<div class=\"ds-source-row\"><a href=\"#research-note\" aria-current=\"page\"><span class=\"ds-source-kind\"><span>Journal article · 2004</span><span class=\"ds-source-review\">Needs review</span><time datetime=\"2026-10-07\">7 Oct</time></span><span class=\"ds-source-title\">Management of Fibromyalgia Syndrome</span><span class=\"ds-source-summary\">A saved clinical review with source facts and generated analysis.</span></a></div>",
+      "css": ".ds-source-row{font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;line-height:1.6;background:var(--ground,#edf1f5);padding:.5rem}.ds-source-row a{display:flex;flex-direction:column;gap:.15rem;padding:.6rem .65rem;border-radius:10px;text-decoration:none;color:var(--ink,#202d3d)}.ds-source-row a:hover{background:var(--history-hover,#dfe7f0)}.ds-source-row a[aria-current=page]{background:var(--paper,#fff);box-shadow:0 1px 3px rgb(32 45 61 / .12),inset 0 0 0 1.5px var(--blue,#2356a5)}.ds-source-kind{display:flex;flex-wrap:wrap;align-items:center;gap:.2rem .6rem;font-size:.74rem;color:var(--muted,#546476);font-weight:600}.ds-source-kind time{margin-left:auto;font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}.ds-source-review{color:var(--attention,#8b4810);font-weight:700}.ds-source-title{font-family:'Source Serif 4 Variable',Georgia,serif;font-size:1.02rem;font-weight:650;line-height:1.3;margin-top:.1rem;overflow-wrap:anywhere}.ds-source-row a[aria-current=page] .ds-source-title{color:var(--blue,#2356a5)}.ds-source-summary{font-size:.82rem;line-height:1.45;color:var(--muted,#546476)}.ds-source-title,.ds-source-summary{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.ds-source-row a:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}@media(max-width:720px){.ds-source-row a{padding:.7rem .7rem}}@media(prefers-reduced-motion:no-preference){.ds-source-row a{transition:background-color .12s ease-out,color .12s ease-out,box-shadow .12s ease-out}}"
     },
     {
-      "name": "Note navigation",
+      "name": "Source section navigation",
       "kind": "nav",
       "refersTo": "note-navigation",
-      "description": "Desktop section links in the notebook margin.",
-      "html": "<aside class=\"ds-note-margin\"><a class=\"ds-back-link\" href=\"#saved-sources\">Back to saved sources</a><p class=\"ds-margin-label\">In this note</p><nav aria-label=\"Note sections\"><a href=\"#source\">Source facts</a><a href=\"#analysis\">Machine interpretation</a><a href=\"#limitations\">Limitations</a><a href=\"#human\">Human notes</a></nav></aside>",
-      "css": ".ds-note-margin{font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;line-height:1.6;background:var(--ground,#edf1f5);color:var(--ink,#202d3d);padding:2.5rem 1.5rem}.ds-note-margin a{color:var(--blue,#2356a5);text-underline-offset:.2em}.ds-back-link{display:block;min-height:44px;font-size:.9rem}.ds-margin-label{font-weight:600;font-size:.8rem;margin:1.7rem 0 0}.ds-note-margin nav{display:flex;flex-direction:column;margin-top:.5rem}.ds-note-margin nav a{padding:.5rem 0;min-height:44px;font-size:.9rem;text-decoration:none}.ds-note-margin nav a:hover{text-decoration:underline}.ds-note-margin a:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}@media(max-width:720px){.ds-note-margin{padding:1rem 1.2rem}.ds-note-margin nav,.ds-margin-label{display:none}.ds-back-link{display:flex;align-items:center}}@media(prefers-reduced-motion:no-preference){.ds-note-margin nav a{transition:color .15s ease-out}}"
+      "description": "Sticky desktop section links with a current-section underline, replaced by a native select on phones.",
+      "html": "<div class=\"ds-note-sections\"><nav class=\"ds-note-tabs\" aria-label=\"Note sections\"><a href=\"#analysis\" aria-current=\"true\">Summary</a><a href=\"#section-findings\">Key findings</a><a href=\"#human\">Notes</a><a href=\"#original\">Original text</a><a href=\"#source\">Details</a></nav><div class=\"ds-note-jump\"><label for=\"ds-note-jump\">Jump to section</label><select id=\"ds-note-jump\"><option>Summary</option><option>Key findings</option><option>Notes</option><option>Original text</option><option>Details</option></select><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"m6 9 6 6 6-6\"/></svg></div></div>",
+      "css": ".ds-note-sections{font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;position:sticky;top:-1.6rem;background:rgb(255 255 255 / .97);border-bottom:1px solid var(--line,#d6dee7)}.ds-note-tabs{display:flex;gap:.2rem;overflow-x:auto;padding:0 .4rem;mask-image:linear-gradient(90deg,transparent,#000 .6rem,#000 calc(100% - 2.5rem),transparent)}.ds-note-tabs a{flex-shrink:0;min-height:44px;display:inline-flex;align-items:center;padding:0 .6rem;font-size:.84rem;font-weight:650;text-decoration:none;color:var(--muted,#546476);white-space:nowrap;box-shadow:inset 0 -2px 0 transparent}.ds-note-tabs a:hover{color:var(--ink,#202d3d);box-shadow:inset 0 -2px 0 var(--line,#d6dee7)}.ds-note-tabs a[aria-current]{color:var(--ink,#202d3d);box-shadow:inset 0 -2px 0 var(--blue,#2356a5)}.ds-note-tabs a:focus-visible,.ds-note-jump select:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}.ds-note-jump{display:none;position:relative;align-items:center}.ds-note-jump label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}.ds-note-jump select{appearance:none;width:100%;min-height:48px;padding:0 1.8rem;border:0;background:transparent;color:var(--ink,#202d3d);font:inherit;font-size:.95rem;font-weight:700;cursor:pointer}.ds-note-jump svg{position:absolute;right:0;color:var(--muted,#546476);pointer-events:none}@media(max-width:720px){.ds-note-sections{top:0;padding:0 1.1rem}.ds-note-tabs{display:none}.ds-note-jump{display:flex}}@media(prefers-reduced-motion:no-preference){.ds-note-tabs a{transition:background-color .12s ease-out,color .12s ease-out,box-shadow .12s ease-out}}"
     },
     {
-      "name": "Default review status",
-      "kind": "chip",
-      "refersTo": "status-default",
-      "description": "An informational label for unreviewed machine interpretation.",
-      "html": "<span class=\"ds-status-default\">Machine interpretation · not reviewed</span>",
-      "css": ".ds-status-default{display:inline-flex;font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:.78rem;line-height:1.6;padding:.2rem .5rem;color:#284e81;background:var(--blue-wash,#eaf1fc);border-radius:4px}"
+      "name": "Masthead",
+      "kind": "nav",
+      "refersTo": "masthead",
+      "description": "Chat and Sources routes with a Shelf brand and More popover. Phone Chat fills the side slots with History and New chat.",
+      "html": "<header class=\"ds-masthead\"><a class=\"ds-brand\" href=\"#chat\"><svg aria-hidden=\"true\" viewBox=\"0 0 512 512\" width=\"30\" height=\"30\"><rect width=\"512\" height=\"512\" fill=\"#14213a\"/><g fill=\"#fff\"><rect x=\"128\" y=\"142\" width=\"64\" height=\"212\" rx=\"10\"/><rect x=\"216\" y=\"118\" width=\"72\" height=\"236\" rx=\"10\" fill=\"#6f9eea\"/><rect x=\"312\" y=\"166\" width=\"64\" height=\"188\" rx=\"10\"/><rect x=\"116\" y=\"374\" width=\"272\" height=\"18\" rx=\"9\"/></g><g stroke=\"#14213a\" stroke-width=\"10\"><path d=\"M144 174h32m-32 26h32m56-48h40m-40 26h40m56 22h32m-32 26h32\"/></g></svg><span>Research library</span></a><nav aria-label=\"Library\"><a href=\"#chat\" aria-current=\"page\">Chat</a><a href=\"#sources\">Sources</a></nav><details class=\"ds-more\"><summary aria-label=\"More\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"1\"/><circle cx=\"19\" cy=\"12\" r=\"1\"/><circle cx=\"5\" cy=\"12\" r=\"1\"/></svg></summary><div class=\"ds-more-menu\"><a href=\"#categories\">Categories</a><form><button type=\"button\">Sign out</button></form></div></details></header>",
+      "css": ".ds-masthead{display:flex;align-items:center;gap:.4rem;min-height:56px;padding:.3rem clamp(1rem,3vw,2rem);background:var(--navy,#14213a);color:var(--paper,#fff);font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px}.ds-brand{display:flex;align-items:center;gap:.5rem;min-height:44px;margin-right:1rem;font-weight:800;font-size:1rem;color:var(--paper,#fff);text-decoration:none}.ds-brand svg{flex-shrink:0}.ds-masthead nav{display:flex;gap:.25rem}.ds-masthead nav a{display:flex;align-items:center;justify-content:center;min-height:40px;padding:0 .9rem;border-radius:999px;color:#c9d5e6;font-size:.88rem;font-weight:600;text-decoration:none}.ds-masthead nav a:hover{background:rgb(255 255 255 / .09);color:var(--paper,#fff)}.ds-masthead nav a[aria-current=page]{background:var(--paper,#fff);color:var(--navy,#14213a);font-weight:750}.ds-more{position:relative;margin:0 0 0 auto}.ds-more summary{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:10px;color:#c9d5e6;cursor:pointer;list-style:none}.ds-more summary::-webkit-details-marker{display:none}.ds-more summary:hover,.ds-more[open] summary{background:rgb(255 255 255 / .1);color:var(--paper,#fff)}.ds-more-menu{position:absolute;right:0;top:50px;z-index:60;min-width:12.5rem;padding:.3rem;background:var(--paper,#fff);border:1px solid var(--line,#d6dee7);border-radius:12px;box-shadow:0 12px 28px -6px rgb(20 33 58 / .28);font-size:.95rem}.ds-more-menu a,.ds-more-menu button{display:flex;align-items:center;min-height:44px;width:100%;padding:0 .75rem;border:0;border-radius:8px;background:transparent;color:var(--ink,#202d3d);font:inherit;font-weight:600;text-decoration:none;text-align:left;cursor:pointer}.ds-more-menu a:hover,.ds-more-menu button:hover{background:var(--ground,#edf1f5)}.ds-more-menu form{margin-top:.3rem;padding-top:.3rem;border-top:1px solid var(--line,#d6dee7)}.ds-masthead :focus-visible{outline:3px solid #9fc1ff;outline-offset:2px}.ds-more-menu :focus-visible{outline-color:var(--blue,#2356a5);outline-offset:-3px}@media(max-width:720px){.ds-masthead{display:grid;grid-template-columns:1fr auto 1fr;gap:.25rem;min-height:52px;padding:.2rem .35rem}.ds-brand{width:44px;margin:0;justify-content:center}.ds-brand span{display:none}.ds-masthead nav{display:grid;grid-template-columns:1fr 1fr;gap:0;width:min(13rem,46vw);padding:3px;border-radius:999px;background:rgb(255 255 255 / .08)}.ds-masthead nav a{position:relative;min-height:38px;padding:0 .5rem}.ds-masthead nav a::after{content:'';position:absolute;inset:-4px 0}.ds-more{justify-self:end}}@media(prefers-reduced-motion:no-preference){.ds-masthead nav a,.ds-more summary{transition:background-color .12s ease-out,color .12s ease-out}}"
     },
     {
       "name": "Limited evidence status",
@@ -336,47 +479,47 @@
       "refersTo": "status-attention",
       "description": "An informational review label for limited or missing evidence.",
       "html": "<span class=\"ds-status-attention\">Needs review · limited evidence</span>",
-      "css": ".ds-status-attention{display:inline-flex;font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:.78rem;line-height:1.6;padding:.2rem .5rem;color:var(--attention,#8b4810);background:var(--attention-wash,#fff1df);border-radius:4px}"
+      "css": ".ds-status-attention{display:inline-flex;font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:.78rem;font-weight:600;line-height:1.6;padding:.15rem .6rem;color:var(--attention,#8b4810);background:var(--attention-wash,#fff1df);border-radius:999px}"
     },
     {
-      "name": "Limitations section",
+      "name": "Generated summary",
       "kind": "card",
-      "refersTo": "limitations-section",
-      "description": "A pale reading block for limitations and open questions.",
-      "html": "<section class=\"ds-limitations\"><h2>Limitations and open questions</h2><p>Limitations have not been assessed from usable source text.</p></section>",
-      "css": ".ds-limitations{font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;line-height:1.6;color:var(--ink,#202d3d);padding:1.2rem 1.4rem;background:#f2f5f8;border-radius:8px}.ds-limitations h2{margin:0 0 .9rem;font-size:1.22rem;font-weight:700;line-height:1.3}.ds-limitations p{margin:0}@media(max-width:720px){.ds-limitations{padding:1.2rem}}"
+      "refersTo": "summary-section",
+      "description": "Unfilled source summary with an explicit outlined Generated origin tag.",
+      "html": "<section class=\"ds-summary\"><h2>Summary <span class=\"ds-origin\">Generated</span></h2><p>Analysis unavailable.</p></section>",
+      "css": ".ds-summary{font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;line-height:1.6;color:var(--ink,#202d3d)}.ds-summary h2{display:flex;align-items:center;gap:.6rem;margin:0 0 .7rem;font-size:1.15rem;font-weight:800;line-height:1.3;letter-spacing:-.01em}.ds-origin{font-size:.7rem;font-weight:700;padding:.05rem .4rem;border:1px solid color-mix(in srgb,currentColor 35%,transparent);border-radius:4px;color:var(--status-ink,#284e81);letter-spacing:.01em}.ds-summary p{margin:0;font-size:1.05rem;line-height:1.65}"
     },
     {
       "name": "Chat Send",
       "kind": "button",
       "refersTo": "chat-send",
-      "description": "A circular blue 44px action. The active job replaces the arrow with Stop.",
+      "description": "A circular blue action, 40px on desktop and 44px on phones. The active job replaces the arrow with Stop.",
       "html": "<button class=\"ds-chat-send\" type=\"button\" aria-label=\"Send\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 7-7 7 7M12 5v14\"/></svg></button>",
-      "css": ".ds-chat-send{font-family:'Source Sans 3 Variable',system-ui,sans-serif;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:var(--blue,#2356a5);color:var(--paper,#fff);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}.ds-chat-send:hover{background:var(--blue-hover,#194584)}.ds-chat-send:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}.ds-chat-send:disabled{background:var(--ground,#edf1f5);color:var(--muted,#546476);cursor:default}"
+      "css": ".ds-chat-send{font-family:'Source Sans 3 Variable',system-ui,sans-serif;width:40px;height:40px;padding:0;border:0;border-radius:50%;background:var(--blue,#2356a5);color:var(--paper,#fff);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}.ds-chat-send:hover{background:var(--blue-hover,#194584)}.ds-chat-send:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}.ds-chat-send:disabled{background:var(--ground,#edf1f5);color:var(--muted,#546476);cursor:default}@media(max-width:720px){.ds-chat-send{width:44px;height:44px}}"
     },
     {
       "name": "Chat composer",
       "kind": "input",
       "refersTo": "chat-composer",
-      "description": "A bottom message field with a blue focus border, a growing textarea, and a circular send action.",
-      "html": "<div class=\"ds-chat-composer\"><label class=\"ds-chat-label\" for=\"ds-chat-message\">Message</label><textarea id=\"ds-chat-message\" rows=\"1\" placeholder=\"Message\"></textarea><button class=\"ds-composer-send\" type=\"button\" aria-label=\"Send\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 7-7 7 7M12 5v14\"/></svg></button></div>",
-      "css": ".ds-chat-composer{font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;display:flex;align-items:flex-end;gap:.5rem;border:1px solid #a8b5c5;border-radius:16px;background:var(--paper,#fff);padding:.45rem}.ds-chat-composer:focus-within{border-color:var(--blue,#2356a5)}.ds-chat-label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.ds-chat-composer textarea{display:block;flex:1;min-width:0;min-height:44px;max-height:180px;resize:none;border:0;background:transparent;color:var(--ink,#202d3d);font:inherit;font-size:1rem;line-height:1.5;padding:.55rem .65rem;caret-color:var(--blue,#2356a5)}.ds-chat-composer textarea:focus-visible{outline:0}.ds-chat-composer textarea::placeholder{color:var(--muted,#546476)}.ds-composer-send{width:44px;height:44px;padding:0;border:0;border-radius:50%;background:var(--blue,#2356a5);color:var(--paper,#fff);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}.ds-composer-send:hover{background:var(--blue-hover,#194584)}.ds-composer-send:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}.ds-composer-send:disabled{background:var(--ground,#edf1f5);color:var(--muted,#546476);cursor:default}@media(max-width:720px){.ds-chat-composer{border-radius:14px}.ds-chat-composer textarea{font-size:16px}}"
+      "description": "Ask your library field with image attachment, a blue focus border, and a circular Send action.",
+      "html": "<div class=\"ds-chat-composer\"><div class=\"ds-composer-row\"><button class=\"ds-composer-attach\" type=\"button\" aria-label=\"Attach images\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M16 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9M16 3h6m-3-3v6M3 16l5-5 4 4 3-3 4 4\"/><circle cx=\"8.5\" cy=\"7.5\" r=\"1.5\"/></svg></button><label class=\"ds-chat-label\" for=\"ds-chat-message\">Message</label><textarea id=\"ds-chat-message\" rows=\"1\" placeholder=\"Ask your library\"></textarea><button class=\"ds-composer-send\" type=\"button\" aria-label=\"Send\"><svg width=\"21\" height=\"21\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 7-7 7 7M12 5v14\"/></svg></button></div></div>",
+      "css": ".ds-chat-composer{font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;display:flex;flex-direction:column;gap:.35rem;border:1.5px solid var(--field-line,#a8b5c5);border-radius:22px;background:var(--paper,#fff);padding:.35rem;box-shadow:0 2px 10px rgb(32 45 61 / .07)}.ds-composer-row{display:flex;align-items:flex-end;gap:.25rem}.ds-chat-composer:focus-within{border-color:var(--blue,#2356a5)}.ds-chat-label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.ds-chat-composer textarea{display:block;flex:1;min-width:0;min-height:40px;max-height:180px;resize:none;border:0;background:transparent;color:var(--ink,#202d3d);font:inherit;font-size:1rem;line-height:1.5;padding:.45rem .3rem;caret-color:var(--blue,#2356a5)}.ds-chat-composer textarea:focus-visible{outline:0}.ds-chat-composer textarea::placeholder{color:var(--muted,#546476)}.ds-composer-send,.ds-composer-attach{width:40px;height:40px;padding:0;border:0;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}.ds-composer-send{background:var(--blue,#2356a5);color:var(--paper,#fff)}.ds-composer-send:hover{background:var(--blue-hover,#194584)}.ds-composer-attach{background:transparent;color:var(--muted,#546476)}.ds-composer-attach:hover{background:var(--ground,#edf1f5);color:var(--ink,#202d3d)}.ds-composer-send:focus-visible,.ds-composer-attach:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}.ds-composer-send:disabled{background:var(--ground,#edf1f5);color:var(--muted,#546476);cursor:default}.ds-composer-attach:disabled{opacity:.45;cursor:default}@media(max-width:720px){.ds-chat-composer{border-radius:20px}.ds-chat-composer textarea{font-size:16px;min-height:44px}.ds-composer-send,.ds-composer-attach{width:44px;height:44px}}"
     },
     {
       "name": "Chat inline evidence",
       "kind": "custom",
       "refersTo": "chat-citation",
-      "description": "A compact numbered citation with a white evidence popover. The phone route opens the same evidence in a bottom sheet.",
-      "html": "<div class=\"ds-citation\"><button class=\"ds-citation-button\" type=\"button\" aria-label=\"Source 1: Saved research note\">1</button><section class=\"ds-citation-preview\" aria-label=\"Citation evidence\"><h4>Saved research note</h4><p class=\"ds-citation-location\">Document text · Saved passage</p><blockquote>The source passage appears here, beside links to its saved note and original source.</blockquote><div class=\"ds-citation-links\"><a href=\"#research-note\">Open note</a><a href=\"#original-source\">Open site</a></div></section></div>",
-      "css": ".ds-citation{position:relative;display:inline-block;font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;color:var(--ink,#202d3d)}.ds-citation-button{display:inline-flex;align-items:center;justify-content:center;min-width:25px;min-height:25px;border:0;border-radius:12px;background:var(--ground,#edf1f5);color:var(--muted,#546476);font-family:inherit;font-size:.7rem;line-height:1;cursor:pointer;font-variant-numeric:tabular-nums}.ds-citation-button:hover,.ds-citation:focus-within .ds-citation-button{background:var(--blue-wash,#eaf1fc);color:var(--blue,#2356a5)}.ds-citation-button:focus-visible,.ds-citation-links a:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}.ds-citation-preview{display:none;position:relative;width:min(380px,calc(100vw - 32px));max-height:min(70vh,620px);overflow:auto;padding:1.2rem;background:var(--paper,#fff);border-radius:12px;box-shadow:0 8px 28px rgb(32 45 61 / .2);font-size:.9rem}.ds-citation:hover .ds-citation-preview,.ds-citation:focus-within .ds-citation-preview{display:block}.ds-citation-preview h4{font-family:inherit;font-size:1rem;font-weight:500;line-height:1.4;margin:0}.ds-citation-location{font-size:.8rem;color:var(--muted,#546476);margin:.5rem 0 0;overflow-wrap:anywhere}.ds-citation-preview blockquote{max-height:36vh;overflow:auto;margin:1rem 0;padding-left:.75rem;border-left:1px solid var(--line,#d6dee7);color:var(--muted,#546476);font-style:normal;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.9rem;line-height:1.6}.ds-citation-links{display:flex;gap:.25rem 1.1rem;flex-wrap:wrap}.ds-citation-links a{color:var(--blue,#2356a5);min-height:44px;display:inline-flex;align-items:center;font-size:.85rem;text-underline-offset:.2em}@media(max-width:720px){.ds-citation-button{min-width:32px;min-height:32px;position:relative}.ds-citation-button::after{content:'';position:absolute;inset:-6px}}"
+      "description": "Source-label citation pill with an adjacent-source count and white desktop evidence popover. The app uses a phone bottom sheet.",
+      "html": "<div class=\"ds-citation\"><button class=\"ds-citation-button\" type=\"button\" aria-label=\"Sources: Saved research note; Another saved source\"><span class=\"ds-citation-label\">Saved research note</span><span class=\"ds-citation-more\">+1</span></button><section class=\"ds-citation-preview\" aria-label=\"Citation evidence\"><h4>Saved research note</h4><p class=\"ds-citation-location\"><strong>Saved research note</strong> · Document text · Saved passage</p><blockquote>The source passage appears here.</blockquote><div class=\"ds-citation-links\"><a href=\"#research-note\">Open note</a><a href=\"#original-source\">Open site</a></div></section></div>",
+      "css": ".ds-citation{position:relative;display:inline-block;font-family:'Source Sans 3 Variable',system-ui,sans-serif;font-size:17px;color:var(--ink,#202d3d)}.ds-citation-button{display:inline-flex;align-items:center;gap:.25rem;max-width:16rem;height:22px;padding:0 .5rem;border:0;border-radius:999px;background:var(--ground,#edf1f5);color:var(--ink,#202d3d);font:inherit;font-size:.72rem;font-weight:650;line-height:1;margin:0 .1rem;vertical-align:.12em;cursor:pointer;white-space:nowrap;position:relative}.ds-citation-label{overflow:hidden;text-overflow:ellipsis}.ds-citation-more{color:var(--muted,#546476);font-variant-numeric:tabular-nums}.ds-citation-button:hover,.ds-citation:focus-within .ds-citation-button{background:var(--blue,#2356a5);color:var(--paper,#fff)}.ds-citation-button:hover .ds-citation-more,.ds-citation:focus-within .ds-citation-more{color:var(--blue-wash,#eaf1fc)}.ds-citation-button:focus-visible,.ds-citation-links a:focus-visible{outline:3px solid var(--blue,#2356a5);outline-offset:4px}.ds-citation-preview{display:none;position:relative;width:min(400px,calc(100vw - 32px));max-height:min(70vh,620px);overflow:auto;padding:.9rem 1rem;background:var(--paper,#fff);border:1px solid var(--line,#d6dee7);border-radius:14px;box-shadow:0 10px 30px rgb(32 45 61 / .18);font-size:.9rem}.ds-citation:hover .ds-citation-preview,.ds-citation:focus-within .ds-citation-preview{display:block}.ds-citation-preview h4{font-size:.98rem;font-weight:700;line-height:1.35;margin:0;padding-right:1.6rem}.ds-citation-location{font-size:.78rem;color:var(--muted,#546476);margin:.3rem 0 0;overflow-wrap:anywhere}.ds-citation-location strong{color:var(--ink,#202d3d)}.ds-citation-preview blockquote{max-height:36vh;overflow:auto;margin:.6rem 0;padding-left:.75rem;border-left:2px solid var(--blue,#2356a5);font-style:normal;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.88rem;line-height:1.55}.ds-citation-links{display:flex;gap:0 1rem;flex-wrap:wrap}.ds-citation-links a{color:var(--blue,#2356a5);min-height:36px;display:inline-flex;align-items:center;font-size:.85rem;font-weight:600;text-underline-offset:.2em}@media(max-width:720px){.ds-citation-button{height:26px;padding:0 .55rem;font-size:.75rem;max-width:12rem}.ds-citation-button::after{content:'';position:absolute;inset:-9px -2px}.ds-citation-links a{min-height:44px}}@media(prefers-reduced-motion:no-preference){.ds-citation-button{transition:background-color .12s ease-out,color .12s ease-out}}"
     }
   ],
   "narrative": {
     "northStar": "The research notebook",
-    "overview": "A cool gray library margin sits beside a white reading page. Source Sans 3 carries controls, source facts, and machine interpretation. Source Serif 4 gives saved titles and personal commentary a different reading rhythm.\n\nThe notebook separates evidence origins through headings, rules, and status text. It keeps the source citation and review state close to the title. The recorded system covers the library, research note, and private chat routes in `apps/reader`. Chat carries the same colors and controls into a continuous sans serif discussion.",
+    "overview": "A cool gray library margin sits beside a white reading page. Source Sans 3 carries controls, source facts, and machine interpretation. Source Serif 4 gives saved titles and personal commentary a different reading rhythm.\n\nThe notebook separates evidence origins through headings, rules, and status text. It keeps source metadata and capture state near the reading content. The recorded system covers Sources, private chat, and Categories in the React reader at `apps/reader`. Chat carries the same colors and controls into a continuous sans serif discussion.",
     "keyCharacteristics": [
       "A library margin beside a white reading page.",
-      "Full-width source rows with serif titles and short sans serif summaries.",
+      "Compact source rows with serif titles and sans serif summaries, beside serif reading titles.",
       "Separate sections for source facts, machine interpretation, limitations, and human notes.",
       "Text labels beside color-coded review states.",
       "A continuous chat page with inline evidence and a bottom composer."
@@ -389,29 +532,29 @@
       },
       {
         "name": "The Two Reading Voices Rule",
-        "body": "Use Source Sans 3 for facts, machine interpretation, controls, and chat messages. Use Source Serif 4 for saved source titles and human commentary in research notes.",
+        "body": "Use Source Sans 3 for facts, machine interpretation, controls, and chat messages. Use Source Serif 4 for source-list and reading titles, original text, human commentary, and Categories document titles and category-name inputs. Categories preview paragraphs also use serif in the current code.",
         "section": "typography"
       },
       {
-        "name": "The Reading Width Rule",
-        "body": "Keep research articles within the 72ch reading column, including long titles, citations, and source URLs.",
+        "name": "The reading width rule",
+        "body": "On source detail pages, the article fills the space beside the source list with responsive side padding. Titles, section navigation, summaries, original text, and details share that width. The retained legacy note CSS has a 72ch cap but no current route. Long titles and source URLs wrap within their pane.",
         "section": "layout"
       }
     ],
     "dos": [
       "Do pair the cool library margin with a white reading page.",
       "Do keep source facts, machine interpretation, limitations, and human notes in separate labeled sections.",
-      "Do retain a visible label for search and every filter.",
-      "Do keep saved source titles and research-note commentary in the serif reading voice; use sans serif for chat messages.",
-      "Do retain the blue keyboard focus outline on reader links and buttons, and the blue composer border in chat.",
-      "Do preserve 44px navigation and composer controls, including expanded phone citation hit areas.",
+      "Do retain an accessible search label and visible labels for every filter.",
+      "Do keep source titles and research-note commentary in the serif reading voice; use sans serif for controls and chat messages.",
+      "Do retain visible keyboard focus on reader links and buttons, using blue by default and pale blue on the masthead. Keep the blue composer border in chat.",
+      "Do preserve 44px phone masthead and composer controls, including expanded phone citation hit areas.",
       "Do keep long source titles and URLs within the reading column.",
       "Do let chat charts and tables use the discussion pane while keeping answer prose within its reading measure."
     ],
     "donts": [
       "Don't communicate review state through color alone.",
       "Don't use the limited-evidence warning treatment for the default machine interpretation state.",
-      "Don't apply shadows to the reader's flat rows and reading page."
+      "Don't apply shadows to every source row or the flat reading page. Keep shadows limited to the documented selection, control, panel, and popover states."
     ]
   }
 }

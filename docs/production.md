@@ -33,7 +33,15 @@ Production uses `https://shelf.huuhka.net/`. Its CNAME points to `orange-ground-
 
 After the binding reports `Ready`, run `python3 scripts/configure-production-delivery.py` to configure the proxy. The script reads the domain from production parameters and sets `READER_ORIGINS` to the exact Shelf and Azure origins. `READER_ORIGIN` records the primary Shelf URL and remains the fallback for older development configuration. API writes require an invited reader and an allowed Origin header. Other origins, missing origins and HTTP variants are refused.
 
-The frontend uses relative `/api/` and `/.auth/` URLs, with same-origin credentials. No cross-origin browser API access or Functions CORS change is needed. GitHub sign-in uses Azure's built-in provider, and login and logout redirects stay on the domain where sign-in began. When creating production invitations, choose the Shelf domain and the existing `reader,library_member` roles. Signing in on the Azure hostname does not establish a browser session on Shelf.
+The frontend uses relative `/api/` and `/.auth/` URLs, with same-origin credentials. No cross-origin browser API access or Functions CORS change is needed. GitHub sign-in uses Azure's built-in provider. Shelf exchanges an invited sign-in for a server-backed session that expires after 30 days without a visit. Renewal and logout stay on the current domain. When creating production invitations, choose the Shelf domain and the existing `reader,library_member` roles. Signing in on the Azure hostname does not establish a browser session on Shelf. See the [authentication and login screen contract](authentication.md).
+
+## Install Shelf
+
+Open `https://shelf.huuhka.net/login.html`. The login page checks the session and starts GitHub sign-in automatically when needed. It stops automatic retries if sign-in does not complete. After sign-in, phones show an installation recommendation when the browser supports it. Not now, a horizontal swipe, or opening the install prompt dismisses the recommendation permanently for that browser. Chrome and Edge still offer installation through their browser menus. On iPhone or iPad, use the browser Share menu, Add to Home Screen, then Add. The manifest names the app Shelf and opens it in a standalone window. Its stable ID and all URLs are relative, so production and development install separately on their own origins. See [browser installation requirements](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable).
+
+Each launch renews the Shelf session through the public sign-in page, then opens the private reader. An installed app may require a separate sign-in, especially on Apple devices. The invitations and reader roles remain required when starting a session.
+
+Sources and chat require a connection. The service worker caches only the generic public offline page. It leaves API and authentication requests alone and never caches app pages, bundles, source files or responses. HTTP access errors still reach the browser unchanged. Static app code is public so it can validate a Shelf session after Azure's cookie expires. Private data requires backend authorization on every request. Bump the service worker's offline cache version when changing that page.
 
 ## Capture and acceptance
 

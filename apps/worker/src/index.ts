@@ -21,6 +21,7 @@ import { readSourceDocument, readSourceText } from './source-reader.js';
 import { chatUploadLimits, readUpload, saveUpload } from './chat-uploads.js';
 import { readReaderNote, saveReaderNote } from './reader-notes.js';
 import { readLibrary } from './library.js';
+import { readerSessionResponse, sessionReaderIdentity } from './reader-session.js';
 const required = (name: string) => { const value = process.env[name]; if (!value) throw new Error(`Missing configuration: ${name}`); return value; };
 const store = createStore;
 let zoteroPromise: Promise<Zotero> | undefined;
@@ -49,8 +50,11 @@ app.http('chatGateway', {
   route: 'chat', methods: ['GET', 'POST'], authLevel: 'function',
   handler: async (request, context): Promise<HttpResponseInit> => {
     try {
-      const owner = readerIdentity(request.headers.get('x-ms-client-principal'));
       const state = store();
+      const encoded = request.headers.get('x-ms-client-principal');
+      const token = request.headers.get('x-reader-session');
+      if (request.query.has('session')) return await readerSessionResponse(state, { encoded, token, renew: request.method === 'POST', logout: request.method === 'POST' && request.query.has('logout'), start: request.query.get('session') === 'start' });
+      const owner = await sessionReaderIdentity(state, encoded, token);
       if (request.method === 'GET' && request.query.has('library')) return { status: 200, jsonBody: await readLibrary(state), headers: { 'Cache-Control': 'private, no-store' } };
       if (request.query.has('notes')) {
         const headers = { 'Cache-Control': 'private, no-store' };

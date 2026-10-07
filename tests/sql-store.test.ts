@@ -2,6 +2,8 @@ import { afterAll, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { SqlStore } from '../apps/worker/src/sql-store.js';
 import { sqlPool, closeSql } from '../apps/worker/src/sql-connection.js';
+import { readerSessionResponse, readReaderSession } from '../apps/worker/src/reader-session.js';
+import { hash } from '../shared/corpus.js';
 
 afterAll(closeSql);
 it.skipIf(!process.env.TEST_SQL)('SQL records support immutable creates, conditional writes, prefix listing and lease fencing', async () => {
@@ -30,4 +32,21 @@ it.skipIf(!process.env.TEST_SQL)('SQL records support immutable creates, conditi
   } finally {
     await (await sqlPool()).request().input('key', key).query('DELETE dbo.Records WHERE record_key=@key');
   }
+}, 60000);
+
+it.skipIf(!process.env.TEST_SQL)('reader sessions survive worker restarts, renew under SQL leases and revoke persistently', async () => {
+  const first = new SqlStore('devstoreaccount1'), second = new SqlStore('devstoreaccount1');
+  const userDetails = (process.env.READER_GITHUB_USERS || '').split(',')[0];
+  expect(userDetails).toBeTruthy();
+  const encoded = Buffer.from(JSON.stringify({ identityProvider: 'github', userId: randomUUID(), userDetails, userRoles: ['reader', 'library_member'] })).toString('base64');
+  const response = await readerSessionResponse(first, { encoded, token: null, renew: true, start: true });
+  const token = response.headers['Set-Cookie'].split(';')[0].split('=')[1];
+  const key = `reader-sessions/${hash(token)}.json`;
+  try {
+    expect((await readReaderSession(second, token))?.clientPrincipal.userDetails).toBe(userDetails);
+    const renewed = await readerSessionResponse(second, { encoded: null, token, renew: true });
+    expect(Date.parse(renewed.jsonBody.expiresAt!)).toBeGreaterThanOrEqual(Date.parse(response.jsonBody.expiresAt!));
+    await readerSessionResponse(first, { encoded: null, token, renew: false, logout: true });
+    expect(await readReaderSession(second, token)).toBeUndefined();
+  } finally { await first.remove(key); }
 }, 60000);

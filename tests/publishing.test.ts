@@ -34,7 +34,7 @@ it('human notes are rendered without executable HTML or tracking images', async 
     expect(selected.humanHtml).not.toMatch(/<script|<img|href=["']javascript:/);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
-it('the private hosting rules authorize SPA rewrites without swallowing assets or API routes', async () => {
+it('hosting serves the app shell while protecting session creation and preserving API routes', async () => {
   const config = JSON.parse(await readFile('apps/reader/staticwebapp.config.json', 'utf8'));
   const matches = (pattern: string, pathname: string) => {
     if (pattern.includes('*.{')) {
@@ -43,21 +43,26 @@ it('the private hosting rules authorize SPA rewrites without swallowing assets o
     }
     return pattern.endsWith('*') ? pathname.startsWith(pattern.slice(0, -1)) : pathname === pattern;
   };
-  const rule = (pathname: string) => config.routes.find((r: { route: string }) => matches(r.route, pathname));
+  const rule = (pathname: string, method = 'GET') => config.routes.find((r: { route: string; methods?: string[] }) => matches(r.route, pathname) && (!r.methods || r.methods.includes(method)));
   for (const pathname of ['/', '/sources/', '/sources/example/', '/chat/conversation/', '/categories/', '/unknown-route']) {
-    expect(rule(pathname).allowedRoles).toEqual(['library_member']);
+    expect(rule(pathname).allowedRoles).toEqual(['anonymous']);
     expect(rule(pathname).rewrite).toBe('/index.html');
   }
-  for (const pathname of ['/assets/main.js', '/assets/font.woff2', '/assets/missing.svg', '/missing.css', '/api/chat', '/api/categories']) {
-    expect(rule(pathname).allowedRoles).toEqual(['library_member']);
+  for (const pathname of ['/assets/main.js', '/assets/font.woff2', '/assets/missing.svg', '/api/chat', '/api/categories', '/api/session', '/api/logout']) {
+    expect(rule(pathname).allowedRoles).toEqual(['anonymous']);
     expect(rule(pathname).rewrite).toBeUndefined();
   }
-  for (const pathname of ['/login.html', '/access.css', '/access.js', '/.auth/me']) {
+  expect(rule('/api/session-start', 'POST').allowedRoles).toEqual(['library_member']);
+  expect(rule('/api/session-start', 'POST').rewrite).toBeUndefined();
+  expect(rule('/missing.css').allowedRoles).toEqual(['library_member']);
+  expect(rule('/missing.css').rewrite).toBeUndefined();
+  for (const pathname of ['/index.html', '/login.html', '/access.css', '/access.js', '/logout.html', '/logout.js', '/.auth/me', '/manifest.webmanifest', '/pwa.js', '/sw.js', '/offline.html', '/icons/shelf-192.png']) {
     expect(rule(pathname).allowedRoles).toEqual(['anonymous']);
     expect(rule(pathname).rewrite).toBeUndefined();
   }
   expect(rule('/.auth/login/aad').statusCode).toBe(404);
-  // Azure skips route authorization for navigationFallback. Use authorized route rewrites instead.
+  // Only the session-start route trusts Azure identity. Corpus requests require
+  // the proxy and worker's validated session rather than the short Azure cookie.
   expect(config.navigationFallback).toBeUndefined();
   expect(config.responseOverrides['403']).toEqual({ rewrite: '/login.html', statusCode: 403 });
   expect(config.globalHeaders['Cache-Control']).toBe('private, no-store');

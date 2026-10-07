@@ -1,14 +1,45 @@
+const origins = () => (process.env.READER_ORIGINS || process.env.READER_ORIGIN || '').split(',').map(origin => origin.trim()).filter(Boolean);
+const sessionToken = request => {
+  const values = (request.headers.get('cookie') || '').split(';').map(value => value.trim()).filter(value => value.startsWith('__Host-ShelfSession='));
+  const token = values.length === 1 ? values[0].slice('__Host-ShelfSession='.length) : '';
+  return /^[a-f0-9]{64}$/.test(token) ? token : undefined;
+};
+const backendHeaders = (request, fresh = false) => ({
+  'x-functions-key': process.env.CHAT_BACKEND_KEY,
+  ...(fresh && request.headers.get('x-ms-client-principal') ? { 'x-ms-client-principal': request.headers.get('x-ms-client-principal') } : {}),
+  ...(sessionToken(request) ? { 'x-reader-session': sessionToken(request) } : {})
+});
+
+export const sessionHandler = (logout, start = false) => async request => {
+  const headers = { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json' };
+  const error = (status, message) => ({ status, jsonBody: { error: message }, headers });
+  if (request.method === 'POST' && !origins().includes(request.headers.get('origin'))) return error(403, 'Open the app to make changes');
+  if (!process.env.CHAT_BACKEND_URL || !process.env.CHAT_BACKEND_KEY) return error(503, 'The service is temporarily unavailable');
+  const url = new URL(process.env.CHAT_BACKEND_URL);
+  url.searchParams.set('session', start ? 'start' : 'resume');
+  if (logout) url.searchParams.set('logout', '1');
+  try {
+    const response = await fetch(url, { method: request.method, redirect: 'error', signal: AbortSignal.timeout(30_000), headers: backendHeaders(request, start) });
+    if (!response.headers.get('content-type')?.includes('application/json')) return error(503, 'The service is temporarily unavailable');
+    if (response.headers.get('set-cookie')) headers['Set-Cookie'] = response.headers.get('set-cookie');
+    if (logout && response.ok) {
+      const requested = request.query.get('returnTo') || '/login.html';
+      // Logout always returns to the public access page on the current host.
+      const target = requested === '/login.html' || requested.startsWith('/login.html?') ? requested : '/login.html';
+      headers.Location = '/.auth/logout?post_logout_redirect_uri=' + encodeURIComponent(target);
+      return { status: 303, headers };
+    }
+    return { status: response.status, body: await response.text(), headers };
+  } catch { return error(503, 'The service is temporarily unavailable. Try again.'); }
+};
+
 export const handler = admin => async request => {
   const headers = { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json' };
   const error = (status, message) => ({ status, jsonBody: { error: message }, headers });
-  let principal;
-  const encoded = request.headers.get('x-ms-client-principal');
-  try { principal = JSON.parse(Buffer.from(encoded || '', 'base64').toString('utf8')); } catch { return error(403, 'Reader access required'); }
-  const allowed = (process.env.READER_GITHUB_USERS || '').split(',').map(name => name.trim().toLowerCase()).filter(Boolean);
-  if (principal?.identityProvider !== 'github' || !principal.userId || typeof principal.userDetails !== 'string' || !allowed.includes(principal.userDetails.toLowerCase())
-    || !Array.isArray(principal.userRoles) || !principal.userRoles.includes('reader')) return error(403, 'Reader access required');
-  const origins = (process.env.READER_ORIGINS || process.env.READER_ORIGIN || '').split(',').map(origin => origin.trim()).filter(Boolean);
-  if (request.method === 'POST' && !origins.includes(request.headers.get('origin'))) return error(403, 'Open the app to make changes');
+  // Identity headers never grant access here. The worker validates the opaque
+  // session against SQL; only the role-protected start endpoint can mint one.
+  if (!sessionToken(request)) return error(403, 'Reader access required');
+  if (request.method === 'POST' && !origins().includes(request.headers.get('origin'))) return error(403, 'Open the app to make changes');
   if (!process.env.CHAT_BACKEND_URL || !process.env.CHAT_BACKEND_KEY) return error(503, 'The service is temporarily unavailable');
   const url = new URL(process.env.CHAT_BACKEND_URL);
   if (admin) url.searchParams.set('admin', '1');
@@ -57,7 +88,7 @@ export const handler = admin => async request => {
   }
   try {
     const response = await fetch(url, { method: request.method, redirect: 'error', body, signal: AbortSignal.timeout(30_000),
-      headers: { 'x-functions-key': process.env.CHAT_BACKEND_KEY, 'x-ms-client-principal': encoded, 'Content-Type': uploading ? request.headers.get('content-type') : 'application/json' } });
+      headers: { ...backendHeaders(request), 'Content-Type': uploading ? request.headers.get('content-type') : 'application/json' } });
     const mime = response.headers.get('content-type') || '';
     if (['application/pdf', 'image/png', 'image/jpeg', 'image/webp'].includes(mime) && request.method === 'GET') {
       if (Number(response.headers.get('content-length')) > 20 * 1024 * 1024) return error(503, 'File is too large');

@@ -9,7 +9,8 @@ async function render(principal: unknown, error?: 'network' | 'html' | 'malforme
   const calls: { path: string; options: RequestInit }[] = [];
   dom.window.fetch = (async (path: string, options: RequestInit) => {
     calls.push({ path, options });
-    if (path !== '/.auth/me') return new Response(denied ? '<h1>Sign in</h1>' : '<div id="root"></div>', { status: denied ? 403 : 200, headers: { 'Content-Type': 'text/html' } });
+    if (path === '/api/session-start') return new Response('<h1>Sign in</h1>', { status: 401, headers: { 'Content-Type': 'text/html' } });
+    if (path !== '/api/session' && path !== '/.auth/me') return new Response(denied ? '<h1>Sign in</h1>' : '<div id="root"></div>', { status: denied ? 403 : 200, headers: { 'Content-Type': 'text/html' } });
     if (error === 'network') throw new Error('offline');
     return new Response(JSON.stringify(error === 'malformed' ? {} : { clientPrincipal: principal }), {
       headers: { 'Content-Type': error === 'html' ? 'text/html' : 'application/json' }
@@ -17,15 +18,19 @@ async function render(principal: unknown, error?: 'network' | 'html' | 'malforme
   }) as typeof fetch;
   const redirects: string[] = [];
   (dom.window as any).recordRedirect = (path: string) => redirects.push(path);
-  dom.window.eval(script.replace('location.replace(destination)', 'window.recordRedirect(destination)'));
+  dom.window.eval(script.replaceAll('location.replace(destination)', 'window.recordRedirect(destination)').replaceAll('location.replace(login)', 'window.recordRedirect(login)'));
   await new Promise(resolve => setTimeout(resolve, 0));
   return { dom, calls, redirects, document: dom.window.document };
 }
-it('shows ordinary sign in only when the session is signed out', async () => {
-  const { dom, calls, document } = await render(null);
-  expect(document.querySelector('h1')?.textContent).toBe('Sign in');
+it('automatically starts GitHub sign-in when the session is signed out', async () => {
+  const { dom, calls, document, redirects } = await render(null);
+  expect(document.querySelector('h1')?.textContent).toBe('Signing you in');
+  expect(redirects).toEqual([document.querySelector('#primary')?.getAttribute('href')]);
+  expect(document.querySelector('#primary')?.hasAttribute('hidden')).toBe(true);
+  expect(document.querySelector('#check')).toBeNull();
   expect(document.querySelector('#primary')?.getAttribute('href')).toContain('/.auth/login/github');
-  expect(calls).toHaveLength(1);
+  expect(calls).toHaveLength(3);
+  expect(calls[0].options.method).toBe('POST');
   expect(calls[0].options.cache).toBe('no-store');
   dom.window.close();
 });
@@ -34,7 +39,7 @@ it('explains missing session roles without claiming sign-in or invitation failed
   expect(document.querySelector('h1')?.textContent).toBe('Signed in, access unavailable');
   expect(document.querySelector('#message')?.textContent).toContain('<DrBushyTop>');
   expect(document.querySelector('#message')?.innerHTML).toContain('&lt;DrBushyTop&gt;');
-  expect(document.querySelector('#primary')?.getAttribute('href')).toBe('/.auth/logout?post_logout_redirect_uri=%2Flogin.html%3FreturnTo%3D%252F');
+  expect(document.querySelector('#primary')?.getAttribute('href')).toBe('/logout.html?returnTo=%2Flogin.html%3FreturnTo%3D%252F');
   expect(document.querySelector('#switch')?.hasAttribute('hidden')).toBe(false);
   dom.window.close();
 });
@@ -54,8 +59,8 @@ it('keeps custom-domain sign-in and return paths on the custom domain', async ()
   const login = new URL(document.querySelector('#primary')!.getAttribute('href')!, dom.window.location.href);
   expect(login.origin).toBe('https://shelf.huuhka.net');
   expect(login.pathname).toBe('/.auth/login/github');
-  expect(login.searchParams.get('post_login_redirect_uri')).toBe('/sources/?source=abc');
-  expect(calls[0].path).toBe('/.auth/me');
+  expect(login.searchParams.get('post_login_redirect_uri')).toBe('/login.html?returnTo=%2Fsources%2F%3Fsource%3Dabc&signIn=returned');
+  expect(calls[0].path).toBe('/api/session');
   expect(calls[0].options.credentials).toBe('same-origin');
   dom.window.close();
 });
@@ -74,8 +79,36 @@ for (const error of ['network', 'html', 'malformed'] as const) {
   it(`shows a retryable identity error for ${error} without treating it as denied access`, async () => {
     const { dom, calls, document } = await render(null, error);
     expect(document.querySelector('h1')?.textContent).toBe('Could not check access');
-    expect((document.querySelector('#check') as HTMLButtonElement).disabled).toBe(false);
+    expect(document.querySelector('#check')).toBeNull();
+    expect(document.querySelector('#primary')?.hasAttribute('hidden')).toBe(false);
     expect(calls).toHaveLength(1);
     dom.window.close();
   });
 }
+
+it('stops automatic sign-in when GitHub returns without a session', async () => {
+  const { dom, document, redirects } = await render(null, undefined, 'https://reader.invalid/login.html?returnTo=%2Fchat%2Fabc%2F&signIn=returned');
+  expect(redirects).toEqual([]);
+  expect(document.querySelector('#primary')?.hasAttribute('hidden')).toBe(false);
+  expect(document.querySelector('#message')?.textContent).toContain('did not complete sign-in');
+  dom.window.close();
+});
+it('stops another automatic attempt after returning with the browser back button', async () => {
+  const { dom, redirects } = await render(null);
+  redirects.length = 0;
+  dom.window.eval('void checkAccess()');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(redirects).toEqual([]);
+  expect(dom.window.document.querySelector('#primary')?.hasAttribute('hidden')).toBe(false);
+  dom.window.close();
+});
+it('offers session refresh rather than bypassing the protected-page loop guard', async () => {
+  const { dom, redirects, document } = await render(authorized);
+  redirects.length = 0;
+  dom.window.eval('void checkAccess()');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(redirects).toEqual([]);
+  expect(document.querySelector('#primary')?.textContent).toBe('Refresh sign-in');
+  expect(document.querySelector('#primary')?.getAttribute('href')).toContain('/logout.html');
+  dom.window.close();
+});

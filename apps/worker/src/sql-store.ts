@@ -161,6 +161,9 @@ export class SqlStore extends BlobStore {
       WHERE updated_at < DATEADD(day,-1,SYSUTCDATETIME())
       AND (record_key LIKE 'chat/jobs/%' OR record_key LIKE 'chat/users/%'
         OR record_key LIKE 'chat/assets/%' OR record_key LIKE 'chat/cancellations/%');`);
+    await (await this.request()).query(`DELETE TOP (500) FROM dbo.Records
+      WHERE record_key LIKE 'reader-sessions/%'
+      AND TRY_CONVERT(datetime2,JSON_VALUE(document,'$.expiresAt'),127) <= SYSUTCDATETIME();`);
   }
   private async snapshot() {
     const signatureRows = await (await this.request()).query(`SELECT source_id,generation_id,revision FROM dbo.Sources WHERE active=1 ORDER BY source_id;

@@ -44,14 +44,6 @@ jobs:
       - run: npm ci
       - run: npm run build:reader
       - run: npm ci --prefix apps/chat-proxy --omit=dev
-      - name: Deploy private production reader and API proxy
-        uses: Azure/static-web-apps-deploy@v1
-        with:
-          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
-          action: upload
-          app_location: apps/reader/dist
-          api_location: apps/chat-proxy
-          skip_app_build: true
       - name: Package production worker
         run: |
           npm run build:worker
@@ -62,3 +54,11 @@ jobs:
           app-name: ${{ vars.FUNCTION_APP }}
           package: .function-package
           sku: flexconsumption
+      - name: Deploy private production reader and API proxy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          action: upload
+          app_location: apps/reader/dist
+          api_location: apps/chat-proxy
+          skip_app_build: true

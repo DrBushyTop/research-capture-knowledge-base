@@ -5,23 +5,45 @@ import { accessStore, forgetPrivateData } from '../lib/api';
 
 type Access = 'checking' | 'allowed' | 'unavailable';
 
-/** Deployed builds confirm the Static Web Apps identity before any screen asks the API for private data. The local dev server has no /.auth. */
+/** The app session renews on visits and while the reader is visible. Local dev has no hosted authentication. */
 function useAccess(): Access {
   const [access, setAccess] = useState<Access>(import.meta.env.DEV ? 'allowed' : 'checking');
   useEffect(() => {
-    if (access !== 'checking') return;
+    if (import.meta.env.DEV) return;
     const controller = new AbortController();
     let disposed = false;
-    const timeout = setTimeout(() => controller.abort(), 10_000);
-    fetch('/.auth/me', { credentials: 'same-origin', cache: 'no-store', signal: controller.signal }).then(async response => {
-      const principal = response.ok && response.headers.get('content-type')?.includes('application/json') ? (await response.json()).clientPrincipal : undefined;
-      if (disposed) return;
-      const roles: unknown = principal?.userRoles;
-      if (principal?.identityProvider === 'github' && Array.isArray(roles) && roles.includes('reader') && roles.includes('library_member')) setAccess('allowed');
-      else setAccess('unavailable');
-    }).catch(() => { if (!disposed) setAccess('unavailable'); }).finally(() => clearTimeout(timeout));
-    return () => { disposed = true; controller.abort(); clearTimeout(timeout); };
-  }, [access]);
+    let pending = false;
+    const refresh = async () => {
+      if (pending) return;
+      pending = true;
+      try {
+        const options: RequestInit = { method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)]) };
+        let response = await fetch('/api/session', options);
+        let data = response.ok && response.headers.get('content-type')?.includes('application/json') ? await response.json() : undefined;
+        if (response.ok && data?.clientPrincipal === null) {
+          response = await fetch('/api/session-start', options);
+          data = response.ok && response.headers.get('content-type')?.includes('application/json') ? await response.json() : undefined;
+        }
+        if (!response.ok && response.status !== 401 && response.status !== 403) throw new Error('Session service unavailable');
+        const principal = data?.clientPrincipal;
+        if (disposed) return;
+        const roles: unknown = principal?.userRoles;
+        setAccess(principal?.identityProvider === 'github' && Array.isArray(roles) && roles.includes('reader') && roles.includes('library_member') ? 'allowed' : 'unavailable');
+      } catch {
+        if (!disposed) setAccess(previous => previous === 'checking' ? 'unavailable' : previous);
+      } finally { pending = false; }
+    };
+    const whenVisible = () => { if (document.visibilityState === 'visible') void refresh(); };
+    void refresh();
+    const timer = setInterval(whenVisible, 10 * 60_000);
+    document.addEventListener('visibilitychange', whenVisible);
+    window.addEventListener('focus', whenVisible);
+    return () => {
+      disposed = true; controller.abort(); clearInterval(timer);
+      document.removeEventListener('visibilitychange', whenVisible);
+      window.removeEventListener('focus', whenVisible);
+    };
+  }, []);
   return access;
 }
 
@@ -67,8 +89,12 @@ export default function Layout() {
         <Link to="/sources/" aria-current={current(path.startsWith('/sources/'))}>Sources</Link>
         <Link to="/categories/" aria-current={current(path.startsWith('/categories/'))}>Categories</Link>
       </nav>
-      <a className="sign-out" href="/.auth/logout?post_logout_redirect_uri=/login.html" onClick={() => forgetPrivateData(queryClient, false)}>Sign out</a>
+      <form className="sign-out" action="/api/logout" method="POST" onSubmit={() => forgetPrivateData(queryClient, false)}><button type="submit">Sign out</button></form>
     </header>
+    {!lost && access === 'allowed' && <aside className="install-recommendation" aria-label="Install Shelf" hidden>
+      <div><strong>Add Shelf to your phone</strong><p className="install-message">Open the library from your home screen.</p></div>
+      <div className="install-actions"><button className="install-app" type="button">Add to home screen</button><button className="dismiss-install" type="button">Not now</button></div>
+    </aside>}
     {lost || access === 'unavailable' ? <AccessProblem /> : access === 'checking' ? <AccessProblem checking /> : <Outlet />}
   </>;
 }

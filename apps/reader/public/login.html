@@ -4,18 +4,24 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#14213a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Shelf">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/shelf.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <title>Access · Research library</title>
   <link rel="stylesheet" href="/access.css">
   <script type="module" src="/access.js"></script>
+  <script type="module" src="/pwa.js"></script>
 </head>
 <body><main>
-  <h1 id="heading">Sign in</h1>
-  <p id="message" role="status">Use your invited GitHub account.</p>
+  <h1 id="heading">Signing you in</h1>
+  <p id="message" role="status">Checking your GitHub session...</p>
   <div class="actions">
-    <a id="primary" href="/.auth/login/github?post_login_redirect_uri=%2F">Sign in with GitHub</a>
-    <button id="check" type="button">Check access again</button>
+    <a id="primary" href="/.auth/login/github?post_login_redirect_uri=%2Flogin.html%3FsignIn%3Dreturned" hidden>Sign in with GitHub</a>
   </div>
-  <a id="switch" href="/.auth/logout?post_logout_redirect_uri=%2Flogin.html" hidden>Sign out or switch account</a>
-  <noscript><p>JavaScript is needed to check your access status. Sign in above, or sign out before switching accounts.</p><a href="/.auth/logout?post_logout_redirect_uri=%2Flogin.html">Sign out</a></noscript>
+  <a id="switch" href="/logout.html" hidden>Sign out or switch account</a>
+  <noscript><p>JavaScript is needed to open the library automatically.</p><a href="/.auth/login/github?post_login_redirect_uri=%2F">Sign in with GitHub</a></noscript>
 </main></body>
 </html>

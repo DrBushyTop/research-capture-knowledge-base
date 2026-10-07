@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
-import { hash, noteSchema, processingVersion, sourceId, type Note, type SourceSnapshot } from '../../../shared/corpus.js';
+import { hash, noteSchema, sourceId, type Note } from '../../../shared/corpus.js';
 import { assignmentSchema, categoryId, templateSchema, type CategoryAssignment, type Registry, type Template, type TemplateAnalysis } from '../../../shared/categories.js';
 import { chatCorpusSchema, type ChatCorpus } from '../../../shared/chat.js';
 import { matchedSourceText } from '../../../shared/source-text.js';
 import type { Job, PipelineStore, SourceState } from './pipeline.js';
 import { categoryRegistry, CategoryError } from './category-registry.js';
+import { SourceGenerations } from './source-generations.js';
 
 interface Entry { sourceId: string; expected: string; jobId: string; assignment?: CategoryAssignment; preserveExisting: boolean; dispatched?: boolean; skipped?: boolean; }
 interface Batch { id: string; registry: Registry; mode: 'apply' | 'reclassify'; categoryId?: string; createdAt: string; entries: Entry[]; cancelled?: boolean; }
@@ -74,25 +75,15 @@ export async function dispatchBatch(store: PipelineStore, id: string, send: (id:
   await store.withLease(`category-batch-${id}`, async () => {
     const batch = await store.read<Batch>(key);
     if (!batch || batch.cancelled) return;
-    await store.withLease('poll', async () => {
-      for (const entry of batch.entries.filter(e => !e.dispatched && !e.skipped).slice(0, 5)) {
-        await store.withLease(`source-${entry.sourceId}`, async () => {
-          const state = await store.read<SourceState>(`sources/${entry.sourceId}.json`);
-          if (!state || !state.source.active || ![entry.expected, entry.jobId].includes(state.generationId)) { entry.skipped = true; return; }
-          const snapshot = await store.read<SourceSnapshot>(`snapshots/${entry.expected}.json`);
-          if (!snapshot) { entry.skipped = true; return; }
-          const template = entry.assignment ? batch.registry.categories.find(c => c.id === entry.assignment!.categoryId) : undefined;
-          await store.create(`snapshots/${entry.jobId}.json`, snapshot);
-          await store.create(`jobs/${entry.jobId}.json`, { id: entry.jobId, source: snapshot.source, snapshotKey: `snapshots/${entry.jobId}.json`, status: 'pending', attempts: 0, observedAt: new Date().toISOString(),
-            categoryPlan: { registry: batch.registry, assignment: entry.assignment, template, batchId: id, preserveExisting: entry.preserveExisting } } satisfies Job);
-          if (entry.assignment) await store.write(`categories/assignments/${entry.sourceId}.json`, entry.assignment);
-          await store.write(`sources/${entry.sourceId}.json`, { ...state, generationId: entry.jobId, processingVersion: state.processingVersion || processingVersion });
-          await send(entry.jobId);
-          entry.dispatched = true;
-        });
-        await store.write(key, batch);
-      }
-    });
+    const generations = new SourceGenerations(store);
+    for (const entry of batch.entries.filter(e => !e.dispatched && !e.skipped).slice(0, 5)) {
+      const template = entry.assignment ? batch.registry.categories.find(c => c.id === entry.assignment!.categoryId) : undefined;
+      const advanced = await generations.dispatchBatch({ sourceId: entry.sourceId, expected: entry.expected, jobId: entry.jobId,
+        categoryPlan: { registry: batch.registry, assignment: entry.assignment, template, batchId: id, preserveExisting: entry.preserveExisting } }, send);
+      if (advanced) entry.dispatched = true;
+      else entry.skipped = true;
+      await store.write(key, batch);
+    }
     if (batch.entries.some(e => !e.dispatched && !e.skipped)) await send(id);
   });
 }
@@ -111,17 +102,9 @@ export async function changeBatch(store: PipelineStore, id: string, action: 'can
   await store.withLease(`category-batch-${id}`, async () => {
     const batch = await store.read<Batch>(key); if (!batch) throw new CategoryError(404, 'Update not found');
     if (action === 'cancel') { batch.cancelled = true; await store.write(key, batch); }
-    for (const entry of batch.entries.filter(e => e.dispatched && (!source || e.sourceId === source))) {
-      await store.withLease(`source-${entry.sourceId}`, async () => {
-        const jobKey = `jobs/${entry.jobId}.json`;
-        const job = await store.read<Job>(jobKey);
-        const state = await store.read<SourceState>(`sources/${entry.sourceId}.json`);
-        if (!job || state?.generationId !== job.id) return;
-        if (action === 'retry' && job.status === 'failed') {
-          if (batch.cancelled) throw new CategoryError(409, 'Start a new update after cancelling this one');
-          await store.write(jobKey, { ...job, status: 'pending', attempts: 0, dispatches: 0, lastQueuedAt: undefined, retryAt: undefined, error: undefined }); await send(job.id);
-        } else if (action === 'cancel' && job.status === 'pending') await store.write(jobKey, { ...job, status: 'failed', error: 'Update cancelled. The existing note is still available.' });
-      });
+    const generations = new SourceGenerations(store);
+    for (const entry of batch.entries.filter(e => !source || e.sourceId === source)) {
+      if (await generations.change(entry.jobId, action, send) === 'cancelled') throw new CategoryError(409, 'Start a new update after cancelling this one');
     }
   });
   return { id };

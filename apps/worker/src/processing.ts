@@ -2,7 +2,7 @@ import { canonical, hash, noteSchema, type Analysis, type Note, type SourceSnaps
 import { assignmentSchema, classificationSchema, registrySchema, templateSchema, type Registry, type Template, type TemplateAnalysis, type CategoryAssignment } from '../../../shared/categories.js';
 import { MissingArtifact, savedMetadata, type Extracted } from './extraction.js';
 import { TransientInference } from './enrichment.js';
-import type { Job, PipelineStore, SourceState } from './pipeline.js';
+import { SourceGenerations, type Job, type PipelineStore } from './source-generations.js';
 import { sourceText } from '../../../shared/source-text.js';
 import type { SourceImage } from './image-input.js';
 
@@ -18,13 +18,10 @@ export async function processJob(store: PipelineStore, id: string, processor: Pr
   if (!/^[a-f0-9]{64}$/.test(id)) throw new Error('Invalid job ID');
   const found = await store.read<Job>(`jobs/${id}.json`);
   if (!found) return;
+  const generations = new SourceGenerations(store);
   return store.withLease(`source-${found.source.id}`, async () => {
     let job = await store.read<Job>(`jobs/${id}.json`);
-    const current = await store.read<SourceState>(`sources/${found.source.id}.json`);
-    if (!job || job.status !== 'pending' || current?.generationId !== id || (job.retryAt && new Date(job.retryAt) > new Date())) return;
-    if (job.categoryPlan?.batchId && (await store.read<{ cancelled?: boolean }>(`categories/batches/${job.categoryPlan.batchId}.json`))?.cancelled) {
-      await store.write(`jobs/${id}.json`, { ...job, status: 'failed', error: 'Update cancelled. The existing note is still available.' }); return;
-    }
+    if (!job || job.status !== 'pending' || !await generations.canProcess(job) || (job.retryAt && new Date(job.retryAt) > new Date())) return;
     if (job.attempts >= 5) { await store.write(`jobs/${id}.json`, { ...job, status: 'failed', error: 'Worker retry budget exhausted; operator replay required' }); return; }
     job = { ...job, attempts: job.attempts + 1 };
     await store.write(`jobs/${id}.json`, job);
@@ -42,6 +39,7 @@ export async function processJob(store: PipelineStore, id: string, processor: Pr
         }
         extracted = savedMetadata(snapshot, { status: 'needs-review', method: 'none', reason: 'Source extraction unavailable; review or replay this capture.', truncated: false, retrievedAt: new Date().toISOString(), artifactHash: null });
       }
+      if (!await generations.canProcess(job)) return;
       let analysis: Analysis | TemplateAnalysis | null = null;
       let category: Extract<Note, { schemaVersion: 2 }>['category'] | undefined;
       let template: Template | undefined;
@@ -60,6 +58,7 @@ export async function processJob(store: PipelineStore, id: string, processor: Pr
           let classified = await store.read<{ categoryId: string; reason: string }>(cacheKey);
           if (!classified) {
             if (!processor.classify) throw new Error('Category classification is not configured');
+            if (!await generations.canProcess(job)) return;
             classified = await processor.classify(snapshot.source, extracted.text, registry, store.leaseSignal, extracted.images);
             if (!registry.categories.some(category => category.id === classified!.categoryId && !category.archived)) throw new Error('Invalid category classification');
             await store.create(cacheKey, classified);
@@ -75,11 +74,12 @@ export async function processJob(store: PipelineStore, id: string, processor: Pr
         if (template.id !== assignment.categoryId) throw new Error('Template does not match assigned category');
         category = { id: template.id, name: template.name, templateRevision: template.revision, assignmentRevision: assignment.revision, assignment: assignment.method, reason: assignment.reason };
         // A late classifier cannot replace an admin's newer assignment.
-        if ((await store.read<SourceState>(`sources/${snapshot.source.id}.json`))?.generationId !== id) return;
+        if (!await generations.canProcess(job)) return;
         await store.write(`categories/assignments/${snapshot.source.id}.json`, assignment);
       }
       if (extracted.text) await store.create(`source-text/${id}.json`, sourceText({ source: snapshot.source, generationId: id, extraction: extracted.evidence }, extracted.text));
       if (extracted.text || extracted.images?.length) {
+        if (!await generations.canProcess(job)) return;
         try { analysis = template ? await processor.analyzeTemplate!(extracted.text, template, store.leaseSignal, snapshot.source, extracted.images) : await processor.enrich(extracted.text, store.leaseSignal, extracted.images); }
         catch (error) {
           store.leaseSignal?.throwIfAborted();
@@ -98,10 +98,12 @@ export async function processJob(store: PipelineStore, id: string, processor: Pr
         rightsEvidence: await processor.rights(snapshot.source.doi) });
       await store.create(`analysis/${id}.json`, note);
     }
-    const desired = await store.read<SourceState>(`sources/${found.source.id}.json`);
-    if (desired?.generationId !== id) return;
+    if (!await generations.canProcess(job)) return;
     await store.create(`staged/${id}.json`, noteSchema.parse(note));
-    if (store.publishNote) await store.publishNote(note);
+    if (store.publishNote) {
+      if (!await generations.canProcess(job)) return;
+      await store.publishNote(note);
+    }
     await store.write(`jobs/${id}.json`, { ...job, status: store.publishNote ? 'imported' : 'staged', retryAt: undefined, error: undefined });
     } catch (error) {
       await store.write(`jobs/${id}.json`, { ...job, status: job.attempts >= 5 ? 'failed' : 'pending',

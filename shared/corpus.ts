@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { categoryId, templateAnalysisSchema } from './categories.js';
 
-export const processingVersion = '2';
+export const processingVersion = '3';
 export const httpUrl = z.url().refine(value => {
   try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password; }
   catch { return false; }
@@ -95,7 +95,7 @@ export interface ZoteroItem { key: string; version: number; data: Record<string,
 export interface LibrarySnapshot { libraryType: 'users' | 'groups'; libraryId: string; version: number; items: ZoteroItem[]; }
 export interface SourceSnapshot { source: Source; root: ZoteroItem; children: ZoteroItem[]; }
 export function normalize(snapshot: LibrarySnapshot): SourceSnapshot[] {
-  return snapshot.items.filter(i => !i.data.parentItem && !['note', 'annotation'].includes(String(i.data.itemType))).map(root => {
+  return snapshot.items.filter(i => !i.data.parentItem && i.data.itemType !== 'annotation').map(root => {
     const descendant = (item: ZoteroItem) => {
       const seen = new Set<string>(); let parent = item.data.parentItem;
       while (typeof parent === 'string' && !seen.has(parent)) {
@@ -110,7 +110,7 @@ export function normalize(snapshot: LibrarySnapshot): SourceSnapshot[] {
     const tags = Array.isArray(d.tags) ? d.tags as { tag: string }[] : [];
     const source = sourceSchema.parse({
       id: `zotero-${snapshot.libraryType}-${snapshot.libraryId}-${root.key}`, libraryType: snapshot.libraryType, libraryId: snapshot.libraryId,
-      key: root.key, fingerprint, title: String(d.title || 'Untitled capture'), itemType: String(d.itemType || 'other'),
+      key: root.key, fingerprint, title: String(d.title || (d.itemType === 'note' ? String(d.note || '').replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200) : '') || 'Untitled capture'), itemType: String(d.itemType || 'other'),
       authors: creators.map(c => String(c.name || [c.firstName, c.lastName].filter(Boolean).join(' '))).filter(Boolean),
       url: httpUrl.safeParse(d.url).success ? d.url : null, doi: d.DOI || null, publishedAt: d.date || null,
       capturedAt: String(d.dateAdded || new Date().toISOString()), tags: tags.map(t => t.tag), active: true

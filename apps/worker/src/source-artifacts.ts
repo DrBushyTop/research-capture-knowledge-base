@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { canonical, hash, httpUrl, sourceId, type Note, type SourceSnapshot, type ZoteroItem } from '../../../shared/corpus.js';
-import { downloadAttachment, downloadPublic, extractArtifact, maxBytes, MissingArtifact, savedMetadata, type Extracted, type RetainedArtifact } from './extraction.js';
+import { downloadAttachment, downloadPublic, extractArtifact, maxBytes, MissingArtifact, savedMetadata, withSavedCommentary, type Extracted, type RetainedArtifact } from './extraction.js';
 import type { BrowserCapture } from './browser-capture.js';
 import type { PipelineStore } from './pipeline.js';
 import type { Zotero } from './zotero.js';
@@ -32,14 +32,12 @@ function mimeFor(bytes: Uint8Array, mime: string) {
 
 function attachments(snapshot: SourceSnapshot) {
   const items = snapshot.root.data.itemType === 'attachment' ? [snapshot.root, ...snapshot.children] : snapshot.children;
-  return items.filter(item => ['imported_file', 'imported_url'].includes(String(item.data.linkMode)));
+  return items.filter(item => ['imported_file', 'imported_url', 'embedded_image'].includes(String(item.data.linkMode)));
 }
 
-function preferred(items: ZoteroItem[]) {
-  return items.find(item => item.data.contentType === 'application/pdf') ||
-    items.find(item => /^(text\/|application\/json$)/.test(String(item.data.contentType))) ||
-    items.find(item => String(item.data.contentType).startsWith('image/')) ||
-    items.find(item => String(item.data.contentType).startsWith('video/'));
+function preference(item: ZoteroItem) {
+  const mime = String(item.data.contentType);
+  return mime === 'application/pdf' ? 0 : /^(text\/|application\/json$)/.test(mime) ? 1 : mime.startsWith('image/') ? 2 : 3;
 }
 
 /** Owns the selection invariant: replay uses the artifact that supplied successful evidence.
@@ -89,16 +87,16 @@ export class SourceArtifacts {
     return this.checked(artifact, receipt);
   }
 
-  private async acquire(snapshot: SourceSnapshot, attachment: ZoteroItem | undefined, zotero: Pick<Zotero, 'request'>) {
+  private async acquire(snapshot: SourceSnapshot, attachment: ZoteroItem | undefined, zotero: Pick<Zotero, 'request'>, url = snapshot.source.url) {
     const location: Receipt['origin'] = attachment ? { kind: 'attachment', key: attachment.key, version: attachment.version }
-      : { kind: 'url', url: snapshot.source.url! };
+      : { kind: 'url', url: url! };
     const key = `artifact-inputs/${snapshot.source.fingerprint}/${hash(canonical(location))}.json`;
     const cached = await this.receipt(key, snapshot.source);
     if (cached) {
       const raw = await this.store.readArtifact(cached.hash);
       if (raw) return { receipt: cached, artifact: this.checked(raw, cached) };
     }
-    const input = attachment ? await downloadAttachment(attachment, zotero) : await downloadPublic(snapshot.source.url!);
+    const input = attachment ? await downloadAttachment(attachment, zotero) : await downloadPublic(url!);
     if (input.bytes.length > maxBytes) throw new Error('Source exceeds byte limit');
     const mime = Buffer.from(input.bytes.subarray(0, 5)).toString() === '%PDF-' ? 'application/pdf' : mimeFor(input.bytes, input.mime);
     const receipt = cached ?? receiptSchema.parse({ hash: hash(input.bytes), mime, retrievedAt: new Date().toISOString(),
@@ -117,23 +115,49 @@ export class SourceArtifacts {
     const unavailable = { status: 'metadata-only' as const, method: 'none' as const, reason: null, truncated: false,
       retrievedAt: new Date().toISOString(), artifactHash: null };
     if (!snapshot.source.active) return { text: '', evidence: { ...unavailable, reason: 'Source is no longer in the observed library.' } };
+    if (snapshot.root.data.itemType === 'note' && !attachments(snapshot).length) return savedMetadata(snapshot, unavailable);
     const selected = await this.receipt(this.selectionKey(snapshot.source.fingerprint), snapshot.source);
     const published = selected ? undefined : await this.published(snapshot.source);
     const cached = selected || published?.receipt || await this.legacy(snapshot.source);
-    const items = attachments(snapshot);
-    const attachment = preferred(items);
-    if (!cached && !attachment && !snapshot.source.url) return savedMetadata(snapshot, { ...unavailable, reason: 'No synced attachment or retrievable source URL.' });
-    let input = published || (cached ? { receipt: cached, artifact: await this.restore(cached) } : await this.acquire(snapshot, attachment, zotero));
-    let result = await extractArtifact(snapshot, input.artifact, browser);
-    // One synced screenshot can rescue an unusable text layer. Never recurse or fetch page image URLs.
-    const image = snapshot.root.data.itemType !== 'attachment' && items.find(item => String(item.data.contentType).startsWith('image/'));
-    const textArtifact = input.artifact.mime === 'application/pdf' || input.artifact.mime === 'application/json' || input.artifact.mime.startsWith('text/');
-    if (image && textArtifact && !['text', 'image'].includes(result.evidence.status)) {
-      input = await this.acquire(snapshot, image, zotero);
-      result = await extractArtifact(snapshot, input.artifact);
+    const items = attachments(snapshot).sort((a, b) => preference(a) - preference(b));
+    const linkedUrl = [snapshot.root, ...snapshot.children].find(item => item.data.linkMode === 'linked_url' && httpUrl.safeParse(item.data.url).success)?.data.url as string | undefined;
+    const url = snapshot.source.url || linkedUrl;
+    const finish = async (input: { receipt: Receipt; artifact: RetainedArtifact }, useBrowser?: () => Promise<BrowserCapture>) => {
+      const result = await extractArtifact(snapshot.source.url || !url ? snapshot : { ...snapshot, source: { ...snapshot.source, url } }, input.artifact, useBrowser);
+      if (items.length > 1) {
+        result.evidence.truncated = true;
+        result.evidence.reason = `${result.evidence.reason ? result.evidence.reason + ' ' : ''}Analyzed one of ${items.length} stored attachments. Other attachments were not analyzed.`.slice(0, 1000);
+      }
+      if (['text', 'image'].includes(result.evidence.status)) {
+        await this.store.create(this.selectionKey(snapshot.source.fingerprint), input.receipt);
+        return withSavedCommentary(snapshot, result);
+      }
+      return result;
+    };
+    if (selected || published) return finish(published || { receipt: selected!, artifact: await this.restore(selected!) }, browser);
+    let result: Extracted | undefined;
+    // Retention failures propagate. Only missing cloud files permit trying another input.
+    let missing: MissingArtifact | undefined;
+    const initial = cached ? { receipt: cached, artifact: await this.restore(cached) } : undefined;
+    if (initial) {
+      result = await finish(initial, browser);
+      if (['text', 'image'].includes(result.evidence.status)) return result;
     }
-    if (['text', 'image'].includes(result.evidence.status)) await this.store.create(this.selectionKey(snapshot.source.fingerprint), input.receipt);
-    return result;
+    for (const item of items.slice(0, 8)) {
+      let input;
+      try { input = await this.acquire(snapshot, item, zotero); }
+      catch (error) { if (error instanceof MissingArtifact) { missing = error; continue; } throw error; }
+      if (initial?.receipt.hash === input.receipt.hash) continue;
+      const candidate = await finish(input, browser);
+      if (['text', 'image'].includes(candidate.evidence.status)) return candidate;
+      result ??= candidate;
+    }
+    if (url && !result) return finish(await this.acquire(snapshot, undefined, zotero, url), browser);
+    if (missing) throw missing;
+    if (result) return result;
+    const linkedFile = [snapshot.root, ...snapshot.children].some(item => item.data.linkMode === 'linked_file');
+    return savedMetadata(snapshot, { ...unavailable, ...(linkedFile ? { status: 'needs-review' as const } : {}),
+      reason: linkedFile ? 'Linked files are local to Zotero desktop and cannot be downloaded from its cloud API. Save a synced attachment.' : 'No synced attachment or retrievable source URL.' });
   }
 
   /** Template analysis can pass its pinned source note here before parsing with extractArtifact.

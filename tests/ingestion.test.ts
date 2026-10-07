@@ -38,13 +38,15 @@ it('observes a child-only change and does not duplicate an unchanged observation
   expect(delivered).toHaveLength(1);
   expect(await store.list('jobs/')).toHaveLength(2);
 });
-it('records a tombstone without destroying the previous capture', async () => {
+it('keeps an imported source active when it disappears from Zotero', async () => {
   const store = new MemoryStore();
   await discover(store, snapshot, 'v1');
   await discover(store, { ...snapshot, version: 9, items: [] }, 'v1');
   const current = await store.read<{source: {active: boolean}}>('sources/zotero-users-12345-PBA4T3PN.json');
-  expect(current?.source.active).toBe(false);
-  expect(await store.list('snapshots/')).toHaveLength(2);
+  expect(current?.source.active).toBe(true);
+  expect(await store.list('snapshots/')).toHaveLength(1);
+  expect(await store.list('jobs/')).toHaveLength(1);
+  expect((await store.read<{ libraryVersion: number }>('checkpoint.json'))?.libraryVersion).toBe(9);
 });
 it('does not roll the corpus back when an older poll finishes late', async () => {
   const store = new MemoryStore();
@@ -53,6 +55,18 @@ it('does not roll the corpus back when an older poll finishes late', async () =>
   await discover(store, snapshot, 'v1');
   const checkpoint = await store.read<{ libraryVersion: number }>('checkpoint.json');
   expect(checkpoint?.libraryVersion).toBe(9);
+  expect(await store.list('jobs/')).toHaveLength(1);
+});
+it('keeps an imported source active when it leaves the configured capture collection', async () => {
+  const store = new MemoryStore();
+  const library = structuredClone(snapshot);
+  library.items[0].data.collections = ['INBOX001'];
+  await discover(store, library, '3', 'INBOX001');
+  const original = await store.read('sources/zotero-users-12345-PBA4T3PN.json');
+  library.version++;
+  library.items[0].data.collections = [];
+  await discover(store, library, '3', 'INBOX001');
+  expect(await store.read('sources/zotero-users-12345-PBA4T3PN.json')).toEqual(original);
   expect(await store.list('jobs/')).toHaveLength(1);
 });
 it('tracks standalone PDFs and annotations under child attachments', async () => {

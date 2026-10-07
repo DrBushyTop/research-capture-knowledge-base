@@ -9,23 +9,54 @@ import type { Zotero } from './zotero.js';
 import { browserCaptureNeeded, type BrowserCapture } from './browser-capture.js';
 import { sourceImage, type SourceImage } from './image-input.js';
 import { pdfText } from './pdf-text.js';
+import { createHash } from 'node:crypto';
 
 export const maxBytes = 20 * 1024 * 1024;
 export class MissingArtifact extends Error {}
 export interface Extracted { text: string; images?: SourceImage[]; evidence: Note['extraction']; }
 export interface RetainedArtifact { bytes: Uint8Array; mime: string; retrievedAt: string; }
-export function savedMetadata(snapshot: SourceSnapshot, evidence: Note['extraction']): Extracted {
-  const abstract = snapshot.root.data.abstractNote;
-  if (typeof abstract !== 'string' || !abstract.trim()) return { text: '', evidence };
-  const dom = new JSDOM(abstract.slice(0, 100_000));
+function savedHtml(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) return '';
+  const dom = new JSDOM(value.slice(0, 100_000));
   let text = '';
   try {
     for (const element of dom.window.document.querySelectorAll('script,style')) element.remove();
+    for (const element of dom.window.document.querySelectorAll('p,div,h1,h2,h3,h4,li,br')) element.append('\n');
     text = dom.window.document.body.textContent?.trim() || '';
   } finally { dom.window.close(); }
+  return text;
+}
+function savedCommentary(snapshot: SourceSnapshot) {
+  const parts: string[] = [];
+  for (const item of [snapshot.root, ...snapshot.children]) {
+    const note = savedHtml(item.data.note);
+    if (note) parts.push(`Saved Zotero note ${item.key}\nHuman commentary, separate from the original source.\n${note}`);
+    if (item.data.itemType === 'annotation') {
+      const quote = typeof item.data.annotationText === 'string' ? item.data.annotationText.trim().slice(0, 100_000) : '';
+      const comment = typeof item.data.annotationComment === 'string' ? item.data.annotationComment.trim().slice(0, 100_000) : '';
+      const page = typeof item.data.annotationPageLabel === 'string' ? item.data.annotationPageLabel.slice(0, 200) : '';
+      if (quote || comment) parts.push(`Saved Zotero annotation ${item.key}${page ? '\nPage: ' + page : ''}${quote ? '\nHighlighted text: ' + quote : ''}${comment ? '\nHuman comment: ' + comment : ''}`);
+    }
+    if (parts.reduce((length, part) => length + part.length, 0) > 60_000) break;
+  }
+  return parts.join('\n\n');
+}
+export function withSavedCommentary(snapshot: SourceSnapshot, extracted: Extracted): Extracted {
+  const commentary = savedCommentary(snapshot);
+  if (!commentary) return extracted;
+  const label = extracted.evidence.method === 'image-vision' ? 'Saved Zotero description or caption' : 'Original source evidence';
+  const text = [extracted.text && `${label}\n${extracted.text}`, commentary].filter(Boolean).join('\n\n');
+  return { ...extracted, text: text.slice(0, 60_000), evidence: { ...extracted.evidence, truncated: extracted.evidence.truncated || text.length > 60_000 } };
+}
+export function savedMetadata(snapshot: SourceSnapshot, evidence: Note['extraction']): Extracted {
+  const abstract = savedHtml(snapshot.root.data.abstractNote);
+  const commentary = savedCommentary(snapshot);
+  const standalone = snapshot.root.data.itemType === 'note';
+  const text = [abstract, commentary].filter(Boolean).join('\n\n');
   if (!text) return { text: '', evidence };
   return { text: text.slice(0, 60_000), evidence: { ...evidence, status: 'metadata-only', method: 'zotero-metadata', truncated: text.length > 60_000,
-    reason: `${evidence.reason ? evidence.reason + ' ' : ''}Analysis uses the description or caption saved in Zotero. The original document or post text was unavailable.`.slice(0, 1000) } };
+    ...(standalone ? { status: 'text' as const, method: 'text' as const } : {}),
+    reason: `${evidence.reason ? evidence.reason + ' ' : ''}${standalone ? 'Analysis uses the standalone note saved in Zotero.' : `Analysis uses the description or caption${commentary ? ' and saved notes or annotations' : ''} saved in Zotero. The original document or post text was unavailable.`}`.slice(0, 1000) } };
 }
 export function publicAddress(address: string) {
   let parsed = ipaddr.parse(address);
@@ -98,6 +129,8 @@ export async function downloadAttachment(attachment: ZoteroItem, zotero: Pick<Zo
     bytes = await boundedResponse(response);
     mime = response.headers.get('content-type') || String(attachment.data.contentType);
   }
+  const md5 = attachment.data.md5;
+  if (typeof md5 === 'string' && /^[a-f0-9]{32}$/i.test(md5) && createHash('md5').update(bytes).digest('hex') !== md5.toLowerCase()) throw new MissingArtifact('The cloud file does not match the saved attachment version. It may need Zotero or WebDAV file sync.');
   return { bytes, mime: String(attachment.data.contentType || mime) };
 }
 
@@ -107,6 +140,7 @@ export async function extractArtifact(snapshot: SourceSnapshot, artifact: Retain
   const evidence: Note['extraction'] = { status: 'metadata-only', method: 'none', reason: null, truncated: false,
     retrievedAt: artifact.retrievedAt, artifactHash: hash(bytes), artifactMime: mime.split(';')[0] };
   let text = '';
+  if (mime.includes('html') && bytes[0] === 0x50 && bytes[1] === 0x4b) return savedMetadata(snapshot, { ...evidence, status: 'needs-review', reason: 'Compressed HTML snapshots are not supported. Save a single-file HTML snapshot.' });
   if (mime.includes('pdf') || Buffer.from(bytes.subarray(0, 5)).toString() === '%PDF-') {
     evidence.method = 'pdf-text';
     evidence.artifactMime = 'application/pdf';
@@ -124,10 +158,10 @@ export async function extractArtifact(snapshot: SourceSnapshot, artifact: Retain
     catch (error) {
       return savedMetadata(snapshot, { ...evidence, status: 'needs-review', reason: error instanceof Error ? error.message : 'Image cannot be analyzed.' });
     }
-    const metadata = savedMetadata(snapshot, evidence);
-    return { text: metadata.text, images: [image], evidence: { ...evidence, status: 'image', method: 'image-vision',
+    const caption = savedHtml(snapshot.root.data.abstractNote);
+    return { text: caption.slice(0, 60_000), images: [image], evidence: { ...evidence, status: 'image', method: 'image-vision', truncated: caption.length > 60_000,
       reason: 'Analysis uses the retained image and any saved caption. Visual interpretation is generated, not a verified text transcription. The original page may contain material outside this image.' } };
-  } else return savedMetadata(snapshot, { ...evidence, status: 'needs-review', reason: mime.startsWith('video/') ? 'Video analysis is not supported. Save a still screenshot as a PNG, JPEG or WebP attachment.' : 'Unsupported source format.' });
+  } else return savedMetadata(snapshot, { ...evidence, status: 'needs-review', reason: mime.startsWith('video/') ? 'Video analysis is not supported. Save a still screenshot as a PNG, JPEG or WebP attachment.' : `Analysis of ${mime} files is not supported. The original is retained for review.` });
   if (mime.includes('html') && browser && browserCaptureNeeded(text, Buffer.from(bytes).toString('utf8'))) {
     try {
       const captured = await browser();

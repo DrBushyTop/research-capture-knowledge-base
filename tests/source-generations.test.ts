@@ -4,7 +4,7 @@ import { reprocessSource } from '../apps/worker/src/reprocessing.js';
 import { categoryRegistry } from '../apps/worker/src/category-registry.js';
 import { startBatch, dispatchBatch, changeBatch, recoverCategoryWork } from '../apps/worker/src/category-work.js';
 import { processJob, type Processor } from '../apps/worker/src/processing.js';
-import { canonical, hash, normalize } from '../shared/corpus.js';
+import { canonical, hash, normalize, processingVersion } from '../shared/corpus.js';
 import { presetRegistry } from '../shared/categories.js';
 import { GenerationStore } from './generation-store.js';
 import { snapshot } from './fixtures.js';
@@ -52,7 +52,7 @@ it('leaves an unchanged source and a recent handoff alone while its worker owns 
   const { store } = await captured();
   const replay = await reprocessSource(store, source.id, async () => {});
   await store.withLease(`source-${source.id}`, async () => {
-    await discover(store, snapshot, '2', undefined, presetRegistry);
+    await discover(store, snapshot, processingVersion, undefined, presetRegistry);
     await reconcile(store, async () => { throw new Error('A recent handoff must wait'); });
   });
   expect((await store.read<SourceState>(sourceKey))?.generationId).toBe(replay);

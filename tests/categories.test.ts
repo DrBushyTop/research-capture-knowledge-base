@@ -136,13 +136,15 @@ it('does not reuse immutable revisions after an interrupted settings save', asyn
   expect((await store.read<any>('categories/templates/recipe/3.json')).name).toBe('Second draft');
 });
 
-it('removes a source without paying for classification or analysis', async () => {
-  const { store, registry, job } = await library();
+it('preserves a source removed from Zotero without paying for classification or analysis', async () => {
+  const { store, registry, job, note } = await library();
   const deleted = { ...snapshot, version: snapshot.version + 1, items: [] };
   await discover(store, deleted, '2', undefined, registry);
   const state = (await store.read<SourceState>(`sources/${job.source.id}.json`))!;
-  const classify = vi.fn(async () => { throw new Error('Do not classify a deleted source'); });
+  const classify = vi.fn(async () => { throw new Error('Do not reclassify a removed capture'); });
   await processJob(store, state.generationId, { ...processor, extract: async () => ({ text: '', evidence: { status: 'metadata-only', method: 'none', reason: 'Source removed', truncated: false, retrievedAt: new Date().toISOString(), artifactHash: null } }), classify });
   expect(classify).not.toHaveBeenCalled();
-  expect((await store.read<Note>(`staged/${state.generationId}.json`))?.source.active).toBe(false);
+  expect(state.generationId).toBe(job.id);
+  expect((await store.read<Note>(`staged/${state.generationId}.json`))?.source.active).toBe(true);
+  expect(await store.read(`analysis/${job.id}.json`)).toEqual(note);
 });

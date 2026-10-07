@@ -38,6 +38,10 @@ For real processing, set `FOUNDRY_ENDPOINT` and `FOUNDRY_DEPLOYMENT`, then run `
 
 Test real SQL behavior with `SQL_SERVER=... SQL_DATABASE=research_dev npm run test:sql`. Unit tests continue to use the in-memory storage fixture.
 
+The Zotero coverage fixtures live in the dev library's `Ingestion matrix - dev` collection. Inspect existing captures with `npx tsx scripts/validate-zotero-dev.ts`. Run `npx tsx scripts/seed-zotero-dev.ts` for a creation preview, or add `--apply` to create missing fixtures and upload their files using the operator-only `zotero-api-key-write` secret in the dev vault. Repeat runs reuse the fixtures. This seed command also needs Python 3 for its compressed snapshot fixture.
+
+Run `npx tsx scripts/validate-zotero-dev.ts --extract` to check extraction and retained-file replay in local dev storage. Add `--process` to publish the representative sources through dev SQL and the configured model. That option makes paid model calls. If historical seeded source notes refer to original files absent from Azurite, add `--restore-dev-artifacts` to copy their hash-verified originals from the dev storage account. The validator refuses `research` and SQL connection-string overrides. It writes its results to ignored `.local/zotero-coverage-results.json`. See [the capture matrix](research/zotero-ingestion-coverage.md) for expected results and remaining format limits.
+
 ## Cutover and recovery
 
 Stop Functions and avoid user writes before running `npm run db:import` with production SQL and storage settings. It copies and verifies structured blobs, imports existing human commentary, and publishes the latest completed analyses. Binary blobs remain in place. The importer never deletes original blobs or Git files. Do not rerun the importer over newer SQL data: mismatches deliberately fail rather than overwrite edits.

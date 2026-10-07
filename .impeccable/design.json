@@ -415,6 +415,11 @@
         "name": "chat-evidence-sheet",
         "value": "chat-sheet-open 0.18s cubic-bezier(.16,1,.3,1)",
         "purpose": "Phone evidence sheet entrance through a 10px vertical offset and a clipped upper edge, only when prefers-reduced-motion is no-preference."
+      },
+      {
+        "name": "chat-text-reveal",
+        "value": "chat-text-reveal .32s cubic-bezier(.16,1,.3,1)",
+        "purpose": "New live-answer Markdown blocks reveal from top to bottom through a gradient mask and opacity fade. No layout animation, delivery delay or replay on validation. Saved answers and reduced motion skip the reveal."
       }
     ],
     "breakpoints": [

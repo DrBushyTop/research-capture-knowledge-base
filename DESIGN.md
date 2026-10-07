@@ -358,7 +358,9 @@ During a reply, the collapsed activity summary names the latest actual tool acti
 
 Activity uses tightened vertical margins of -0.45rem above and -0.2rem below. Its summary has a -0.4rem left margin to align text with the answer. Answer actions use -0.25rem top and -0.55rem left margins to bring Copy and Sources closer to the answer.
 
-Answers display complete Markdown blocks as the worker produces them. Tables and code fences remain buffered until complete; validated final answers replace provisional text and add citations. Stopped or failed drafts are labelled unverified and are not saved as completed conversation turns. Live indicators respect reduced motion, and progress does not force readers away from their current scroll position.
+Answers display complete Markdown blocks as the worker produces them. New blocks have a 320 ms top-to-bottom gradient-mask reveal with an opacity fade and `cubic-bezier(.16,1,.3,1)` easing. The reveal does not delay text delivery or animate layout. The same Markdown renderer stays mounted through validation, so existing paragraphs do not replay when the final answer adds citations. Saved answers appear immediately. Reduced motion skips the reveal.
+
+Tables and code fences remain buffered until complete. Stopped or failed drafts are labelled unverified and are not saved as completed conversation turns. Live indicators respect reduced motion, and progress does not force readers away from their current scroll position.
 
 Capture diagnostics live in a collapsed disclosure under source Details, after the reading content. A concise capture-status link beside the summary states partial or unavailable evidence without placing operational instructions above the content.
 

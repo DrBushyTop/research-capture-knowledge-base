@@ -73,7 +73,6 @@ export default function ReaderNotes({ sourceId }: { sourceId: string }) {
             try { localStorage.removeItem(key); } catch { /* Storage can be disabled. */ }
           }}>Cancel</button>
         </div>
-        <p className="note-help">Shared with the other reader. Reprocessing keeps these notes.</p>
       </> : <>
         {note.markdown ? <p className="reader-note-text human-prose">{note.markdown}</p> : <p>No reader notes yet.</p>}
         <button type="button" onClick={() => { setDraft(note.markdown); setEditing(true); }}>{note.markdown ? 'Edit notes' : 'Add notes'}</button>

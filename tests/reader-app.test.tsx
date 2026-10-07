@@ -179,6 +179,7 @@ it('lists the newest saves first and removes an active filter from its label', a
 it('blocks leaving a dirty note, keeps the draft when cancelled, and refreshes the library after save', async () => {
   const { router } = await mount(`/sources/?source=${ids[0]}`);
   await click([...host.querySelectorAll('.reader-notes button')].find(button => button.textContent === 'Add notes')!);
+  expect(host.querySelector('.reader-notes .note-help')).toBeNull();
   await type(host.querySelector<HTMLTextAreaElement>('#reader-note-draft')!, 'my draft');
   const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
   await click(host.querySelector(`.source-rows a[href*="${ids[1]}"]`));

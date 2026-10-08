@@ -17,7 +17,9 @@ import { readChatFile } from './chat-files.js';
 import { readSourceDocument, readSourceText } from './source-reader.js';
 import { chatUploadLimits, readUpload, saveUpload } from './chat-uploads.js';
 import { readReaderNote, saveReaderNote } from './reader-notes.js';
-import { readLibrary } from './library.js';
+import { changeSourceLifecycleSchema } from '../../../shared/source-lifecycle.js';
+import { SourceAccessError, SourceLifecycleService, sourceLifecycle, sourceLifecycles } from './source-lifecycle.js';
+import { readLibrary, readTrash } from './library.js';
 import { readerSessionResponse, sessionReaderIdentity } from './reader-session.js';
 const required = (name: string) => { const value = process.env[name]; if (!value) throw new Error(`Missing configuration: ${name}`); return value; };
 const store = createStore;
@@ -52,6 +54,21 @@ app.http('chatGateway', {
       const token = request.headers.get('x-reader-session');
       if (request.query.has('session')) return await readerSessionResponse(state, { encoded, token, renew: request.method === 'POST', logout: request.method === 'POST' && request.query.has('logout'), start: request.query.get('session') === 'start' });
       const owner = await sessionReaderIdentity(state, encoded, token);
+      if (request.method === 'GET' && request.query.has('lifecycles')) return { status: 200, jsonBody: await sourceLifecycles(state), headers: { 'Cache-Control': 'private, no-store' } };
+      if (request.method === 'GET' && request.query.has('trash')) return { status: 200, jsonBody: await readTrash(state), headers: { 'Cache-Control': 'private, no-store' } };
+      if (request.query.has('lifecycle')) {
+        const id = request.query.get('lifecycle') || '';
+        const headers = { 'Cache-Control': 'private, no-store' };
+        if (request.method === 'GET') return { status: 200, jsonBody: await sourceLifecycle(state, id), headers };
+        const text = await request.text();
+        if (Buffer.byteLength(text) > 1000) throw new SourceAccessError(413, 'Action is too large');
+        let input: unknown; try { input = JSON.parse(text); } catch { throw new SourceAccessError(400, 'Invalid source action'); }
+        const parsed = changeSourceLifecycleSchema.safeParse(input);
+        if (!parsed.success) throw new SourceAccessError(400, 'Invalid source action');
+        const result = await new SourceLifecycleService(state).change(id, parsed.data.action, parsed.data.revision, owner);
+        if (result.state === 'purging') await state.send(`d_${id}`).catch(() => undefined);
+        return { status: 200, jsonBody: result, headers };
+      }
       if (request.method === 'GET' && request.query.has('library')) return { status: 200, jsonBody: await readLibrary(state), headers: { 'Cache-Control': 'private, no-store' } };
       if (request.query.has('notes')) {
         const headers = { 'Cache-Control': 'private, no-store' };
@@ -112,7 +129,7 @@ app.http('chatGateway', {
       return { status: request.method === 'POST' ? 202 : 200, jsonBody: result, headers: { 'Cache-Control': 'private, no-store' } };
     } catch (error) {
       context.error(JSON.stringify({ event: 'gateway-error', name: (error as Error).name, code: (error as { code?: string }).code, number: (error as { number?: number }).number }));
-      return { status: error instanceof ChatAccessError || error instanceof CategoryError ? error.status : 503, jsonBody: { error: error instanceof ChatAccessError || error instanceof CategoryError ? error.message : 'The service is temporarily unavailable. Try again.' }, headers: { 'Cache-Control': 'private, no-store' } };
+      return { status: error instanceof ChatAccessError || error instanceof CategoryError || error instanceof SourceAccessError ? error.status : 503, jsonBody: { error: error instanceof ChatAccessError || error instanceof CategoryError || error instanceof SourceAccessError ? error.message : 'The service is temporarily unavailable. Try again.' }, headers: { 'Cache-Control': 'private, no-store' } };
     }
   }
 });
@@ -122,6 +139,7 @@ app.timer('recoverChats', { schedule: '30 */5 * * * *', handler: async (_timer, 
   await deleteExpiredWorkspaces(sandboxClient());
   context.log(JSON.stringify({ event: 'chat-reconciliation-complete' }));
 } });
+app.timer('recoverSourceDeletion', { schedule: '0 * * * * *', handler: async () => { await new SourceLifecycleService(store()).recover(); } });
 app.storageQueue('answerChat', { queueName: 'chat', connection: 'AzureWebJobsStorage', handler: async (message: unknown, context) => {
   const payload = typeof message === 'string' ? JSON.parse(message) : message;
   const id = (payload as { jobId: string }).jobId;
@@ -139,6 +157,7 @@ app.storageQueue('processCapture', {
     try {
       const state = store();
       const analyzeTemplate = (text: string, template: import('../../../shared/categories.js').Template, signal?: AbortSignal, source?: import('../../../shared/corpus.js').Note['source'], images?: import('./image-input.js').SourceImage[]) => enrichTemplate(text, template, required('FOUNDRY_ENDPOINT'), required('FOUNDRY_DEPLOYMENT'), signal, source, images);
+      if (id.startsWith('d_')) { await new SourceLifecycleService(state).cleanup(id.slice(2)); return; }
       if (id.startsWith('b_')) { await dispatchBatch(state, id, next => state.send(next)); return; }
       if (id.startsWith('p_')) {
         const { SourceArtifacts } = await import('./source-artifacts.js');

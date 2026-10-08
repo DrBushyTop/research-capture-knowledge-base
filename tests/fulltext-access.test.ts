@@ -38,6 +38,14 @@ async function library() {
   return { store, source, note, tools, sandbox };
 }
 
+it('keeps trashed originals readable but blocks new retrieval from a previously pinned corpus', async () => {
+  const { store, note, tools } = await library();
+  await store.create(`source-lifecycle/${note.source.id}.json`, { sourceId: note.source.id, state: 'trashed', revision: 1, changedAt: new Date().toISOString(), changedBy: 'admin' });
+  expect((await readSourceText(store, note.source.id)).text).toContain('Early evidence');
+  expect((await tools.execute('search_corpus', { query: '', offset: 0, limit: 20 })).content).toMatchObject({ total: 0, results: [] });
+  await expect(tools.execute('read_source', { sourceId: note.source.id, section: 'source', query: 'late', page: null })).rejects.toMatchObject({ status: 410 });
+});
+
 it('serves full original text with continuation and keeps Zotero commentary separate', async () => {
   const { store, note } = await library();
   const first = await readSourceText(store, note.source.id, { attachmentKey: 'PDF00001' });

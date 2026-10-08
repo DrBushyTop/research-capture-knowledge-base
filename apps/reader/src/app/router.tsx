@@ -4,6 +4,7 @@ import Sources from '../components/Sources';
 
 const Chat = lazyRouteComponent(() => import('../components/Chat'));
 const Categories = lazyRouteComponent(() => import('../components/Categories'));
+const Trash = lazyRouteComponent(() => import('../components/Trash'));
 
 declare module '@tanstack/react-router' {
   interface Register { router: typeof router }
@@ -37,8 +38,9 @@ export const chatIndexRoute = createRoute({ getParentRoute: () => chatRoute, pat
 export const conversationRoute = createRoute({ getParentRoute: () => chatRoute, path: '/chat/$conversationId', component: Outlet });
 export const sourcesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/sources', component: Sources, validateSearch: parseSourcesSearch, staticData: { title: 'Sources' } });
 export const categoriesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/categories', component: Categories, validateSearch: parseCategoriesSearch, staticData: { title: 'Categories' } });
+export const trashRoute = createRoute({ getParentRoute: () => rootRoute, path: '/trash', component: Trash, staticData: { title: 'Trash' } });
 
-const routeTree = rootRoute.addChildren([chatRoute.addChildren([chatIndexRoute, conversationRoute]), sourcesRoute, categoriesRoute]);
+const routeTree = rootRoute.addChildren([chatRoute.addChildren([chatIndexRoute, conversationRoute]), sourcesRoute, categoriesRoute, trashRoute]);
 
 export const createAppRouter = (history?: RouterHistory) => createRouter({ routeTree, history, trailingSlash: 'always', scrollRestoration: true, defaultPreload: 'intent' });
 export const router = createAppRouter();

@@ -47,6 +47,18 @@ The record of where a fact or interpretation came from and how it entered a sour
 **Human note**:
 Commentary written or edited by a person. Reprocessing must preserve it.
 
+**Trash**:
+The shared collection of sources removed from the active corpus but retained for restoration. Trashed sources keep their source artifacts, generated analysis and human notes.
+
+**Restore**:
+Returning Shelf's saved copy of a trashed source to the active corpus with its retained source artifacts, analysis and human notes. Restore does not wait for fresh capture or analysis.
+
+**Permanent deletion**:
+An explicit, irreversible removal of a saved source from Shelf. Existing conversations retain earlier quotations and identify its citations as deleted.
+
+**Zotero attachment cleanup**:
+Removal of synced Zotero attachments to reclaim space while preserving the corresponding captured sources and evidence in Shelf.
+
 **Reprocessing**:
 Producing a new analysis of a previously captured source without requiring the user to capture it again.
 

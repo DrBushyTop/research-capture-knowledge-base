@@ -24,6 +24,7 @@ let root: Root | undefined;
 let host: HTMLDivElement;
 
 const api: Handler = (url, init) => {
+  if (url.includes('lifecycles=1')) return json({});
   if (url.includes('library=1')) return json([entry(ids[0], 'Alpha'), entry(ids[1], 'Beta')]);
   if (url.includes('notes=')) return init?.method === 'POST' ? json({ markdown: 'saved', revision: 2, updatedAt: '2026-10-06T00:00:00Z' }) : json({ markdown: '', revision: 1 });
   if (url.includes('source=')) return json({ text: '' });

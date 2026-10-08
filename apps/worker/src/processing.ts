@@ -4,6 +4,7 @@ import { MissingArtifact, savedMetadata, type Extracted } from './extraction.js'
 import { TransientInference } from './enrichment.js';
 import { SourceGenerations, type Job, type PipelineStore } from './source-generations.js';
 import { AnalysisInputs } from './analysis-input.js';
+import { sourceLifecycle } from './source-lifecycle.js';
 import type { SourceImage } from './image-input.js';
 
 export interface Processor {
@@ -17,7 +18,7 @@ export interface Processor {
 export async function processJob(store: PipelineStore, id: string, processor: Processor) {
   if (!/^[a-f0-9]{64}$/.test(id)) throw new Error('Invalid job ID');
   const found = await store.read<Job>(`jobs/${id}.json`);
-  if (!found) return;
+  if (!found || (await sourceLifecycle(store, found.source.id)).state !== 'active') return;
   const generations = new SourceGenerations(store);
   return store.withLease(`source-${found.source.id}`, async () => {
     let job = await store.read<Job>(`jobs/${id}.json`);
@@ -41,6 +42,10 @@ export async function processJob(store: PipelineStore, id: string, processor: Pr
       }
       if (!await generations.canProcess(job)) return;
       const input = await new AnalysisInputs(store).retain({ source: snapshot.source, generationId: id, extraction: extracted.evidence }, extracted);
+      const previous = await store.retainedSource?.(snapshot.source.id);
+      if (previous?.note.extraction.artifactHash && (!input.extraction.artifactHash || !['text', 'image'].includes(input.extraction.status))) {
+        await store.write(`jobs/${id}.json`, { ...job, status: 'failed', error: 'The updated capture has no readable original. The saved copy and its evidence remain available.' }); return;
+      }
       let analysis: Analysis | TemplateAnalysis | null = null;
       let category: Extract<Note, { schemaVersion: 2 }>['category'] | undefined;
       let template: Template | undefined;
@@ -90,7 +95,7 @@ export async function processJob(store: PipelineStore, id: string, processor: Pr
           input.extraction.status = 'needs-review'; input.extraction.reason = 'Machine analysis unavailable or invalid; source retained privately for reprocessing.';
         }
       }
-      if (job.categoryPlan?.preserveExisting && !analysis) {
+      if ((job.categoryPlan?.preserveExisting || previous?.note.analysis) && !analysis) {
         await store.write(`jobs/${id}.json`, { ...job, status: 'failed', error: 'Analysis could not be generated. The existing note is still available. Retry this document.' }); return;
       }
       note = noteSchema.parse({ schemaVersion: category ? 2 : 1, ...(category ? { category } : {}), generationId: id, source: snapshot.source, extraction: input.extraction, analysis,
@@ -106,6 +111,7 @@ export async function processJob(store: PipelineStore, id: string, processor: Pr
     }
     await store.write(`jobs/${id}.json`, { ...job, status: store.publishNote ? 'imported' : 'staged', retryAt: undefined, error: undefined });
     } catch (error) {
+      if ((await sourceLifecycle(store, job.source.id)).state !== 'active' || (error as { number?: number }).number === 51004) return;
       await store.write(`jobs/${id}.json`, { ...job, status: job.attempts >= 5 ? 'failed' : 'pending',
         retryAt: new Date(Date.now() + 5 * 60_000).toISOString(), error: 'Worker failed; source snapshot retained for operator recovery' });
       throw error;

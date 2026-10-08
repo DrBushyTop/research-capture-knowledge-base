@@ -3,6 +3,7 @@ import { matchedSourceText, sourceText, sourceTextSchema } from '../../../shared
 import { sourceImage, sourceImageLimits, type SourceImage } from './image-input.js';
 import type { PipelineStore } from './pipeline.js';
 import type { SourceArtifacts } from './source-artifacts.js';
+import { requireSourceState } from './source-lifecycle.js';
 import { DocumentTexts } from './document-text.js';
 import type { DocumentTextInput } from '../../../shared/document-text.js';
 
@@ -64,6 +65,7 @@ export class AnalysisInputs {
   }
 
   async read(sourceId: string, generationId: string) {
+    await requireSourceState(this.store, sourceId);
     if (!/^[a-f0-9]{64}$/.test(generationId)) throw new Error('Invalid analysis generation');
     const note = noteSchema.parse(await this.store.read(`analysis/${generationId}.json`));
     if (note.source.id !== sourceId || note.generationId !== generationId) throw new Error('Analysis does not match the pinned source generation');
@@ -81,6 +83,7 @@ export class AnalysisInputs {
     }
     const input = this.checked(note, { text, images });
     if (!input.available) throw new Error('No readable text or supported image evidence is available');
+    await requireSourceState(this.store, sourceId);
     return { ...input, extraction: note.extraction, source: note.source };
   }
 }

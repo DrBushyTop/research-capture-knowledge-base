@@ -4,10 +4,12 @@ import { useBlocker } from '@tanstack/react-router';
 import type { ReaderNote } from '../../../../shared/reader-notes';
 import { ApiError, postJson } from '../lib/api';
 import { keys, notesQuery } from '../lib/queries';
+import { draftKey } from '../lib/lifecycle';
 
 const leaveMessage = 'Leave this source? Your unsaved note draft will stay in this browser.';
 
-export default function ReaderNotes({ sourceId }: { sourceId: string }) {
+/** readOnly shows the saved notes of a trashed source; its browser draft stays untouched until restore. */
+export default function ReaderNotes({ sourceId, readOnly = false }: { sourceId: string; readOnly?: boolean }) {
   const queryClient = useQueryClient();
   const notes = useQuery(notesQuery(sourceId));
   const note = notes.data;
@@ -16,7 +18,7 @@ export default function ReaderNotes({ sourceId }: { sourceId: string }) {
   const [error, setError] = useState('');
   const [conflict, setConflict] = useState(false);
   const started = useRef(false);
-  const key = `reader-note-draft:${sourceId}`;
+  const key = draftKey(sourceId);
   // The draft starts from the browser-saved copy once; later refetches update only the saved note shown beside it.
   useEffect(() => {
     if (!note || started.current) return;
@@ -26,7 +28,7 @@ export default function ReaderNotes({ sourceId }: { sourceId: string }) {
     setDraft(saved ?? note.markdown);
     if (saved !== null && saved !== note.markdown) setEditing(true);
   }, [note]);
-  const dirty = editing && !!note && draft !== note.markdown;
+  const dirty = !readOnly && editing && !!note && draft !== note.markdown;
   useBlocker({
     disabled: !dirty,
     // Search and filter changes keep the same source open, so only leaving the source asks.
@@ -60,7 +62,7 @@ export default function ReaderNotes({ sourceId }: { sourceId: string }) {
     {(error || loadError) && <p role="alert">{error || loadError}</p>}
     {!note && !loadError && <p aria-busy="true">Loading notes…</p>}
     {note && <>
-      {editing ? <>
+      {readOnly ? note.markdown ? <p className="reader-note-text human-prose">{note.markdown}</p> : <p>No reader notes.</p> : editing ? <>
         {conflict && <button type="button" disabled={busy} onClick={() => void latest()}>Load latest notes, keep my draft</button>}
         {draft !== note.markdown && note.markdown && <details><summary>Current saved notes</summary><p className="reader-note-text">{note.markdown}</p></details>}
         <label htmlFor="reader-note-draft">Your notes</label>

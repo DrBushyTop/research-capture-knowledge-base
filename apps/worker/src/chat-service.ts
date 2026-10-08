@@ -3,6 +3,7 @@ import { canonical, hash, noteArtifacts } from '../../../shared/corpus.js';
 import { chatCorpusSchema, chatRequestSchema, validateAnswer, type ChatJob, type ChatCorpus, type Evidence, type ChatConversation, type ChatActivity, type ChatAsset, type ChatSourceContext } from '../../../shared/chat.js';
 import { withReaderNotes } from './reader-notes.js';
 import type { PipelineStore } from './pipeline.js';
+import { requireSourceState, sourceLifecycle, SourceAccessError } from './source-lifecycle.js';
 import { ownedUpload, uploadKey } from './chat-uploads.js';
 export class ChatAccessError extends Error { constructor(public status: number, message: string) { super(message); } }
 async function savedAnswer(store: PipelineStore, job: ChatJob) {
@@ -46,7 +47,8 @@ export async function submitChat(store: PipelineStore, owner: string, input: unk
     const corpus = chatCorpusSchema.parse(await store.read<ChatCorpus>(`chat/corpora/${current.revision}.json`));
     const images = [];
     for (const imageId of parsed.data.images) { const { id, mime, width, height } = await ownedUpload(store, owner, imageId); images.push({ id, mime, width, height }); }
-    for (const id of [parsed.data.sourceId, parsed.data.visual?.sourceId].filter(Boolean)) {
+    for (const id of [parsed.data.sourceId, parsed.data.visual?.sourceId].filter((id): id is string => !!id)) {
+      await requireSourceState(store, id);
       if (!corpus.sources.some(source => source.note.source.id === id && source.note.source.active)) throw new ChatAccessError(400, 'Source is unavailable in this dataset');
     }
     if (parsed.data.visual) {
@@ -56,7 +58,10 @@ export async function submitChat(store: PipelineStore, owner: string, input: unk
       if (original.mime.startsWith('image/') && parsed.data.visual.page !== 1) throw new ChatAccessError(400, 'Images have only page 1');
     }
     const conversationId = parsed.data.conversationId || randomBytes(16).toString('hex');
-    if (parsed.data.conversationId) await getConversation(store, owner, conversationId);
+    if (parsed.data.conversationId) {
+      const conversation = await getConversation(store, owner, conversationId);
+      if (conversation.sourceContext) await requireSourceState(store, conversation.sourceContext.sourceId);
+    }
     else {
       const source = corpus.sources.find(source => source.note.source.id === parsed.data.sourceId)?.note.source;
       await store.create(`chat/conversations/${owner}/${conversationId}.json`, { id: conversationId, owner, createdAt: now.toISOString(), updatedAt: now.toISOString(),
@@ -77,6 +82,10 @@ export async function chatStatus(store: PipelineStore, owner: string, id: string
   if (!job || job.owner !== owner || Date.now() - Date.parse(job.createdAt) > 24 * 60 * 60_000 || (job.conversationId && await deleted(store, owner, job.conversationId))) throw new ChatAccessError(404, 'Question not found');
   const saved = job.status !== 'complete' ? await savedAnswer(store, job) : undefined;
   if (saved) return { id: job.id, conversationId: job.conversationId, status: 'complete' as const, result: saved, activities: job.activities, error: undefined };
+  if (['pending', 'running'].includes(job.status)) {
+    const ids = [job.request.sourceId, job.request.visual?.sourceId, ...job.activities?.map(activity => activity.sourceId) || []].filter((id): id is string => !!id);
+    for (const source of ids) if (['purging', 'deleted'].includes((await sourceLifecycle(store, source)).state)) return { id: job.id, conversationId: job.conversationId, status: 'failed' as const, error: 'A source was removed while this answer was running. Retry the question using the remaining library.' };
+  }
   return { id: job.id, conversationId: job.conversationId, status: job.status, result: job.result, activities: job.activities, draft: job.draft, error: job.error };
 }
 const tombstone = (owner: string, id: string) => `chat/conversations/${owner}/${id}.deleted.json`;
@@ -196,11 +205,16 @@ export async function processChatJob(store: PipelineStore, id: string, answer: (
           });
         runSignal.throwIfAborted();
         if (await store.read(`chat/cancellations/${id}.json`) || (job!.conversationId && await deleted(store, job!.owner, job!.conversationId))) throw new Error('Chat cancelled');
+        const ids = [...new Set([...result.evidence.map(item => item.sourceId), ...result.assets?.map(asset => asset.sourceId) || []])];
+        for (const source of ids) await requireSourceState(store, source);
+        const publish = async () => {
         const validated = validateAnswer(result.answer, result.evidence, result.assets);
         if (conversation) await store.write(`chat/conversations/${job!.owner}/${conversation.id}.json`, { ...conversation, updatedAt: new Date().toISOString(), turns: [...conversation.turns.filter(turn => turn.jobId !== id), { jobId: id, question: job!.request.question, ...(job!.images?.length ? { images: job!.images } : {}), result: validated,
           ...(job!.activities?.length ? { activities: job!.activities } : {}), ...(result.modelAnswer && result.modelAnswer.length <= 100000 ? { modelAnswer: result.modelAnswer } : {}), workedMs: Date.now() - Date.parse(job!.startedAt || job!.createdAt) }].slice(-100) });
         await store.write(key, { ...job!, status: 'complete', result: validated, draft: undefined, error: undefined });
         if (job!.conversationId && await deleted(store, job!.owner, job!.conversationId)) throw new Error('Chat cancelled');
+        };
+        if (store.withSourceAccess) await store.withSourceAccess(ids, publish); else await publish();
       };
       if (job.conversationId) await store.withLease(`chat-conversation-${job.owner}-${job.conversationId}`, run);
       else await run();
@@ -208,6 +222,9 @@ export async function processChatJob(store: PipelineStore, id: string, answer: (
       // Inner conversation writes have their own ETags. Refresh in this lease frame.
       job = (await store.read<ChatJob>(key)) || job;
       if (controller.signal.aborted || await store.read(`chat/cancellations/${id}.json`)) { await store.write(key, { ...job, status: 'cancelled', result: undefined, error: undefined }); return; }
+      if (error instanceof SourceAccessError || (error as { number?: number }).number === 51004) {
+        await store.write(key, { ...job, status: 'failed', draft: undefined, result: undefined, error: 'A source was removed while this answer was running. Retry the question using the remaining library.' }); return;
+      }
       console.error(JSON.stringify({ event: 'chat-attempt-failed', jobId: id, attempt: job.attempts, errorType: error instanceof Error ? error.name : 'Unknown', statusCode: (error as { statusCode?: number })?.statusCode }));
       await store.write(key, { ...job, status: job.attempts >= 2 ? 'failed' : 'pending', retryAt: new Date(Date.now() + 60_000).toISOString(),
         error: 'An answer could not be verified or completed. Retry the question if this persists.' });

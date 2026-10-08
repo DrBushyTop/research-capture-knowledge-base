@@ -5,6 +5,8 @@ import type { ChatJob } from '../shared/chat.js';
 import { normalize, type Note } from '../shared/corpus.js';
 import { snapshot } from './fixtures.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { SourceLifecycleService } from '../apps/worker/src/source-lifecycle.js';
+import { evidenceChunk } from '../shared/chat.js';
 class LeaseStore extends MemoryStore {
   private frames = new AsyncLocalStorage<Map<string, number>>();
   private versions = new Map<string, number>();
@@ -24,6 +26,24 @@ async function store(state = new MemoryStore()) {
   await state.create(`chat/corpora/${revision}.json`, { revision, sources: [] }); return state;
 }
 const insufficient = async () => ({ answer: { answer: 'No evidence.', insufficientEvidence: true, citations: [] }, evidence: [] });
+it('discards a running answer and its draft when a source is permanently removed', async () => {
+  const state = await store();
+  const source = normalize(snapshot)[0].source;
+  await state.create(`sources/${source.id}.json`, { source, generationId: 'a'.repeat(64) });
+  const job = await submitChat(state, 'owner', { question: 'Find a passage' }, async () => undefined);
+  await processChatJob(state, job.id, async (_corpus, _job, _record, _conversation, progress, _signal, draft) => {
+    await progress({ tool: 'read_source', title: source.title, sourceId: source.id });
+    await draft('A private draft quotation');
+    const lifecycle = new SourceLifecycleService(state);
+    await lifecycle.change(source.id, 'trash', 0, 'other-admin');
+    await lifecycle.change(source.id, 'purge', 1, 'other-admin');
+    expect(await chatStatus(state, 'owner', job.id)).toMatchObject({ status: 'failed', error: expect.stringContaining('removed') });
+    const passage = evidenceChunk({ sourceId: source.id, generationId: 'a'.repeat(64), title: source.title, kind: 'source', locator: 'Original', text: 'A private passage' });
+    return { answer: { answer: `A passage [${passage.id}]`, insufficientEvidence: false, citations: [{ evidenceId: passage.id, quote: 'A private passage' }] }, evidence: [passage] };
+  });
+  expect(await chatStatus(state, 'owner', job.id)).toMatchObject({ status: 'failed', draft: undefined, result: undefined, error: expect.stringContaining('removed') });
+  expect((await getConversation(state, 'owner', job.conversationId!)).turns).toEqual([]);
+});
 it('requires an allowlisted authenticated GitHub account and prevents cross-reader job access', async () => {
   const allowed = new Set(['pinaatti', 'drbushytop']);
   expect(() => readerIdentity(null, allowed)).toThrow('Reader access required');

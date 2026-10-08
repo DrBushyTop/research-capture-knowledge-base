@@ -8,6 +8,7 @@ import type { SourceArtifacts } from './source-artifacts.js';
 import type { SourceImage } from './image-input.js';
 import type { Job, PipelineStore, SourceState } from './pipeline.js';
 import { categoryRegistry, CategoryError } from './category-registry.js';
+import { sourceLifecycle, requireSourceState } from './source-lifecycle.js';
 import { SourceGenerations } from './source-generations.js';
 
 interface Entry { sourceId: string; expected: string; jobId: string; assignment?: CategoryAssignment; preserveExisting: boolean; dispatched?: boolean; skipped?: boolean; }
@@ -24,6 +25,7 @@ async function deployed(store: PipelineStore): Promise<ChatCorpus | undefined> {
 export async function categoryOverview(store: PipelineStore) {
   const registry = await categoryRegistry(store);
   const corpus = await deployed(store);
+  if (corpus) corpus.sources = (await Promise.all(corpus.sources.map(async source => (await sourceLifecycle(store, source.note.source.id)).state === 'active' ? source : undefined))).filter((source): source is ChatCorpus['sources'][number] => !!source);
   const sources = await Promise.all((corpus?.sources || []).filter(s => s.note.source.active).map(async ({ note }) => {
     const assignment = await store.read<CategoryAssignment>(`categories/assignments/${note.source.id}.json`);
     const state = await store.read<SourceState>(`sources/${note.source.id}.json`);
@@ -51,6 +53,7 @@ export async function startBatch(store: PipelineStore, input: unknown, send: (id
     const corpus = await deployed(store);
     const entries: Entry[] = [];
     for (const source of request.sourceIds) {
+      await requireSourceState(store, source);
       const note = corpus?.sources.find(s => s.note.source.id === source)?.note;
       const state = await store.read<SourceState>(`sources/${source}.json`);
       if (!note || !state?.source.active) throw new CategoryError(400, 'A selected document is no longer available. Reload the list.');
@@ -78,6 +81,11 @@ export async function dispatchBatch(store: PipelineStore, id: string, send: (id:
     const batch = await store.read<Batch>(key);
     if (!batch || batch.cancelled) return;
     const generations = new SourceGenerations(store);
+    const entries = (await Promise.all(batch.entries.map(async entry => ['purging', 'deleted'].includes((await sourceLifecycle(store, entry.sourceId)).state) ? undefined : entry))).filter((entry): entry is Entry => !!entry);
+    if (entries.length !== batch.entries.length) {
+      batch.entries = entries;
+      await store.write(key, batch);
+    }
     for (const entry of batch.entries.filter(e => !e.dispatched && !e.skipped).slice(0, 5)) {
       const template = entry.assignment ? batch.registry.categories.find(c => c.id === entry.assignment!.categoryId) : undefined;
       const advanced = await generations.dispatchBatch({ sourceId: entry.sourceId, expected: entry.expected, jobId: entry.jobId,
@@ -127,23 +135,27 @@ export async function startPreview(store: PipelineStore, owner: string, source: 
   const corpus = await deployed(store);
   const note = corpus?.sources.find(s => s.note.source.id === source)?.note;
   if (!note?.source.active) throw new CategoryError(404, 'Document not found');
+  await requireSourceState(store, source);
   const id = 'p_' + randomUUID().replaceAll('-', '');
-  await store.withLease(`category-preview-${owner}`, async () => {
+  await store.withLease(`source-${source}`, () => store.withLease(`category-preview-${owner}`, async () => {
     const recent = await Promise.all((await store.list('chat/assets/category-previews/')).map(key => store.read<Preview>(key)));
     if (recent.filter(p => p?.owner === owner && Date.now() - Date.parse(p.createdAt) < 60 * 60_000).length >= 20) throw new CategoryError(429, 'Preview limit reached. Try again in an hour.');
     await store.create(previewKey(id), { id, owner, sourceId: source, generationId: note.generationId, template: template.data, status: 'pending', createdAt: new Date().toISOString(), attempts: 0 } satisfies Preview);
     await send(id);
-  });
+  }));
   return { id };
 }
 export async function getPreview(store: PipelineStore, owner: string, id: string) {
   const preview = await store.read<Preview>(previewKey(id));
   if (!preview || preview.owner !== owner) throw new CategoryError(404, 'Preview not found');
+  await requireSourceState(store, preview.sourceId);
   return { id, status: preview.status, result: preview.result, error: preview.error };
 }
 export async function processPreview(store: PipelineStore, id: string, analyze: (text: string, template: Template, signal?: AbortSignal, source?: Note['source'], images?: SourceImage[]) => Promise<TemplateAnalysis>, artifacts?: Pick<SourceArtifacts, 'readForNote'>) {
   const key = previewKey(id);
-  await store.withLease(`category-preview-${id}`, async () => {
+  const found = await store.read<Preview>(key);
+  if (!found || (await sourceLifecycle(store, found.sourceId)).state !== 'active') return;
+  await store.withLease(`source-${found.sourceId}`, () => store.withLease(`category-preview-${id}`, async () => {
     const preview = await store.read<Preview>(key);
     if (!preview || preview.status !== 'pending') return;
     if (preview.attempts >= 3 || Date.now() - Date.parse(preview.createdAt) >= 24 * 60 * 60_000) {
@@ -154,10 +166,12 @@ export async function processPreview(store: PipelineStore, id: string, analyze: 
     try {
       const input = await new AnalysisInputs(store, artifacts).read(preview.sourceId, preview.generationId);
       const result = await analyze(input.text, preview.template, store.leaseSignal, input.source, input.images);
+      await requireSourceState(store, preview.sourceId);
       await store.write(key, { ...preview, status: 'complete', result });
     } catch {
+      if ((await sourceLifecycle(store, preview.sourceId)).state !== 'active') return;
       store.leaseSignal?.throwIfAborted();
       await store.write(key, { ...preview, status: 'failed', error: 'Preview unavailable. Check that this document has readable text or a retained PNG, JPEG or WebP image, then try again.' });
     }
-  });
+  }));
 }

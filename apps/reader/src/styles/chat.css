@@ -150,3 +150,14 @@
 .chat-retry{min-height:40px;padding:.35rem .7rem;margin-left:-.7rem;border:0;background:transparent;color:var(--blue);font:inherit;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:.2em}.chat-retry:disabled{opacity:.5;cursor:default}
 
 @media(min-width:721px){.chat-markdown p,.chat-markdown>ul,.chat-markdown>ol,.chat-markdown>h1,.chat-markdown>h2,.chat-markdown>h3,.chat-markdown>blockquote{max-width:90ch}.chat-markdown table{width:100%}}
+/* Source lifecycle: trashed and deleted sources keep their quotations but say what can still be opened. */
+.chat-citation-state{margin-top:.3rem;font-size:.82rem;font-weight:600;color:var(--attention)}
+.chat-citation-detail[data-source-state=purging] .chat-citation-state,.chat-citation-detail[data-source-state=deleted] .chat-citation-state{color:var(--chat-error)}
+.chat-citation-detail[data-source-state=unknown] .chat-citation-state{color:var(--muted)}
+.chat-citation-state-tag{font-size:.66rem;font-weight:700;color:var(--attention)}
+.chat-citation-button[data-source-state=purging],.chat-citation-button[data-source-state=deleted]{background:transparent;box-shadow:inset 0 0 0 1px var(--line);color:var(--muted)}
+.chat-citation-button[data-source-state=purging] .chat-citation-label,.chat-citation-button[data-source-state=deleted] .chat-citation-label{text-decoration:line-through}
+.chat-citation-button[data-source-state=purging] .chat-citation-state-tag,.chat-citation-button[data-source-state=deleted] .chat-citation-state-tag{color:var(--chat-error)}
+.chat-citation-button:hover .chat-citation-state-tag,.chat-citation-button[data-state=open] .chat-citation-state-tag{color:inherit}
+.chat-file-gone{margin:0;flex-direction:column;align-items:flex-start;gap:0;color:var(--muted);border-style:dashed}.chat-file-gone small{font-weight:400}
+.chat-context-state{margin-left:.4rem;font-size:.75rem;font-weight:700;color:var(--attention)}

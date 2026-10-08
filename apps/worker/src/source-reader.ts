@@ -6,14 +6,16 @@ import type { PipelineStore } from './pipeline.js';
 import type { BlobStore } from './storage.js';
 import { DocumentTexts } from './document-text.js';
 import type { DocumentTextReadOptions } from '../../../shared/document-text.js';
+import { requireSourceState } from './source-lifecycle.js';
 import { readCaptureCommentary } from './source-commentary.js';
 
-type SourceStore = Pick<PipelineStore, 'read'> & { source?(id: string): Promise<{ note: Note } | undefined> };
+type SourceStore = Pick<PipelineStore, 'read'> & { source?(id: string): Promise<{ note: Note } | undefined>; retainedSource?(id: string): Promise<{ note: Note } | undefined> };
 
 async function currentNote(store: SourceStore, id: string): Promise<Note> {
   if (!sourceId.safeParse(id).success) throw new ChatAccessError(404, 'Document not found');
+  const lifecycle = await requireSourceState(store, id, true);
   if (store.source) {
-    const source = await store.source(id);
+    const source = lifecycle.state === 'trashed' ? await store.retainedSource?.(id) : await store.source(id);
     if (!source?.note.source.active || source.note.source.id !== id) throw new ChatAccessError(404, 'Document not found');
     return source.note;
   }
@@ -29,10 +31,12 @@ async function currentNote(store: SourceStore, id: string): Promise<Note> {
 export async function readSourceText(store: SourceStore, id: string, options: DocumentTextReadOptions = {}) {
   const note = await currentNote(store, id);
   const document = await new DocumentTexts(store).read(note, options);
+  await requireSourceState(store, id, true);
   if (document) return { ...document, title: note.source.title, extraction: note.extraction,
     ...(!options.offset ? { captureCommentary: await readCaptureCommentary(store, note) } : {}) };
   if (options.attachmentKey || options.startPage || options.endPage || options.offset) throw new ChatAccessError(404, 'Full text is unavailable for this saved attachment');
   const saved = await store.read(`source-text/${note.generationId}.json`);
+  await requireSourceState(store, id, true);
   return { sourceId: id, title: note.source.title, generationId: note.generationId,
     text: saved ? matchedSourceText(note, saved) : '', extraction: note.extraction, nextOffset: null };
 }
@@ -60,5 +64,6 @@ export async function readSourceDocument(store: SourceStore & Pick<BlobStore, 'r
     : mime === 'image/webp' ? bytes.subarray(0, 4).toString() === 'RIFF' && bytes.subarray(8, 12).toString() === 'WEBP'
     : extension === 'docx' ? bytes[0] === 0x50 && bytes[1] === 0x4b : true;
   if (!signature || hash(bytes) !== artifact) throw new ChatAccessError(404, 'Saved file is unavailable');
+  await requireSourceState(store, id, true);
   return { bytes, mime, filename: `${id}${reference?.key ? '-' + reference.key : ''}.${extension}`, disposition: ['pdf', 'png', 'jpg', 'webp'].includes(extension) ? 'inline' : 'attachment' };
 }

@@ -2,10 +2,13 @@ import { chatCorpusSchema, type ChatCorpus } from '../../../shared/chat.js';
 import { mergeReaderNotes, readerNoteSchema, saveReaderNoteSchema, type ReaderNote } from '../../../shared/reader-notes.js';
 import { sourceId } from '../../../shared/corpus.js';
 import { ChatAccessError } from './chat-service.js';
+import { requireSourceState } from './source-lifecycle.js';
 import type { PipelineStore } from './pipeline.js';
 
 async function requireSource(store: PipelineStore, id: string) {
   if (!sourceId.safeParse(id).success) throw new ChatAccessError(404, 'Source not found');
+  await requireSourceState(store, id, true);
+  if (store.retainedSource && (await store.retainedSource(id))?.note.source.active) return;
   const current = await store.read<{ revision: string }>('chat/current.json');
   if (!current) throw new ChatAccessError(503, 'The dataset is not ready yet');
   const corpus = chatCorpusSchema.parse(await store.read(`chat/corpora/${current.revision}.json`));
@@ -15,6 +18,7 @@ async function requireSource(store: PipelineStore, id: string) {
 export async function readReaderNote(store: PipelineStore, id: string): Promise<ReaderNote> {
   await requireSource(store, id);
   const saved = await store.read(`reader-notes/${id}.json`);
+  await requireSourceState(store, id, true);
   return saved ? readerNoteSchema.parse(saved) : { sourceId: id, revision: 0, markdown: '', updatedAt: null, updatedBy: null };
 }
 
@@ -24,6 +28,7 @@ export async function saveReaderNote(store: PipelineStore, owner: string, input:
   const request = parsed.data;
   await requireSource(store, request.sourceId);
   return store.withLease(`reader-note-${request.sourceId}`, async () => {
+    await requireSourceState(store, request.sourceId);
     const key = `reader-notes/${request.sourceId}.json`;
     const saved = await store.read<ReaderNote>(key);
     if ((saved?.revision || 0) !== request.revision) throw new ChatAccessError(409, 'These notes changed in another tab. Your draft is kept. Load the latest notes before saving.');

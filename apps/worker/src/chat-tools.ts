@@ -1,6 +1,6 @@
 import { hash, noteArtifacts } from '../../../shared/corpus.js';
 import { citationLabel, chunkText, corpusEvidence, packEvidence, type ChatActivity, type ChatAsset, type ChatCorpus, type ChatJob, type Evidence } from '../../../shared/chat.js';
-import { loadSearchIndex, rankEvidenceSources } from '../../../shared/search.js';
+import { buildSearchIndex, loadSearchIndex, rankEvidenceSources } from '../../../shared/search.js';
 import { matchedSourceText } from '../../../shared/source-text.js';
 import type { BlobStore } from './storage.js';
 import { gatherEvidence } from './chat-sandbox.js';
@@ -8,12 +8,16 @@ import { chatToolSchemas, type ChatToolName, type ChatTools } from './chat-agent
 import { readUpload } from './chat-uploads.js';
 import { DocumentTexts } from './document-text.js';
 import { documentTextEvidence } from './chat-page-ranges.js';
+import { requireSourceState, sourceLifecycle } from './source-lifecycle.js';
 import { readCaptureCommentary } from './source-commentary.js';
 
 export async function corpusTools(store: BlobStore, corpus: ChatCorpus, job: ChatJob, recordSandbox: (id: string) => Promise<void>, progress: (activity: ChatActivity) => Promise<void>, signal: AbortSignal): Promise<ChatTools> {
   const stored = await store.read<{ revision: string; index: unknown }>(`chat/indexes/${corpus.revision}.json`);
-  if (stored?.revision !== corpus.revision) throw new Error('Chat index unavailable');
-  const index = await loadSearchIndex(JSON.stringify(stored.index));
+  if (stored && stored.revision !== corpus.revision) throw new Error('Chat index unavailable');
+  const index = stored ? await loadSearchIndex(JSON.stringify(stored.index)) : buildSearchIndex(await Promise.all(corpus.sources.map(async ({ note, humanMarkdown }) => ({
+    id: note.source.id, title: note.source.title, authors: note.source.authors.join(' '), topics: (note.analysis?.topics || note.source.tags).join('\n'), type: note.source.itemType,
+    year: note.source.publishedAt || 'Unknown', body: `${JSON.stringify(note.analysis)}\n${humanMarkdown}\n${await new DocumentTexts(store).readAll(note) || ''}` }))));
+  const sourceAvailable = async (id: string) => (await sourceLifecycle(store, id)).state === 'active';
   if (index.documentCount !== corpus.sources.length || corpus.sources.some(source => !index.has(source.note.source.id))) throw new Error('Chat index does not match corpus');
   const evidence: Evidence[] = []; const assets: ChatAsset[] = [];
   const addEvidence = (chunks: Evidence[]) => {
@@ -26,6 +30,7 @@ export async function corpusTools(store: BlobStore, corpus: ChatCorpus, job: Cha
     return chunks;
   };
   const register = async (asset: ChatAsset) => {
+    await requireSourceState(store, asset.sourceId);
     asset = { originJobId: job.id, ...asset };
     if (!assets.some(item => item.id === asset.id)) { assets.push(asset); await store.create(`chat/assets/${job.id}/${asset.id}.json`, asset); }
     const { blobKey: _blob, artifactHash: _hash, ...publicAsset } = asset;
@@ -49,11 +54,14 @@ export async function corpusTools(store: BlobStore, corpus: ChatCorpus, job: Cha
   const start = async (activity: ChatActivity) => { current = { id: String(++step), ...activity }; await progress(current); };
   const execute = async (name: ChatToolName, input: unknown) => {
     current = undefined;
-    const output = await run(name, input).catch(async error => {
+    const source = name === 'search_corpus' ? undefined : (name === 'read_source' ? chatToolSchemas.read_source : chatToolSchemas.inspect_media).parse(input).sourceId;
+    const output = await (source ? store.withLease(`source-${source}`, () => run(name, input)) : run(name, input)).catch(async error => {
       const started = current as ChatActivity | undefined;
       if (started && !signal.aborted) await progress({ ...started, detail: 'Unavailable' });
       throw error;
     });
+    const content = output.content as { sourceId?: string; results?: { sourceId: string }[] };
+    for (const id of [content.sourceId, ...content.results?.map(source => source.sourceId) || []].filter((id): id is string => !!id)) await requireSourceState(store, id);
     // run() sets current when the step actually starts.
     const started = current as ChatActivity | undefined;
     if (started) {
@@ -72,7 +80,8 @@ export async function corpusTools(store: BlobStore, corpus: ChatCorpus, job: Cha
     if (name === 'search_corpus') {
       const { query, offset, limit } = chatToolSchemas.search_corpus.parse(input);
       await start({ tool: name, title: query || 'All sources' });
-      const ids = query.trim() ? rankEvidenceSources(index, query) : corpus.sources.map(source => source.note.source.id);
+      const candidates = query.trim() ? rankEvidenceSources(index, query) : corpus.sources.map(source => source.note.source.id);
+      const ids = (await Promise.all(candidates.map(async id => await sourceAvailable(id) ? id : undefined))).filter((id): id is string => !!id);
       const results = [];
       for (const id of ids.slice(offset, offset + limit)) {
         const source = corpus.sources.find(source => source.note.source.id === id)!;
@@ -90,6 +99,7 @@ export async function corpusTools(store: BlobStore, corpus: ChatCorpus, job: Cha
     const params = name === 'read_source' ? chatToolSchemas.read_source.parse(input) : chatToolSchemas.inspect_media.parse(input);
     const source = corpus.sources.find(source => source.note.source.id === params.sourceId);
     if (!source) throw new Error('Source unavailable');
+    await requireSourceState(store, params.sourceId);
     await start({ tool: name, title: source.note.source.title, sourceId: params.sourceId, ...('pages' in params && params.pages ? { detail: `Pages ${params.pages.start} to ${params.pages.end}` } : params.page ? { detail: `Page ${params.page}` } : 'section' in params && params.section !== 'source' ? { detail: { analysis: 'Generated analysis', notes: 'Human notes', metadata: 'Source facts' }[params.section] } : {}) });
     const available = await availableAssets(source);
     if (name === 'read_source' && 'section' in params && params.section !== 'source') {
@@ -151,7 +161,7 @@ export async function corpusTools(store: BlobStore, corpus: ChatCorpus, job: Cha
     const ids = new Set([...result.attachments.map(item => item.id), ...result.citations.flatMap(cite => cite.assetId ? [cite.assetId] : [])]);
     for (const id of ids) {
       const asset = await store.read<ChatAsset>(`chat/assets/${previousJobId}/${id}.json`);
-      if (asset) await register({ ...asset, originJobId: asset.originJobId || previousJobId });
+      if (asset && await sourceAvailable(asset.sourceId)) await register({ ...asset, originJobId: asset.originJobId || previousJobId });
     }
   };
   const images = async (ids: string[]) => {
@@ -163,5 +173,5 @@ export async function corpusTools(store: BlobStore, corpus: ChatCorpus, job: Cha
     }
     return urls;
   };
-  return { execute, remember, images, progress, evidence, assets };
+  return { execute, sourceAvailable, remember, images, progress, evidence, assets };
 }

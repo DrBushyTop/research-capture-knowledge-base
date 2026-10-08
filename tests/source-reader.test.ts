@@ -66,5 +66,5 @@ it('rejects inactive or unknown SQL sources without falling back to a stale chat
   const source = vi.fn(async () => undefined);
   const read = vi.spyOn(state, 'read');
   await expect(readSourceText({ source, read: state.read.bind(state) }, note.source.id)).rejects.toMatchObject({ status: 404 });
-  expect(read).not.toHaveBeenCalled();
+  expect(read).toHaveBeenCalledExactlyOnceWith(`source-lifecycle/${note.source.id}.json`);
 });

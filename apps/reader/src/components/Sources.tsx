@@ -11,6 +11,9 @@ import ReaderNotes from './ReaderNotes';
 import OriginalText from './OriginalText';
 import { buildSearchIndex, searchIds } from '../../../../shared/search';
 import { libraryQuery, type LibraryEntry } from '../lib/queries';
+import { isGone, trashQuery, useLifecycles, type SourceLifecycle } from '../lib/lifecycle';
+import { MoveToTrash, TrashNotice } from './SourceLifecycle';
+import '../styles/trash.css';
 import { sourcesRoute, type SourcesSearch } from '../app/router';
 
 type Entry = LibraryEntry;
@@ -54,8 +57,14 @@ export default function Sources() {
   const navigate = useNavigate({ from: '/sources' });
   const phone = usePhone();
   const library = useQuery(libraryQuery);
-  const entries = library.data ?? noEntries;
+  const { query: lifecycles, stateOf, lifecycleOf } = useLifecycles();
+  // The library can be up to a refresh behind the lifecycle map; a source another admin removed leaves at once.
+  const entries = useMemo(() => (library.data ?? noEntries).filter(entry => !lifecycles.data?.[entry.note.source.id] || lifecycles.data[entry.note.source.id].state === 'active'), [library.data, lifecycles.data]);
   const selected = search.source || '';
+  const selectedState = selected ? stateOf(selected) : 'unknown';
+  const trash = useQuery({ ...trashQuery, enabled: selectedState === 'trashed' });
+  const trashed = selectedState === 'trashed' ? trash.data?.find(item => item.sourceId === selected) : undefined;
+  const [moved, setMoved] = useState('');
   // The field keeps its own value so typing never waits for the router; the URL follows it.
   const [query, setQuery] = useState(search.q || '');
   useEffect(() => { if (document.activeElement?.id !== 'search') setQuery(search.q || ''); }, [search.q]);
@@ -146,10 +155,22 @@ export default function Sources() {
         })}</ul>
       </section>)}</div>
     </aside>
-    {current ? <Reading key={`reading:${current.note.source.id}`} entry={current} next={next} /> : <main id="main" className="reading-pane reading-empty">
+    {selected && selectedState === 'unknown' ? <main id="main" className="reading-pane reading-empty">
+      {lifecycles.error ? <p role="alert">{lifecycles.error.message} <button type="button" className="trash-retry" onClick={() => void lifecycles.refetch()}>Try again</button></p> : <p aria-busy="true">Loading source…</p>}
+    </main>
+    : selectedState === 'trashed' ? trashed?.entry ? <Reading key={`trashed:${selected}`} entry={trashed.entry} readOnly
+      notice={<TrashNotice sourceId={selected} lifecycle={trashed.lifecycle} entry={trashed.entry} justMoved={moved === selected} />} />
+      : <main id="main" className="reading-pane reading-empty"><div className="source-gone">
+        <TrashNotice sourceId={selected} lifecycle={lifecycleOf(selected)} justMoved={moved === selected} />
+        {trash.error ? <p role="alert">{trash.error.message}</p> : trash.isPending ? <p aria-busy="true">Loading saved copy…</p> : <p>The saved copy is not available.</p>}
+      </div></main>
+    : isGone(selectedState) ? <main id="main" className="reading-pane reading-empty"><div className="source-gone">
+      <h1>Source deleted</h1><p>This source was permanently deleted. Its original files and notes are gone. Quotations in existing conversations remain.</p>
+    </div></main>
+    : current ? <Reading key={`reading:${current.note.source.id}`} entry={current} next={next} lifecycle={lifecycleOf(selected)} onTrashed={() => setMoved(selected)} /> : <main id="main" className="reading-pane reading-empty">
       <p>{selected && !loading ? 'This source is unavailable. Select another source.' : 'Select a source to read it here.'}</p>
     </main>}
-    {current && <SourceAsk key={`ask:${current.note.source.id}`} sourceId={current.note.source.id} title={current.note.source.title} />}
+    {current && selectedState === 'active' && <SourceAsk key={`ask:${current.note.source.id}`} sourceId={current.note.source.id} title={current.note.source.title} />}
     <Dialog.Root open={filtersOpen && phone} onOpenChange={setFiltersOpen}><Dialog.Portal>
       <Dialog.Overlay className="sheet-overlay" />
       <Dialog.Content className="filter-sheet" aria-describedby={undefined}>
@@ -214,7 +235,9 @@ function useScrollingDown() {
   return down;
 }
 
-function Reading({ entry: { note, humanHtml }, next }: { entry: Entry; next?: Entry }) {
+type ReadingProps = { entry: Entry; next?: Entry; readOnly?: boolean; notice?: React.ReactNode; lifecycle?: SourceLifecycle; onTrashed?: () => void };
+/** readOnly is a trashed source: the saved copy and its files stay readable, but nothing changes until restore. */
+function Reading({ entry: { note, humanHtml }, next, readOnly = false, notice, lifecycle, onTrashed }: ReadingProps) {
   const { source, analysis } = note, c = category(note), content = sections(note);
   const captureLabel = note.extraction.truncated ? 'Partial capture' : note.extraction.status === 'metadata-only' ? 'Source text unavailable' : note.extraction.status === 'image' ? 'Image-based analysis' : 'Capture details';
   const outline = [{ id: 'analysis', label: 'Summary' }, ...content.map(s => ({ id: `section-${s.id}`, label: s.heading })),
@@ -228,14 +251,16 @@ function Reading({ entry: { note, humanHtml }, next }: { entry: Entry; next?: En
   }, [section]);
   const compactAsk = useScrollingDown();
   return <main id="main" className="reading-pane" data-tone={categoryTone(c?.id)}>
-    <article className="research-note"><nav className="reading-back" aria-label="Breadcrumb"><Link to="/sources/" search={previous => ({ ...previous, source: undefined })}>Sources</Link></nav>
+    <article className="research-note"><nav className="reading-back" aria-label="Breadcrumb">{readOnly ? <Link to="/trash/">Trash</Link> : <Link to="/sources/" search={previous => ({ ...previous, source: undefined })}>Sources</Link>}</nav>
+      {notice}
       <header className="note-head">
         <p className="note-kind">{c && <span className="category-chip">{c.name}</span>}
           <span>{sourceTypeLabel(source.itemType)}</span>{source.publishedAt && <span>{source.publishedAt.slice(0, 10)}</span>}</p>
         <h1>{source.title}</h1><p className="citation">{source.authors.join(', ') || 'Authors not provided'}</p>
-        <div className="note-actions"><button className="ask-button" type="button" data-ask-open aria-controls="source-ask" aria-expanded="false">Ask about this source</button>
+        <div className="note-actions">{!readOnly && <button className="ask-button" type="button" data-ask-open aria-controls="source-ask" aria-expanded="false">Ask about this source</button>}
           {source.url && <a href={source.url} target="_blank" rel="noreferrer">Original<ExternalLink size={14} aria-hidden="true" /></a>}
           {source.doi && <a href={`https://doi.org/${encodeURIComponent(source.doi)}`} target="_blank" rel="noreferrer">DOI<ExternalLink size={14} aria-hidden="true" /></a>}
+          {!readOnly && onTrashed && <MoveToTrash sourceId={source.id} lifecycle={lifecycle} onMoved={onTrashed} />}
         </div>
       </header>
       <div className="note-sections">
@@ -250,20 +275,20 @@ function Reading({ entry: { note, humanHtml }, next }: { entry: Entry; next?: En
       {content.map(s => <section className="analysis-section" id={`section-${s.id}`} key={s.id}><h2>{s.heading}</h2>
         {s.format === 'text' ? <p>{s.text}</p> : s.format === 'steps' ? <ol>{s.items.map((item, i) => <li key={i}>{item}</li>)}</ol> : <ul>{s.items.map((item, i) => <li key={i}>{item}</li>)}</ul>}</section>)}
       <section id="human" className="human-section"><h2>Notes <span className="origin-tag is-human">Human</span></h2>
-        {humanHtml && <div className="human-prose" dangerouslySetInnerHTML={{ __html: humanHtml }} />}<ReaderNotes sourceId={source.id} /></section>
+        {humanHtml && <div className="human-prose" dangerouslySetInnerHTML={{ __html: humanHtml }} />}<ReaderNotes sourceId={source.id} readOnly={readOnly} /></section>
       <section id="original" className="original-section"><h2>Original text <span className="origin-tag is-source">Source</span></h2><OriginalText key={note.generationId} sourceId={source.id} artifactMime={note.extraction.artifactMime} artifacts={note.extraction.artifacts} sourceUrl={source.url} /></section>
       <section id="source" className="details-section"><h2>Details</h2><dl className="facts">
         <div><dt>Captured</dt><dd>{longDate(source.capturedAt)}</dd></div><div><dt>Source type</dt><dd>{sourceTypeLabel(source.itemType)}</dd></div>
         <div><dt>Text</dt><dd>{note.extraction.method}</dd></div><div><dt>Analysis prepared</dt><dd>{longDate(note.processing.processedAt)}</dd></div>
         <div><dt>Category</dt><dd>{c ? `${c.name}, template ${c.templateRevision} · ${c.assignment}` : 'Not set'}{' '}
-          <Link className="category-change" to="/categories/" search={{ source: source.id }}>{c ? 'Change category' : 'Set category'}</Link></dd></div>
+          {!readOnly && <Link className="category-change" to="/categories/" search={{ source: source.id }}>{c ? 'Change category' : 'Set category'}</Link>}</dd></div>
       </dl>{note.extraction.reason && <details id="capture-details" className="capture-details"><summary>{captureLabel}</summary><p>{note.extraction.reason}</p></details>}</section>
-      {next && <Link className="next-source" to="/sources/" search={previous => ({ ...previous, source: next.note.source.id })}>
+      {next && !readOnly && <Link className="next-source" to="/sources/" search={previous => ({ ...previous, source: next.note.source.id })}>
         <span>Next source</span><strong>{next.note.source.title}</strong><ArrowRight size={20} aria-hidden="true" />
       </Link>}
     </article>
-    <div className="ask-fab-wrap"><button className="ask-fab" type="button" data-ask-open data-compact={compactAsk || undefined} aria-controls="source-ask" aria-expanded="false" aria-label="Ask about this source">
+    {!readOnly && <div className="ask-fab-wrap"><button className="ask-fab" type="button" data-ask-open data-compact={compactAsk || undefined} aria-controls="source-ask" aria-expanded="false" aria-label="Ask about this source">
       <MessageSquareText size={20} aria-hidden="true" /><span>Ask</span>
-    </button></div>
+    </button></div>}
   </main>;
 }

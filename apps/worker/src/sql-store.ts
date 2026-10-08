@@ -7,11 +7,14 @@ import { hash, noteSchema, privatePublication, type Note } from '../../../shared
 import { chatSnapshotRevision, type ChatCorpus } from '../../../shared/chat.js';
 import { buildSearchIndex } from '../../../shared/search.js';
 import { matchedSourceText } from '../../../shared/source-text.js';
+import { sourceLifecycle, requireSourceState } from './source-lifecycle.js';
+import { purgeSourceContent } from './source-purge.js';
 import { DocumentTexts } from './document-text.js';
 
-type Frame = { key: string; owner: string; controller: AbortController; revisions: Map<string, string | undefined>; parent?: Frame };
+type Frame = { key: string; owner: string; controller: AbortController; revisions: Map<string, string | undefined>; source?: { id: string; revision: number }; parent?: Frame };
 const snapshots = new Map<string, { signature: string; promise: Promise<{ revision: string; sources: ChatCorpus['sources'] }> }>();
 export class SqlStore extends BlobStore {
+  private readonly access = new AsyncLocalStorage<{ id: string; revision: number }[]>();
   private readonly frames = new AsyncLocalStorage<Frame>();
   override get leaseSignal(): AbortSignal | undefined {
     const signals: AbortSignal[] = [];
@@ -24,6 +27,26 @@ export class SqlStore extends BlobStore {
     if (key) request.input('key', sql.NVarChar(450), key);
     return request;
   }
+  private sourceGuard(request: sql.Request, id: string, revision?: number, suffix = 'content', retained = false) {
+    request.input(`source_${suffix}`, sql.NVarChar(450), `source-lifecycle/${id}.json`);
+    if (revision !== undefined) request.input(`source_revision_${suffix}`, sql.Int, revision);
+    return `IF EXISTS (SELECT 1 FROM dbo.Records WITH (UPDLOCK,HOLDLOCK) WHERE record_key=@source_${suffix} AND
+      (JSON_VALUE(document,'$.state') NOT IN (${retained ? "N'active',N'trashed'" : "N'active'"}) ${revision !== undefined ? `OR TRY_CONVERT(int,JSON_VALUE(document,'$.revision'))<>@source_revision_${suffix}` : ''}))
+      THROW 51004, 'Source lifecycle changed', 1;\n`;
+  }
+  private contentGuards(request: sql.Request, key: string, value: unknown) {
+    if (key.startsWith('source-lifecycle/') || key.startsWith('source-purges/')) return '';
+    const content = value as { sourceId?: string; source?: { id?: string } };
+    if (key.startsWith('sources/') && this.frames.getStore()?.key === `lifecycle-${content?.source?.id}`) return '';
+    const ids = new Set<string>();
+    if (key.startsWith('chat/corpora/') && !this.frames.getStore()?.key.startsWith('corpus-')) for (const source of (value as ChatCorpus).sources || []) ids.add(source.note.source.id);
+    if (content?.sourceId) ids.add(content.sourceId);
+    if (content?.source?.id) ids.add(content.source.id);
+    if (key.startsWith('chat/indexes/')) for (const id of (value as { sourceIds?: string[] }).sourceIds || []) ids.add(id);
+    const batches = key.startsWith('categories/batches/') && !this.cleaningSourceContent() ? (value as { entries?: { sourceId: string }[] }).entries || [] : [];
+    const batchGuards = batches.map((entry, i) => this.sourceGuard(request, entry.sourceId, undefined, `batch${i}`, true)).join('');
+    return batchGuards + [...ids].map((id, i) => this.sourceGuard(request, id, undefined, `content${i}`)).join('');
+  }
   private guards(request: sql.Request) {
     let checks = '';
     let index = 0;
@@ -31,9 +54,33 @@ export class SqlStore extends BlobStore {
       frame.controller.signal.throwIfAborted();
       request.input(`lock${index}`, sql.NVarChar(200), frame.key).input(`owner${index}`, sql.UniqueIdentifier, frame.owner);
       checks += `IF NOT EXISTS (SELECT 1 FROM dbo.Leases WITH (UPDLOCK,HOLDLOCK) WHERE lease_key=@lock${index} AND owner=@owner${index} AND expires_at>SYSUTCDATETIME()) THROW 51001, 'SQL lease was lost', 1;\n`;
+      if (frame.source && !this.purging(frame.source.id)) checks += this.sourceGuard(request, frame.source.id, frame.source.revision, String(index));
       index++;
     }
+    for (const [i, source] of (this.access.getStore() || []).entries()) checks += this.sourceGuard(request, source.id, source.revision, `access${i}`);
     return checks;
+  }
+  async withSourceAccess<T>(ids: string[], fn: () => Promise<T>): Promise<T> {
+    const sources = await Promise.all([...new Set(ids)].map(async id => ({ id, revision: (await requireSourceState(this, id)).revision })));
+    return this.access.run(sources, async () => { const result = await fn(); await this.verifyLease(); return result; });
+  }
+  private cleaningSourceContent() {
+    for (let frame = this.frames.getStore(); frame; frame = frame.parent) if (frame.key.startsWith('purge-')) return true;
+    return false;
+  }
+  private purging(id: string) {
+    for (let frame = this.frames.getStore(); frame; frame = frame.parent) if (frame.key === `purge-${id}`) return true;
+    return false;
+  }
+  private ownership(request: sql.Request, key: string, value: unknown) {
+    if (key.startsWith('source-records/') || key.startsWith('source-lifecycle/') || key.startsWith('source-purges/') || key.startsWith('chat/conversations/') || key.startsWith('chat/jobs/')) return '';
+    const content = value as { sourceId?: string; source?: { id?: string } };
+    let id = content?.sourceId || content?.source?.id;
+    for (let frame = this.frames.getStore(); !id && frame; frame = frame.parent) id = frame.source?.id;
+    if (!id || this.purging(id)) return '';
+    request.input('ownershipKey', sql.NVarChar(450), `source-records/${id}/${hash(key)}.json`)
+      .input('ownership', sql.NVarChar(sql.MAX), JSON.stringify({ key }));
+    return 'IF NOT EXISTS(SELECT 1 FROM dbo.Records WITH(UPDLOCK,HOLDLOCK) WHERE record_key=@ownershipKey) INSERT dbo.Records(record_key,document) VALUES(@ownershipKey,@ownership);';
   }
   override async verifyLease() {
     const request = await this.request();
@@ -58,7 +105,7 @@ export class SqlStore extends BlobStore {
     request.input('document', sql.NVarChar(sql.MAX), JSON.stringify(value));
     request.input('expected', sql.BigInt, frame.revisions.get(key) ?? null);
     const result = await request.query(`SET XACT_ABORT ON; BEGIN TRANSACTION;
-      ${this.guards(request)}
+      ${this.guards(request)} ${this.contentGuards(request, key, value)}
       IF @expected IS NULL
       BEGIN
         IF EXISTS (SELECT 1 FROM dbo.Records WITH (UPDLOCK,HOLDLOCK) WHERE record_key=@key) THROW 51002, 'Stale SQL revision', 1;
@@ -69,6 +116,7 @@ export class SqlStore extends BlobStore {
         UPDATE dbo.Records SET document=@document,revision=revision+1,updated_at=SYSUTCDATETIME() WHERE record_key=@key AND revision=@expected;
         IF @@ROWCOUNT=0 THROW 51002, 'Stale SQL revision', 1;
       END;
+      ${this.ownership(request, key, value)}
       SELECT CONVERT(varchar(30),revision) AS revision FROM dbo.Records WHERE record_key=@key;
       COMMIT;`);
     frame.revisions.set(key, result.recordset[0].revision);
@@ -77,9 +125,10 @@ export class SqlStore extends BlobStore {
     const request = await this.request(key);
     request.input('document', sql.NVarChar(sql.MAX), JSON.stringify(value));
     await request.query(`SET XACT_ABORT ON; BEGIN TRANSACTION;
-      ${this.guards(request)}
+      ${this.guards(request)} ${this.contentGuards(request, key, value)}
       IF NOT EXISTS (SELECT 1 FROM dbo.Records WITH (UPDLOCK,HOLDLOCK) WHERE record_key=@key)
         INSERT dbo.Records(record_key,document) VALUES(@key,@document);
+      ${this.ownership(request, key, value)}
       COMMIT;`);
   }
   override async list(prefix: string) {
@@ -92,7 +141,7 @@ export class SqlStore extends BlobStore {
     const request = await this.request(key);
     await request.query(`SET XACT_ABORT ON; BEGIN TRANSACTION; ${this.guards(request)} DELETE dbo.Records WHERE record_key=@key; COMMIT;`);
     // Binary assets deliberately remain blobs.
-    if (!key.endsWith('.json')) await this.container.getBlockBlobClient(key).deleteIfExists();
+    await this.container.getBlockBlobClient(key).deleteIfExists();
   }
   override async withLease<T>(key: string, fn: () => Promise<T>): Promise<T> {
     if (key.length > 200) throw new Error('Lease key is too long');
@@ -106,7 +155,8 @@ export class SqlStore extends BlobStore {
       IF @@ROWCOUNT=0 INSERT dbo.Leases VALUES(@lock,@owner,DATEADD(second,60,SYSUTCDATETIME()));
       COMMIT;`);
     const controller = new AbortController();
-    const frame: Frame = { key, owner, controller, revisions: new Map(), parent: this.frames.getStore() };
+    const source = key.startsWith('source-') ? { id: key.slice(7), revision: (await sourceLifecycle(this, key.slice(7))).revision } : undefined;
+    const frame: Frame = { key, owner, controller, revisions: new Map(), parent: this.frames.getStore(), source };
     let renewing = false;
     const renew = setInterval(() => {
       if (renewing || controller.signal.aborted) return;
@@ -134,7 +184,7 @@ export class SqlStore extends BlobStore {
       .input('published', sql.NVarChar(200), note.source.publishedAt).input('captured', sql.DateTime2, new Date(note.source.capturedAt))
       .input('active', sql.Bit, note.source.active).input('note', sql.NVarChar(sql.MAX), JSON.stringify(note))
       .input('human', sql.NVarChar(sql.MAX), humanMarkdown ?? null).input('publication', sql.NVarChar(sql.MAX), JSON.stringify(publication));
-    await request.query(`SET XACT_ABORT ON; BEGIN TRANSACTION; ${this.guards(request)}
+    await request.query(`SET XACT_ABORT ON; BEGIN TRANSACTION; ${this.guards(request)} ${this.sourceGuard(request, note.source.id)}
       UPDATE dbo.Sources WITH(UPDLOCK,HOLDLOCK) SET generation_id=@generation,title=@title,item_type=@type,category_id=@category,
         published_at=@published,captured_at=@captured,active=@active,note_json=@note,
         human_markdown=COALESCE(@human,human_markdown),revision=revision+1,updated_at=SYSUTCDATETIME() WHERE source_id=@id;
@@ -143,21 +193,67 @@ export class SqlStore extends BlobStore {
       COMMIT;`);
   }
   async sources(): Promise<ChatCorpus['sources']> {
-    const result = await (await this.request()).query('SELECT note_json,human_markdown FROM dbo.Sources WHERE active=1 ORDER BY captured_at DESC,source_id');
+    const result = await (await this.request()).query(`SELECT note_json,human_markdown FROM dbo.Sources WHERE active=1 AND NOT EXISTS(SELECT 1 FROM dbo.Records r WHERE r.record_key=N'source-lifecycle/'+source_id+N'.json' AND JSON_VALUE(r.document,'$.state')<>N'active') ORDER BY captured_at DESC,source_id`);
     return result.recordset.map(row => ({ note: noteSchema.parse(JSON.parse(row.note_json)), humanMarkdown: row.human_markdown }));
   }
   async source(id: string): Promise<ChatCorpus['sources'][number] | undefined> {
     const result = await (await this.request()).input('id', sql.NVarChar(100), id)
-      .query('SELECT note_json,human_markdown FROM dbo.Sources WHERE source_id=@id AND active=1');
+      .query(`SELECT note_json,human_markdown FROM dbo.Sources WHERE source_id=@id AND active=1 AND NOT EXISTS(SELECT 1 FROM dbo.Records r WHERE r.record_key=N'source-lifecycle/'+source_id+N'.json' AND JSON_VALUE(r.document,'$.state')<>N'active')`);
     const row = result.recordset[0];
     return row ? { note: noteSchema.parse(JSON.parse(row.note_json)), humanMarkdown: row.human_markdown } : undefined;
   }
+  async retainedSource(id: string): Promise<ChatCorpus['sources'][number] | undefined> {
+    const result = await (await this.request()).input('id', sql.NVarChar(100), id)
+      .query('SELECT note_json,human_markdown FROM dbo.Sources WHERE source_id=@id');
+    const row = result.recordset[0];
+    return row ? { note: noteSchema.parse(JSON.parse(row.note_json)), humanMarkdown: row.human_markdown } : undefined;
+  }
+  async removeSource(id: string) {
+    const request = (await this.request()).input('id', sql.NVarChar(100), id);
+    await request.query(`SET XACT_ABORT ON; BEGIN TRANSACTION; ${this.guards(request)} DELETE dbo.Sources WHERE source_id=@id; COMMIT;`);
+  }
+  override async createBinary(key: string, data: Uint8Array, mime: string) {
+    const request = await this.request();
+    const ownership = this.ownership(request, key, {});
+    if (ownership) await request.query(`SET XACT_ABORT ON; BEGIN TRANSACTION; ${this.guards(request)} ${ownership} COMMIT;`);
+    await super.createBinary(key, data, mime);
+  }
+  async removeLegacy(key: string) { await this.verifyLease(); await this.container.getBlockBlobClient(key).deleteIfExists(); }
+  async legacyKeys() {
+    const keys: string[] = [];
+    for await (const blob of this.container.listBlobsFlat()) if (!blob.name.startsWith('locks/')) keys.push(blob.name);
+    return keys;
+  }
+  async legacyRead<T>(key: string): Promise<T | undefined> { return super.read<T>(key); }
+  async purgeSourceContent(id: string) { await purgeSourceContent(this, id); }
+  override async retain(artifact: string, data: Uint8Array, mime: string) {
+    let id: string | undefined;
+    for (let frame = this.frames.getStore(); frame; frame = frame.parent) if (frame.source) { id = frame.source.id; break; }
+    if (!id) throw new Error('Retaining an original requires a source lease');
+    const source = id;
+    await this.withLease(`artifact-${artifact}`, async () => {
+      await requireSourceState(this, source);
+      // Register before uploading. Cleanup holds this same hash lease before removing a blob.
+      await this.create(`artifact-references/${artifact}/${source}.json`, { sourceId: source, hash: artifact });
+      await super.retain(artifact, data, mime);
+    });
+  }
+  async artifactReferenced(artifact: string) {
+    const result = await (await this.request()).input('artifact', sql.VarChar(64), artifact).query(`
+      SELECT TOP(1) source_id FROM dbo.Sources WHERE CHARINDEX(@artifact,note_json)>0;
+      SELECT TOP(1) record_key FROM dbo.Records WHERE
+        (record_key LIKE N'artifacts/%' OR record_key LIKE N'artifact-inputs/%' OR record_key LIKE N'artifact-selections/%'
+          OR record_key LIKE N'artifact-sets/%' OR record_key LIKE N'analysis/%' OR record_key LIKE N'staged/%' OR record_key LIKE N'browser-captures/%')
+        AND CHARINDEX(@artifact,document)>0;`);
+    return (result.recordsets as sql.IRecordSet<unknown>[]).some(rows => rows.length > 0);
+  }
+  async removeArtifact(artifact: string) { await this.verifyLease(); await this.raw.getBlockBlobClient(artifact).deleteIfExists(); }
   async sourceInputs() {
     const result = await (await this.request()).query(`SELECT s.source_id,s.generation_id,s.note_json,t.document AS source_text,n.document AS reader_note
       FROM dbo.Sources s
       LEFT JOIN dbo.Records t ON t.record_key=(N'source-text/'+s.generation_id+N'.json') COLLATE Latin1_General_100_BIN2
       LEFT JOIN dbo.Records n ON n.record_key=N'reader-notes/'+s.source_id+N'.json'
-      WHERE s.active=1;
+      WHERE s.active=1 AND NOT EXISTS(SELECT 1 FROM dbo.Records l WHERE l.record_key=N'source-lifecycle/'+s.source_id+N'.json' AND JSON_VALUE(l.document,'$.state')<>N'active');
       SELECT r.record_key,r.document FROM dbo.Records r
       INNER JOIN dbo.Sources s ON s.active=1 AND r.record_key LIKE (N'document-text/'+s.generation_id+N'/%') COLLATE Latin1_General_100_BIN2
       WHERE r.kind=N'document-text';`);
@@ -184,7 +280,7 @@ export class SqlStore extends BlobStore {
   }
   private async snapshot() {
     const signatureRows = await (await this.request()).query(`SELECT source_id,generation_id,revision FROM dbo.Sources WHERE active=1 ORDER BY source_id;
-      SELECT record_key,revision FROM dbo.Records WHERE kind IN (N'source-text',N'document-text',N'reader-notes') ORDER BY record_key;`);
+      SELECT record_key,revision FROM dbo.Records WHERE kind IN (N'source-text',N'document-text',N'reader-notes',N'source-lifecycle') ORDER BY record_key;`);
     const signature = hash(JSON.stringify(signatureRows.recordsets));
     const key = `${process.env.SQL_SERVER}/${process.env.SQL_DATABASE}/${process.env.SQL_CONNECTION_STRING ? 'local' : 'entra'}`;
     const previous = snapshots.get(key);
@@ -210,7 +306,7 @@ export class SqlStore extends BlobStore {
     const index = JSON.parse(JSON.stringify(buildSearchIndex(documents)));
     const revision = chatSnapshotRevision(hash('sql'), sources, index);
     await this.create(`chat/corpora/${revision}.json`, { revision, sources });
-    await this.create(`chat/indexes/${revision}.json`, { revision, index });
+    await this.create(`chat/indexes/${revision}.json`, { revision, index, sourceIds: sources.map(source => source.note.source.id) });
     return { revision, sources };
   }
 }

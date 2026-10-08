@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet, useMatches, useRouterState } from '@tanstack/react-router';
-import { Ellipsis, LogOut, Tags } from 'lucide-react';
+import { Ellipsis, LogOut, Tags, Trash2 } from 'lucide-react';
 import { accessStore, forgetPrivateData } from '../lib/api';
+import { useLifecycleSync } from '../lib/lifecycle';
 import { MastheadSlots } from './masthead';
 
 type Access = 'allowed' | 'unavailable';
@@ -76,6 +77,7 @@ export function NotFound() {
 }
 
 export default function Layout() {
+  useLifecycleSync();
   const queryClient = useQueryClient();
   const access = useAccess();
   const lost = useSyncExternalStore(accessStore.subscribe, accessStore.get);
@@ -106,7 +108,7 @@ export default function Layout() {
       </nav>
       <div className="masthead-actions">
         <div className="masthead-end" ref={setEnd} />
-        <MoreMenu categories={path.startsWith('/categories/')} signOut={() => forgetPrivateData(queryClient, false)} />
+        <MoreMenu current={path.startsWith('/categories/') ? 'Categories' : path.startsWith('/trash/') ? 'Trash' : undefined} signOut={() => forgetPrivateData(queryClient, false)} />
       </div>
     </header>
     {!lost && access === 'allowed' && <aside className="install-recommendation" aria-label="Install Shelf" hidden>
@@ -117,15 +119,16 @@ export default function Layout() {
   </MastheadSlots.Provider>;
 }
 
-/** Categories is a rarely used admin page and sign-out is rarer still, so both live behind one menu. */
-function MoreMenu({ categories, signOut }: { categories: boolean; signOut: () => void }) {
+/** Categories and Trash are rarely used admin pages and sign-out is rarer still, so they live behind one menu. */
+function MoreMenu({ current, signOut }: { current?: 'Categories' | 'Trash'; signOut: () => void }) {
   const [open, setOpen] = useState(false);
   return <Popover.Root open={open} onOpenChange={setOpen}>
-    <Popover.Trigger className="masthead-tool masthead-more" aria-label={categories ? 'More, Categories open' : 'More'} data-current={categories || undefined}>
+    <Popover.Trigger className="masthead-tool masthead-more" aria-label={current ? `More, ${current} open` : 'More'} data-current={current ? true : undefined}>
       <Ellipsis size={22} aria-hidden="true" />
     </Popover.Trigger>
     <Popover.Portal><Popover.Content className="masthead-menu" align="end" sideOffset={6} collisionPadding={8}>
-      <Link to="/categories/" aria-current={categories ? 'page' : undefined} onClick={() => setOpen(false)}><Tags size={18} aria-hidden="true" />Categories</Link>
+      <Link to="/categories/" aria-current={current === 'Categories' ? 'page' : undefined} onClick={() => setOpen(false)}><Tags size={18} aria-hidden="true" />Categories</Link>
+      <Link to="/trash/" aria-current={current === 'Trash' ? 'page' : undefined} onClick={() => setOpen(false)}><Trash2 size={18} aria-hidden="true" />Trash</Link>
       <a href="/logout.html" onClick={signOut}><LogOut size={18} aria-hidden="true" />Sign out</a>
     </Popover.Content></Popover.Portal>
   </Popover.Root>;

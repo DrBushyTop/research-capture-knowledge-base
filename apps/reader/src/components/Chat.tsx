@@ -16,6 +16,7 @@ import { useReaderConversation, type ConversationTurn as Turn } from '../lib/rea
 import { sourceHref } from '../app/router';
 import { MastheadSlots } from '../app/masthead';
 import { usePhone } from '../lib/usePhone';
+import { isGone, useLifecycles, useSourceState, type SourceState } from '../lib/lifecycle';
 import '../styles/chat.css';
 
 type Result = NonNullable<ChatJob['result']>;
@@ -64,16 +65,28 @@ async function prepareImage(file: Blob): Promise<Blob> {
 
 const labelOf = (cite: Citation) => cite.label || citationLabel({ title: cite.title, authors: [], url: cite.sourceUrl || null });
 
+const stateNote: Partial<Record<SourceState, string>> = {
+  trashed: 'In Trash. The saved copy opens read-only.',
+  purging: 'Deleted. The note and saved files are no longer available.',
+  deleted: 'Deleted. The note and saved files are no longer available.',
+  unknown: 'Checking whether this source is still available…'
+};
+const stateTag = (state: SourceState) => state === 'trashed' ? 'In Trash' : isGone(state) ? 'Deleted' : '';
+
+/** Quotations stay with the conversation. Links into the library open only while the source is known to be active or in Trash. */
 function CitationDetail({ cite, jobId }: { cite: Citation; jobId: string }) {
-  return <div className="chat-citation-detail">
+  const state = useSourceState(cite.sourceId);
+  const readable = state === 'active' || state === 'trashed';
+  return <div className="chat-citation-detail" data-source-state={state}>
     <InlineCitationSource title={cite.title} className="chat-citation-source">
       <p className="chat-citation-location"><strong>{labelOf(cite)}</strong> · {origin[cite.kind]} · {cite.locator}</p>
+      {stateNote[state] && <p className="chat-citation-state">{stateNote[state]}</p>}
     </InlineCitationSource>
-    {cite.assetId && <a className="chat-cited-image" href={fileUrl(jobId, { asset: cite.assetId })} target="_blank" rel="noreferrer"><ExpiringImage src={fileUrl(jobId, { asset: cite.assetId })} alt={cite.title} loading="lazy" />Open image</a>}
+    {readable && cite.assetId && <a className="chat-cited-image" href={fileUrl(jobId, { asset: cite.assetId })} target="_blank" rel="noreferrer"><ExpiringImage src={fileUrl(jobId, { asset: cite.assetId })} alt={cite.title} loading="lazy" />Open image</a>}
     {(cite.quote || cite.excerpt) && <InlineCitationQuote className="chat-citation-quote">{cite.quote || cite.excerpt}</InlineCitationQuote>}
     <div className="chat-source-links">
-      <a href={sourceHref(cite.sourceId)} target="_blank" rel="noreferrer">Open note</a>
-      {cite.pdf && <a href={fileUrl(jobId, { file: cite.sourceId, evidence: cite.evidenceId })} target="_blank" rel="noreferrer">Open PDF</a>}
+      {readable && <a href={sourceHref(cite.sourceId)} target="_blank" rel="noreferrer">Open note</a>}
+      {readable && cite.pdf && <a href={fileUrl(jobId, { file: cite.sourceId, evidence: cite.evidenceId })} target="_blank" rel="noreferrer">Open PDF</a>}
       {safeUrl(cite.sourceUrl) && <a href={safeUrl(cite.sourceUrl)} target="_blank" rel="noreferrer">Open site</a>}
     </div>
   </div>;
@@ -89,9 +102,11 @@ function CitationPill({ cites, jobId }: { cites: Citation[]; jobId: string }) {
   const enter = () => { clearTimeout(close.current); setOpen(true); };
   const leave = () => { close.current = setTimeout(() => setOpen(false), 180); };
   const hover = { onPointerEnter: (event: React.PointerEvent) => { if (event.pointerType === 'mouse') enter(); }, onPointerLeave: (event: React.PointerEvent) => { if (event.pointerType === 'mouse') leave(); } };
-  const label = `Sources: ${cites.map(cite => cite.title).join('; ')}`;
-  const button = <button className="chat-citation-button" type="button" aria-label={label} {...(phone ? {} : { ...hover, onClick: (event: React.MouseEvent) => { event.preventDefault(); enter(); } })}>
-    <span className="chat-citation-label">{labelOf(cites[0])}</span>{cites.length > 1 && <span className="chat-citation-more">+{cites.length - 1}</span>}
+  const { stateOf } = useLifecycles();
+  const label = `Sources: ${cites.map(cite => cite.title + (stateTag(stateOf(cite.sourceId)) ? ` (${stateTag(stateOf(cite.sourceId))})` : '')).join('; ')}`;
+  const first = stateOf(cites[0].sourceId);
+  const button = <button className="chat-citation-button" data-source-state={first} type="button" aria-label={label} {...(phone ? {} : { ...hover, onClick: (event: React.MouseEvent) => { event.preventDefault(); enter(); } })}>
+    <span className="chat-citation-label">{labelOf(cites[0])}</span>{stateTag(first) && <span className="chat-citation-state-tag" aria-hidden="true">{stateTag(first)}</span>}{cites.length > 1 && <span className="chat-citation-more">+{cites.length - 1}</span>}
   </button>;
   const details = cites.map(cite => <CitationDetail key={cite.evidenceId} cite={cite} jobId={jobId} />);
   if (phone) return <InlineCitation><Dialog.Root open={open} onOpenChange={setOpen}>
@@ -176,6 +191,9 @@ function ImageDialog({ url, title, children }: { url: string; title: string; chi
 }
 
 function Attachment({ asset, jobId }: { asset: ChatAsset; jobId: string }) {
+  const state = useSourceState(asset.sourceId);
+  if (asset.kind !== 'site' && isGone(state)) return <p className="chat-file chat-file-gone">{asset.title}<small>Deleted source. This file is no longer available.</small></p>;
+  if (asset.kind !== 'site' && state === 'unknown') return <p className="chat-file chat-file-gone" aria-busy="true">{asset.title}<small>Checking availability…</small></p>;
   const url = fileUrl(jobId, { asset: asset.id });
   const title = `${asset.title}${asset.page ? ` · Page ${asset.page}` : ''}`;
   if (asset.kind === 'image') return <figure className="chat-image">
@@ -295,6 +313,7 @@ export default function Chat({ source, embedded = false, onClose }: Props = {}) 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [confirming, setConfirming] = useState<string>();
   const [dragging, setDragging] = useState(false);
+  const { stateOf } = useLifecycles();
 
   useEffect(() => {
     if (embedded) return;
@@ -400,7 +419,9 @@ export default function Chat({ source, embedded = false, onClose }: Props = {}) 
   const tool = inMasthead ? 'masthead-tool' : 'chat-icon-button';
   const historyButton = !embedded && <button type="button" className={inMasthead ? tool : `${tool} chat-history-toggle`} aria-label="History" disabled={busy} onClick={() => { void history.refresh(); setHistoryOpen(true); }}><History size={20} /></button>;
   const newButton = <button type="button" className={tool} aria-label="New chat" disabled={busy && !unavailable} onClick={startNew}><SquarePen size={19} /></button>;
-  const contextLine = context && <p className="chat-context"><FileText size={15} aria-hidden="true" /><span>{embedded && context.sourceId === source?.sourceId ? 'Started from this source' : <>Started from <RouterLink to="/sources/" search={{ source: context.sourceId }}>{context.title}</RouterLink></>}</span></p>;
+  const contextState = stateOf(context?.sourceId ?? '');
+  const contextLine = context && <p className="chat-context"><FileText size={15} aria-hidden="true" /><span>{embedded && context.sourceId === source?.sourceId ? 'Started from this source' : isGone(contextState) ? <>Started from {context.title} <span className="chat-context-state">Deleted</span></>
+    : <>Started from <RouterLink to="/sources/" search={{ source: context.sourceId }}>{context.title}</RouterLink>{contextState === 'trashed' && <span className="chat-context-state">In Trash</span>}</>}</span></p>;
   return <div ref={root} className={`discussion-chat${embedded ? ' is-embedded' : ''}`}>
     {!embedded && <aside className="chat-history" aria-label="Chat history">{historyList}</aside>}
     <Main {...(embedded ? { 'aria-label': 'Ask about this source' } : { id: 'main', tabIndex: -1 })} className={`chat-main${empty ? ' is-empty' : ''}`}>

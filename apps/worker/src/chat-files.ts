@@ -1,3 +1,4 @@
+import { requireSourceState } from './source-lifecycle.js';
 import type { BlobStore } from './storage.js';
 import { hash, noteArtifacts, noteSchema } from '../../../shared/corpus.js';
 import { ChatAccessError, chatStatus } from './chat-service.js';
@@ -12,18 +13,22 @@ export async function readChatFile(store: BlobStore, owner: string, id: string, 
     if (!/^a_[a-f0-9]{16}$/.test(assetId)) throw new ChatAccessError(404, 'File not found');
     const asset = await store.read<ChatAsset>(`chat/assets/${id}/${assetId}.json`);
     if (!asset || (!result.attachments.some(item => item.id === assetId) && !result.citations.some(cite => cite.sourceId === asset.sourceId))) throw new ChatAccessError(404, 'File not found');
+    await requireSourceState(store, asset.sourceId, true);
     const originId = asset.originJobId || id;
     if (originId !== id) await chatStatus(store, owner, originId);
     if (asset.kind === 'image' && asset.blobKey === `chat/assets/${originId}/${assetId}.png`) {
       const blob = store.container.getBlockBlobClient(asset.blobKey);
       const properties = await blob.getProperties({ abortSignal: AbortSignal.timeout(20000) });
       if (!properties.contentLength || properties.contentLength > 5 * 1024 * 1024) throw new ChatAccessError(404, 'File unavailable');
-      return { bytes: await blob.downloadToBuffer(0, undefined, { conditions: { ifMatch: properties.etag }, abortSignal: AbortSignal.timeout(20000) }), mime: 'image/png', filename: 'page.png' };
+      const bytes = await blob.downloadToBuffer(0, undefined, { conditions: { ifMatch: properties.etag }, abortSignal: AbortSignal.timeout(20000) });
+      await requireSourceState(store, asset.sourceId, true);
+      return { bytes, mime: 'image/png', filename: 'page.png' };
     }
     if (asset.kind === 'pdf' || asset.kind === 'image' && asset.artifactHash) { sourceId = asset.sourceId; artifactHash = asset.artifactHash; }
     else throw new ChatAccessError(404, 'File not found');
   }
   if (!sourceId || (!result.citations.some(cite => cite.sourceId === sourceId) && !result.attachments.some(item => item.sourceId === sourceId && (item.kind === 'pdf' || item.kind === 'image' && item.id === assetId)))) throw new ChatAccessError(404, 'File not found');
+  await requireSourceState(store, sourceId, true);
   const job = (await store.read<ChatJob>(`chat/jobs/${id}.json`))!;
   const corpus = chatCorpusSchema.parse(await store.read(`chat/corpora/${job.corpusRevision}.json`));
   let note = corpus.sources.find(source => source.note.source.id === sourceId)?.note;
@@ -45,5 +50,6 @@ export async function readChatFile(store: BlobStore, owner: string, id: string, 
   const bytes = await blob.downloadToBuffer(0, undefined, { conditions: { ifMatch: properties.etag }, abortSignal: AbortSignal.timeout(20000) });
   if (hash(bytes) !== artifactHash) throw new ChatAccessError(404, 'Saved file unavailable');
   const extension = ({ 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' } as Record<string, string>)[original.mime];
+  await requireSourceState(store, sourceId, true);
   return { bytes, mime: original.mime, filename: `${sourceId}${original.key ? '-' + original.key : ''}.${extension}` };
 }

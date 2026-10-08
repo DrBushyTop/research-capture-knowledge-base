@@ -33,6 +33,11 @@ it('serves cited image evidence even when it is not an answer attachment', async
   await state.create(`chat/assets/${id}/${asset}.json`, { id: asset, sourceId, kind: 'image', blobKey: `chat/assets/${id}/${asset}.png` });
   const store = Object.assign(state, { container: { getBlockBlobClient: () => ({ getProperties: async () => ({ contentLength: 3, etag: 'version' }), downloadToBuffer: async () => Buffer.from('png') }) } }) as unknown as BlobStore;
   expect((await readChatFile(store, 'owner', id, asset, null)).mime).toBe('image/png');
+  await state.create(`source-lifecycle/${sourceId}.json`, { sourceId, state: 'trashed', revision: 1, changedAt: new Date().toISOString(), changedBy: 'admin' });
+  expect((await readChatFile(store, 'owner', id, asset, null)).mime).toBe('image/png');
+  await state.write(`source-lifecycle/${sourceId}.json`, { sourceId, state: 'purging', revision: 2, changedAt: new Date().toISOString(), changedBy: 'admin' });
+  await expect(readChatFile(store, 'owner', id, asset, null)).rejects.toMatchObject({ status: 410 });
+  expect((await state.read<ChatJob>(`chat/jobs/${id}.json`))?.result?.citations[0].excerpt).toBe('Rendered image');
   await expect(readChatFile(store, 'other', id, asset, null)).rejects.toMatchObject({ status: 404 });
 });
 

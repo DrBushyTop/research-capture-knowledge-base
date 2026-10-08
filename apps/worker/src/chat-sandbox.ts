@@ -1,3 +1,4 @@
+import { requireSourceState } from './source-lifecycle.js';
 import { readFile } from 'node:fs/promises';
 import { DefaultAzureCredential } from '@azure/identity';
 import { SandboxGroupClient, endpointForRegion } from '@azure/containerapps-sandbox';
@@ -17,11 +18,11 @@ export async function gatherEvidence(store: BlobStore, corpus: ChatCorpus, job: 
   const initial = corpusEvidence(corpus);
   const query = [job.request.question, ...job.request.history.filter(turn => turn.role === 'user').map(turn => turn.content)].join('\n');
   const storedIndex = await store.read<{ revision: string; index: unknown }>(`chat/indexes/${corpus.revision}.json`);
-  if (storedIndex?.revision !== corpus.revision) throw new Error('Chat retrieval index does not match corpus');
-  const index = await loadSearchIndex(JSON.stringify(storedIndex.index));
-  if (index.documentCount !== corpus.sources.length || corpus.sources.some(source => !index.has(source.note.source.id))) throw new Error('Chat retrieval index contains different sources');
+  if (storedIndex ? storedIndex.revision !== corpus.revision : !job.request.sourceId) throw new Error('Chat retrieval index does not match corpus');
+  const index = storedIndex ? await loadSearchIndex(JSON.stringify(storedIndex.index)) : undefined;
+  if (index && (index.documentCount !== corpus.sources.length || corpus.sources.some(source => !index.has(source.note.source.id)))) throw new Error('Chat retrieval index contains different sources');
   const selected = job.request.sourceId ? corpus.sources.filter(entry => entry.note.source.id === job.request.sourceId) : (() => {
-    const ranked = rankEvidenceSources(index, query).slice(0, 4);
+    const ranked = rankEvidenceSources(index!, query).slice(0, 4);
     const ids = ranked.length ? ranked : [...new Set(packEvidence(initial, query).map(chunk => chunk.sourceId))];
     return ids.map(id => corpus.sources.find(entry => entry.note.source.id === id)!).filter(Boolean);
   })();
@@ -39,6 +40,7 @@ export async function gatherEvidence(store: BlobStore, corpus: ChatCorpus, job: 
     await writeWorkspaceFile(sandbox.id, '/workspace/corpus.json', JSON.stringify({ revision: corpus.revision, sources }), signal);
     const inputs: { sourceId: string; path: string; hash: string; mime: string; attachmentKey?: string; title?: string; visualPage?: number; textPage?: number; textPages?: PageRange; query?: string }[] = [];
     for (const { note } of sources) {
+      await requireSourceState(store, note.source.id);
       let originals = noteArtifacts(note).filter(artifact => artifact.analyzed);
       const selectedKey = options?.attachmentKey || job.request.visual?.attachmentKey;
       if (selectedKey) originals = originals.filter(artifact => artifact.key === selectedKey);
@@ -106,6 +108,7 @@ export async function gatherEvidence(store: BlobStore, corpus: ChatCorpus, job: 
       packed = packEvidence(evidence, query, [visual, ...original.values()]);
     }
     if (options) packed = packEvidence(evidence.filter(chunk => chunk.kind === 'source'), query, image ? [image.evidence] : []);
+    for (const { note } of sources) await requireSourceState(store, note.source.id);
     return { evidence: packed, image, pageCount: extracted[0]?.pageCount };
   } finally {
     // Delete before inference, so waiting for the model consumes no sandbox compute.

@@ -2,7 +2,9 @@ import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { createServer as createVite } from 'vite';
 import { createStore } from '../apps/worker/src/sql-store.js';
-import { readLibrary } from '../apps/worker/src/library.js';
+import { changeSourceLifecycleSchema } from '../shared/source-lifecycle.js';
+import { SourceLifecycleService, sourceLifecycle, sourceLifecycles } from '../apps/worker/src/source-lifecycle.js';
+import { readLibrary, readTrash } from '../apps/worker/src/library.js';
 import { categoryOverview, startBatch, startPreview, getPreview, changeBatch } from '../apps/worker/src/category-work.js';
 import { saveCategory } from '../apps/worker/src/category-registry.js';
 import { readReaderNote, saveReaderNote } from '../apps/worker/src/reader-notes.js';
@@ -23,7 +25,18 @@ const api = createServer(async (request, response) => {
     let body: any;
     if (request.method === 'POST') { const chunks = []; let bytes = 0; for await (const chunk of request) { bytes += chunk.length; if (bytes > 100000) throw new Error('Request too large'); chunks.push(chunk); } body = JSON.parse(Buffer.concat(chunks).toString()); }
     let result: unknown;
-    if (url.searchParams.has('library')) result = await readLibrary(store);
+    if (url.searchParams.has('lifecycles')) result = await sourceLifecycles(store);
+    else if (url.searchParams.has('trash')) result = await readTrash(store);
+    else if (url.searchParams.has('lifecycle')) {
+      const id = url.searchParams.get('lifecycle')!;
+      if (!body) result = await sourceLifecycle(store, id);
+      else {
+        const input = changeSourceLifecycleSchema.parse(body);
+        result = await new SourceLifecycleService(store).change(id, input.action, input.revision, owner);
+        if ((result as { state: string }).state === 'purging') void new SourceLifecycleService(store).cleanup(id).catch(() => undefined);
+      }
+    }
+    else if (url.searchParams.has('library')) result = await readLibrary(store);
     else if (url.searchParams.has('notes')) result = body ? await saveReaderNote(store, owner, body) : await readReaderNote(store, url.searchParams.get('notes')!);
     else if (url.searchParams.has('source')) {
       const offset = url.searchParams.get('offset');

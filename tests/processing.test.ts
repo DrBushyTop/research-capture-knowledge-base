@@ -5,6 +5,24 @@ import { processJob, type Processor } from '../apps/worker/src/processing.js';
 import type { Analysis, Note } from '../shared/corpus.js';
 const analysis: Analysis = { summary: 'A narrative review reports uncertainty in the evidence.', topics: ['research-methods'], sourceCategory: 'research-paper', studyType: 'narrative review', keyFindings: [], limitations: ['Not a randomized trial.'], claims: [], relevance: [], population: null, participantCount: null, intervention: null, comparator: null, outcomes: [], funding: null, suggestedRelationships: [] };
 const processor: Processor = { version: 'v1', model: 'test-deployment', extract: async () => ({ text: 'Available source evidence.', evidence: { status: 'text', method: 'pdf-text', reason: null, truncated: false, retrievedAt: '2026-10-05T10:00:00Z', artifactHash: null } }), enrich: async () => analysis, rights: async () => [] };
+it('keeps the saved analysis and original when a later Zotero update loses its attachment', async () => {
+  const store = new MemoryStore();
+  let published: Note | undefined;
+  const adapter = Object.assign(store, { publishNote: async (note: Note) => { published = note; }, retainedSource: async () => published ? { note: published, humanMarkdown: 'Human notes' } : undefined });
+  await discover(adapter, snapshot, 'v1');
+  const original = (await adapter.read<Job>((await adapter.list('jobs/'))[0]))!;
+  await processJob(adapter, original.id, { ...processor, extract: async () => ({ text: 'Available source evidence.', evidence: { status: 'text', method: 'pdf-text', reason: null, truncated: false, retrievedAt: '2026-10-05T10:00:00Z', artifactHash: 'a'.repeat(64) } }) });
+  const updated = structuredClone(snapshot);
+  updated.version++;
+  updated.items = [updated.items[0]];
+  updated.items[0].version++;
+  await discover(adapter, updated, 'v1');
+  const current = (await adapter.read<{ generationId: string }>(`sources/${original.source.id}.json`))!;
+  await processJob(adapter, current.generationId, processor);
+  expect(published?.generationId).toBe(original.id);
+  expect(published?.analysis?.summary).toBe(analysis.summary);
+  expect((await adapter.read<Job>(`jobs/${current.generationId}.json`))?.status).toBe('failed');
+});
 it('stages a validated note once despite duplicate delivery', async () => {
   const store = new MemoryStore(); await discover(store, snapshot, 'v1');
   const key = (await store.list('jobs/'))[0]; const job = (await store.read<Job>(key))!;

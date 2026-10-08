@@ -17,6 +17,7 @@ export const chatToolSchemas = {
 export type ChatToolName = keyof typeof chatToolSchemas;
 export interface ChatTools {
   execute(name: ChatToolName, input: unknown): Promise<{ content: unknown; image?: string }>;
+  sourceAvailable?(id: string): Promise<boolean>;
   remember?(result: NonNullable<ChatJob['result']>, jobId: string): Promise<void>;
   /** Loads the reader's own uploaded images as data URLs. */
   images?(ids: string[]): Promise<string[]>;
@@ -130,7 +131,7 @@ export async function discuss(job: ChatJob, conversation: ChatConversation | und
   for (const turn of history) {
     await tools.remember?.(turn.result, turn.jobId);
     messages.push({ role: 'user', content: await userContent(turn.question, replay.get(turn.jobId)) }, { role: 'assistant', content: turn.modelAnswer || JSON.stringify(turn.result) });
-    for (const cite of turn.result.citations) if (!tools.evidence.some(item => item.id === cite.evidenceId)) tools.evidence.push({ id: cite.evidenceId, sourceId: cite.sourceId, generationId: cite.generationId, title: cite.title, kind: cite.kind, locator: cite.locator, text: [cite.excerpt, cite.quote].filter(Boolean).join('\n'), sourceUrl: cite.sourceUrl, pdf: cite.pdf, assetId: cite.assetId || undefined });
+    for (const cite of turn.result.citations) if ((!tools.sourceAvailable || await tools.sourceAvailable(cite.sourceId)) && !tools.evidence.some(item => item.id === cite.evidenceId)) tools.evidence.push({ id: cite.evidenceId, sourceId: cite.sourceId, generationId: cite.generationId, title: cite.title, kind: cite.kind, locator: cite.locator, text: [cite.excerpt, cite.quote].filter(Boolean).join('\n'), sourceUrl: cite.sourceUrl, pdf: cite.pdf, assetId: cite.assetId || undefined });
   }
   if (!conversation) for (const turn of job.request.history) messages.push({ role: turn.role, content: turn.content });
   messages.push({ role: 'user', content: await userContent(job.request.question, job.request.images) });

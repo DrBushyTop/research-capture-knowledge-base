@@ -1,4 +1,5 @@
 import { canonical, hash, processingVersion, type Note, type SourceSnapshot } from '../../../shared/corpus.js';
+import { sourceLifecycle } from './source-lifecycle.js';
 import type { CategoryAssignment, Registry, Template } from '../../../shared/categories.js';
 
 export interface PipelineStore {
@@ -9,9 +10,11 @@ export interface PipelineStore {
   list(prefix: string): Promise<string[]>;
   withLease<T>(key: string, fn: () => Promise<T>): Promise<T>;
   publishNote?(note: Note): Promise<void>;
+  withSourceAccess?<T>(ids: string[], fn: () => Promise<T>): Promise<T>;
+  retainedSource?(id: string): Promise<{ note: Note; humanMarkdown: string } | undefined>;
 }
 export interface CategoryPlan { registry: Registry; assignment?: CategoryAssignment; template?: Template; batchId?: string; preserveExisting?: boolean; }
-export interface Job { id: string; source: SourceSnapshot['source']; snapshotKey: string; status: 'pending' | 'staged' | 'imported' | 'failed'; attempts: number; dispatches?: number; observedAt: string; lastQueuedAt?: string; error?: string; retryAt?: string; categoryPlan?: CategoryPlan; }
+export interface Job { id: string; lifecycleRevision?: number; source: SourceSnapshot['source']; snapshotKey: string; status: 'pending' | 'staged' | 'imported' | 'failed'; attempts: number; dispatches?: number; observedAt: string; lastQueuedAt?: string; error?: string; retryAt?: string; categoryPlan?: CategoryPlan; }
 export interface SourceState { generationId: string; source: SourceSnapshot['source']; processingVersion?: string; }
 type Send = (id: string) => Promise<void>;
 export interface BatchGeneration { sourceId: string; expected: string; jobId: string; categoryPlan: CategoryPlan; }
@@ -21,20 +24,23 @@ const stateKey = (id: string) => `sources/${id}.json`;
 const assignmentKey = (id: string) => `categories/assignments/${id}.json`;
 const cancelledError = 'Update cancelled. The existing note is still available.';
 
-// Every source transition uses the same lease as processing and publication.
+// Generation changes share the processing lease. Lifecycle decisions fence those writes independently.
 // Records precede the current generation. Recovery never adopts orphan records.
 export class SourceGenerations {
   constructor(private readonly store: PipelineStore) {}
 
   async observe(snapshot: SourceSnapshot, version: string, registry?: Registry) {
+    if ((await sourceLifecycle(this.store, snapshot.source.id)).state !== 'active') return;
     const observed = await this.store.read<SourceState>(stateKey(snapshot.source.id));
     if (observed?.source.fingerprint === snapshot.source.fingerprint && observed.processingVersion === version) return;
     return this.store.withLease(`source-${snapshot.source.id}`, async () => {
+      if ((await sourceLifecycle(this.store, snapshot.source.id)).state !== 'active') return;
       const current = await this.store.read<SourceState>(stateKey(snapshot.source.id));
       if (current?.source.fingerprint === snapshot.source.fingerprint && current.processingVersion === version) return;
       const assignment = registry ? await this.store.read<CategoryAssignment>(assignmentKey(snapshot.source.id)) : undefined;
       const manual = assignment?.method === 'manual' ? assignment : undefined;
-      const id = hash(`${snapshot.source.id}:${snapshot.source.fingerprint}:${version}:${registry ? canonical({ registry, manual }) : 'legacy'}`);
+      const revision = (await sourceLifecycle(this.store, snapshot.source.id)).revision;
+      const id = hash(`${snapshot.source.id}:${snapshot.source.fingerprint}:${version}:${registry ? canonical({ registry, manual }) : 'legacy'}${revision ? ':lifecycle:' + revision : ''}`);
       await this.advance(snapshot, id, version, registry ? { registry, ...(manual ? { assignment: manual } : {}) } : undefined);
       return id;
     });
@@ -43,6 +49,7 @@ export class SourceGenerations {
   async reprocess(source: string, registry: Registry, version: string, send: Send) {
     return this.store.withLease(`source-${source}`, async () => {
       const current = await this.store.read<SourceState>(stateKey(source));
+      if ((await sourceLifecycle(this.store, source)).state !== 'active') throw new Error('Source is in Trash or deleted');
       if (!current?.source.active) throw new Error('Unknown or inactive source');
       const snapshot = await this.store.read<SourceSnapshot>(`snapshots/${current.generationId}.json`);
       if (!snapshot) throw new Error('Missing source snapshot');
@@ -57,6 +64,7 @@ export class SourceGenerations {
   async dispatchBatch(entry: BatchGeneration, send: Send, now = new Date()): Promise<boolean> {
     return this.store.withLease(`source-${entry.sourceId}`, async () => {
       const current = await this.store.read<SourceState>(stateKey(entry.sourceId));
+      if ((await sourceLifecycle(this.store, entry.sourceId)).state !== 'active') return false;
       if (!current?.source.active || ![entry.expected, entry.jobId].includes(current.generationId)) return false;
       if (current.generationId !== entry.jobId) {
         const snapshot = await this.store.read<SourceSnapshot>(`snapshots/${entry.expected}.json`);
@@ -83,7 +91,7 @@ export class SourceGenerations {
       const job = await this.store.read<Job>(key);
       if (!job || job.status !== 'pending') continue;
       const current = await this.store.read<SourceState>(stateKey(job.source.id));
-      if (current?.generationId !== job.id) continue;
+      if (current?.generationId !== job.id || (await sourceLifecycle(this.store, job.source.id)).state !== 'active') continue;
       if (!this.due(job, now) && !await this.cancelled(job)) continue;
       await this.store.withLease(`source-${job.source.id}`, () => this.handoff(job.id, send, now));
     }
@@ -95,7 +103,7 @@ export class SourceGenerations {
     return this.store.withLease(`source-${found.source.id}`, async () => {
       const job = await this.store.read<Job>(jobKey(id));
       const current = await this.store.read<SourceState>(stateKey(found.source.id));
-      if (!job || current?.generationId !== id) return;
+      if (!job || current?.generationId !== id || (await sourceLifecycle(this.store, found.source.id)).state !== 'active') return;
       if (action === 'cancel' && job.status === 'pending') {
         await this.store.write(jobKey(id), { ...job, status: 'failed', error: cancelledError });
       } else if (action === 'retry' && job.status === 'failed') {
@@ -110,7 +118,8 @@ export class SourceGenerations {
   async canProcess(job: Job): Promise<boolean> {
     this.store.leaseSignal?.throwIfAborted();
     const current = await this.store.read<SourceState>(stateKey(job.source.id));
-    if (current?.generationId !== job.id) return false;
+    const lifecycle = await sourceLifecycle(this.store, job.source.id);
+    if (current?.generationId !== job.id || lifecycle.state !== 'active' || (job.lifecycleRevision || 0) !== lifecycle.revision) return false;
     if (await this.cancelled(job)) {
       await this.store.write(jobKey(job.id), { ...job, status: 'failed', error: cancelledError });
       return false;
@@ -125,7 +134,7 @@ export class SourceGenerations {
   private async create(snapshot: SourceSnapshot, id: string, categoryPlan?: CategoryPlan) {
     const snapshotKey = `snapshots/${id}.json`;
     await this.store.create(snapshotKey, snapshot);
-    await this.store.create(jobKey(id), { id, source: snapshot.source, snapshotKey, status: 'pending', attempts: 0, observedAt: new Date().toISOString(), ...(categoryPlan ? { categoryPlan } : {}) } satisfies Job);
+    await this.store.create(jobKey(id), { id, lifecycleRevision: (await sourceLifecycle(this.store, snapshot.source.id)).revision, source: snapshot.source, snapshotKey, status: 'pending', attempts: 0, observedAt: new Date().toISOString(), ...(categoryPlan ? { categoryPlan } : {}) } satisfies Job);
   }
   private async advance(snapshot: SourceSnapshot, id: string, version: string, categoryPlan?: CategoryPlan) {
     await this.create(snapshot, id, categoryPlan);

@@ -81,6 +81,14 @@ async function mount(url: string) {
 }
 const click = async (element: Element | null | undefined) => { expect(element).toBeTruthy(); await act(async () => { element!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })); }); await settle(); };
 const button = (text: string, scope: ParentNode = document) => [...scope.querySelectorAll('button')].find(item => item.textContent?.trim() === text);
+async function waitFor(assertion: () => void) {
+  const deadline = Date.now() + 1000;
+  for (;;) {
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)); });
+    try { assertion(); return; }
+    catch (error) { if (Date.now() >= deadline) throw error; }
+  }
+}
 
 it('refreshes the library when another admin restores a source', async () => {
   states = { [alpha]: life(alpha, 'trashed', 1) };
@@ -117,6 +125,11 @@ it('moves an active source to Trash, shows it read-only, and Undo restores the s
 });
 
 it('lists Trash from the menu, restores, and deletes permanently after a confirmation that names the source', async () => {
+  const fetch = globalThis.fetch;
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input).includes('trash=1')) await new Promise(resolve => setTimeout(resolve, 50));
+    return fetch(input, init);
+  }));
   states[alpha] = life(alpha, 'trashed', 1);
   states[beta] = life(beta, 'trashed', 1);
   localStorage.setItem(`reader-note-draft:${beta}`, 'unsaved');
@@ -125,10 +138,10 @@ it('lists Trash from the menu, restores, and deletes permanently after a confirm
   await click([...document.querySelectorAll('.masthead-menu a')].find(link => link.textContent === 'Trash'));
   expect(router.state.location.pathname).toBe('/trash/');
   const rows = () => [...host.querySelectorAll('.trash-row')];
-  expect(rows().map(row => row.querySelector('.trash-title')?.textContent)).toEqual(['Alpha', 'Beta']);
+  await waitFor(() => expect(rows().map(row => row.querySelector('.trash-title')?.textContent)).toEqual(['Alpha', 'Beta']));
   await click(button('Restore', rows()[0]));
   expect(posts[0].body).toEqual({ action: 'restore', revision: 1 });
-  expect(rows().map(row => row.querySelector('.trash-title')?.textContent)).toEqual(['Beta']);
+  await waitFor(() => expect(rows().map(row => row.querySelector('.trash-title')?.textContent)).toEqual(['Beta']));
 
   await click(button('Delete permanently', rows()[0]));
   const dialog = document.querySelector('[role=alertdialog]')!;
@@ -137,10 +150,12 @@ it('lists Trash from the menu, restores, and deletes permanently after a confirm
   expect(document.activeElement?.textContent).toBe('Keep in Trash');
   await click(button('Delete permanently', dialog));
   expect(posts[1].body).toEqual({ action: 'purge', revision: 1 });
-  expect(document.querySelector('[role=alertdialog]')).toBeNull();
-  expect(localStorage.getItem(`reader-note-draft:${beta}`)).toBeNull();
-  expect(rows()[0].textContent).toContain('Deleting permanently');
-  expect(button('Restore', rows()[0])).toBeUndefined();
+  await waitFor(() => {
+    expect(document.querySelector('[role=alertdialog]')).toBeNull();
+    expect(localStorage.getItem(`reader-note-draft:${beta}`)).toBeNull();
+    expect(rows()[0].textContent).toContain('Deleting permanently');
+    expect(button('Restore', rows()[0])).toBeUndefined();
+  });
 });
 
 it('shows a cleanup failure with Retry cleanup, and a stale change refreshes to the real state', async () => {

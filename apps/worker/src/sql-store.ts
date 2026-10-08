@@ -7,6 +7,7 @@ import { hash, noteSchema, privatePublication, type Note } from '../../../shared
 import { chatSnapshotRevision, type ChatCorpus } from '../../../shared/chat.js';
 import { buildSearchIndex } from '../../../shared/search.js';
 import { matchedSourceText } from '../../../shared/source-text.js';
+import { DocumentTexts } from './document-text.js';
 
 type Frame = { key: string; owner: string; controller: AbortController; revisions: Map<string, string | undefined>; parent?: Frame };
 const snapshots = new Map<string, { signature: string; promise: Promise<{ revision: string; sources: ChatCorpus['sources'] }> }>();
@@ -152,14 +153,24 @@ export class SqlStore extends BlobStore {
     return row ? { note: noteSchema.parse(JSON.parse(row.note_json)), humanMarkdown: row.human_markdown } : undefined;
   }
   async sourceInputs() {
-    const result = await (await this.request()).query(`SELECT s.source_id,t.document AS source_text,n.document AS reader_note
+    const result = await (await this.request()).query(`SELECT s.source_id,s.generation_id,s.note_json,t.document AS source_text,n.document AS reader_note
       FROM dbo.Sources s
       LEFT JOIN dbo.Records t ON t.record_key=(N'source-text/'+s.generation_id+N'.json') COLLATE Latin1_General_100_BIN2
       LEFT JOIN dbo.Records n ON n.record_key=N'reader-notes/'+s.source_id+N'.json'
-      WHERE s.active=1;`);
-    return new Map<string, { text?: unknown; readerNote?: { markdown: string } }>(result.recordset.map(row => [
-      row.source_id, { text: row.source_text ? JSON.parse(row.source_text) : undefined, readerNote: row.reader_note ? JSON.parse(row.reader_note) : undefined }
-    ]));
+      WHERE s.active=1;
+      SELECT r.record_key,r.document FROM dbo.Records r
+      INNER JOIN dbo.Sources s ON s.active=1 AND r.record_key LIKE (N'document-text/'+s.generation_id+N'/%') COLLATE Latin1_General_100_BIN2
+      WHERE r.kind=N'document-text';`);
+    const [sourceRows, documentRows] = result.recordsets as sql.IRecordSet<Record<string, string>>[];
+    const records = new Map<string, unknown>(documentRows.map(row => [row.record_key, JSON.parse(row.document)]));
+    const documents = new DocumentTexts({ read: async <T>(key: string) => records.get(key) as T | undefined });
+    const inputs = new Map<string, { generationId: string; text?: unknown; fullText?: string; readerNote?: { markdown: string } }>();
+    for (const row of sourceRows) {
+      const note = noteSchema.parse(JSON.parse(row.note_json));
+      inputs.set(row.source_id, { generationId: row.generation_id, text: row.source_text ? JSON.parse(row.source_text) : undefined,
+        fullText: await documents.readAll(note), readerNote: row.reader_note ? JSON.parse(row.reader_note) : undefined });
+    }
+    return inputs;
   }
   async expireTemporaryRecords() {
     // Conversations, templates and reader notes are durable. Only transient chat records expire.
@@ -173,7 +184,7 @@ export class SqlStore extends BlobStore {
   }
   private async snapshot() {
     const signatureRows = await (await this.request()).query(`SELECT source_id,generation_id,revision FROM dbo.Sources WHERE active=1 ORDER BY source_id;
-      SELECT record_key,revision FROM dbo.Records WHERE kind IN (N'source-text',N'reader-notes') ORDER BY record_key;`);
+      SELECT record_key,revision FROM dbo.Records WHERE kind IN (N'source-text',N'document-text',N'reader-notes') ORDER BY record_key;`);
     const signature = hash(JSON.stringify(signatureRows.recordsets));
     const key = `${process.env.SQL_SERVER}/${process.env.SQL_DATABASE}/${process.env.SQL_CONNECTION_STRING ? 'local' : 'entra'}`;
     const previous = snapshots.get(key);
@@ -189,11 +200,12 @@ export class SqlStore extends BlobStore {
     const documents = sources.map(({ note, humanMarkdown }) => {
       const input = inputs.get(note.source.id);
       const text = input?.text;
+      if (input?.fullText !== undefined && input.generationId !== note.generationId) throw new Error('Full search text does not match the published generation');
       return { id: note.source.id, title: note.source.title, authors: note.source.authors.join(' '),
         type: note.source.itemType, category: note.schemaVersion === 2 ? note.category.id : '',
         year: note.source.publishedAt?.match(/\b(?:19|20)\d{2}\b/)?.[0] || 'Unknown',
         topics: (note.analysis?.topics || note.source.tags).join('\n'),
-        body: `${JSON.stringify(note.analysis)}\n${humanMarkdown}\n${input?.readerNote?.markdown || ''}\n${text ? matchedSourceText(note, text) : ''}` };
+        body: `${JSON.stringify(note.analysis)}\n${humanMarkdown}\n${input?.readerNote?.markdown || ''}\n${input?.fullText || ''}\n${text ? matchedSourceText(note, text) : ''}` };
     });
     const index = JSON.parse(JSON.stringify(buildSearchIndex(documents)));
     const revision = chatSnapshotRevision(hash('sql'), sources, index);

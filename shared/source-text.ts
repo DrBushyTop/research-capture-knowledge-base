@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import { legacyNoteSchema, sourceId, type Note } from './corpus.js';
+import { canonical, legacyNoteSchema, sourceId, type Note } from './corpus.js';
+export const sourceTextLimit = 180_000;
 export const sourceTextSchema = z.strictObject({ sourceId, generationId: z.string().regex(/^[a-f0-9]{64}$/),
-  artifactHash: z.string().regex(/^[a-f0-9]{64}$/).nullable(), text: z.string().max(60_000),
+  artifactHash: z.string().regex(/^[a-f0-9]{64}$/).nullable(), text: z.string().max(sourceTextLimit),
   extraction: legacyNoteSchema.shape.extraction.optional() })
   .refine(value => !value.extraction || value.extraction.artifactHash === value.artifactHash, 'Text extraction does not match its artifact');
 export function sourceText(note: Pick<Note, 'source' | 'generationId' | 'extraction'>, text: string) {
@@ -10,5 +11,6 @@ export function sourceText(note: Pick<Note, 'source' | 'generationId' | 'extract
 export function matchedSourceText(note: Pick<Note, 'source' | 'generationId' | 'extraction'>, input: unknown) {
   const value = sourceTextSchema.parse(input);
   if (value.sourceId !== note.source.id || value.generationId !== note.generationId || value.artifactHash !== note.extraction.artifactHash) throw new Error('Search text does not match published source');
+  if (canonical(value.extraction?.artifacts) !== canonical(note.extraction.artifacts)) throw new Error('Search text does not match the published attachment set');
   return value.text;
 }

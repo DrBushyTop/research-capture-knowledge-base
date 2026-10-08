@@ -6,7 +6,7 @@ param captureEnabled bool = true
 param modelCapacity int = 1000
 param vaultName string = 'kv-research-dev-16681c6a'
 param bootstrapPrincipalId string
-param processingVersion string = '3'
+param processingVersion string = '4'
 param readerGithubUsers string = 'pinaatti,DrBushyTop'
 param readerCustomDomain string = ''
 param sqlServer string = 'sql-research-dev-16681c6a.database.windows.net'

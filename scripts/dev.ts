@@ -25,8 +25,14 @@ const api = createServer(async (request, response) => {
     let result: unknown;
     if (url.searchParams.has('library')) result = await readLibrary(store);
     else if (url.searchParams.has('notes')) result = body ? await saveReaderNote(store, owner, body) : await readReaderNote(store, url.searchParams.get('notes')!);
-    else if (url.searchParams.has('source')) result = await readSourceText(store, url.searchParams.get('source')!);
-    else if (url.searchParams.has('document')) { const file = await readSourceDocument(store, url.searchParams.get('document')!); response.setHeader('Content-Type', file.mime); response.end(file.bytes); return; }
+    else if (url.searchParams.has('source')) {
+      const offset = url.searchParams.get('offset');
+      const attachmentKey = url.searchParams.get('attachment');
+      if (offset !== null && !/^\d{1,10}$/.test(offset)) throw new Error('Invalid original text position');
+      if (attachmentKey !== null && !/^[A-Z0-9]{8}$/.test(attachmentKey)) throw new Error('Invalid original attachment');
+      result = await readSourceText(store, url.searchParams.get('source')!, { ...(offset !== null ? { offset: Number(offset) } : {}), ...(attachmentKey ? { attachmentKey } : {}) });
+    }
+    else if (url.searchParams.has('document')) { const file = await readSourceDocument(store, url.searchParams.get('document')!, url.searchParams.get('attachment')); response.setHeader('Content-Type', file.mime); response.setHeader('Content-Disposition', `${file.disposition}; filename="${file.filename}"`); response.end(file.bytes); return; }
     else if (url.pathname === '/api/categories') {
       result = !body ? url.searchParams.has('preview') ? await getPreview(store, owner, url.searchParams.get('preview')!) : await categoryOverview(store)
         : body.action === 'save' ? { registry: await saveCategory(store, body.registryRevision, body.template) }

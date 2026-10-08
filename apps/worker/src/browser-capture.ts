@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const browserCaptureVersion = 'browser-1';
-export const captureLimits = { views: 20, actions: 40, milliseconds: 180_000, text: 60_000 };
+export const captureLimits = { views: 20, actions: 40, milliseconds: 360_000, text: 180_000 };
 export interface BrowserControl { id: string; label: string; kind: 'link' | 'button'; href?: string }
 export interface BrowserView { url: string; title: string; text: string; controls: BrowserControl[]; screenshot?: string; capturedAt?: string; blockedRequests: number }
 export interface BrowserCaptureSession {

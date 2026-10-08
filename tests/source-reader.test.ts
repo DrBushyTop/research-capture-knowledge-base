@@ -45,7 +45,7 @@ it('does not serve HTML originals or content mislabeled as a PDF', async () => {
 });
 it('bounds downloads before reading large raw files', async () => {
   const { files, note, properties, download } = await saved();
-  properties.mockResolvedValueOnce({ contentLength: 21 * 1024 * 1024, etag: 'large' });
+  properties.mockResolvedValueOnce({ contentLength: 41 * 1024 * 1024, etag: 'large' });
   await expect(readSourceDocument(files, note.source.id)).rejects.toMatchObject({ status: 413 });
   expect(download).not.toHaveBeenCalled();
 });
@@ -57,7 +57,8 @@ it('reads one current SQL source without building or loading the chat retrieval 
   const store = { source, read: state.read.bind(state) };
   expect((await readSourceText(store, note.source.id)).text).toBe('Original saved text.');
   expect(source).toHaveBeenCalledExactlyOnceWith(note.source.id);
-  expect(read).toHaveBeenCalledExactlyOnceWith(`source-text/${note.generationId}.json`);
+  expect(read).toHaveBeenCalledWith(`source-text/${note.generationId}.json`);
+  expect(read.mock.calls.some(([key]) => key.startsWith('chat/'))).toBe(false);
 });
 
 it('rejects inactive or unknown SQL sources without falling back to a stale chat snapshot', async () => {

@@ -3,7 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { SqlStore } from '../apps/worker/src/sql-store.js';
 import { sqlPool, closeSql } from '../apps/worker/src/sql-connection.js';
 import { readerSessionResponse, readReaderSession } from '../apps/worker/src/reader-session.js';
-import { hash } from '../shared/corpus.js';
+import { hash, normalize, type Note } from '../shared/corpus.js';
+import { sourceText } from '../shared/source-text.js';
+import { DocumentTexts } from '../apps/worker/src/document-text.js';
+import { readLibrary } from '../apps/worker/src/library.js';
+import { snapshot } from './fixtures.js';
 
 afterAll(closeSql);
 it.skipIf(!process.env.TEST_SQL)('SQL records support immutable creates, conditional writes, prefix listing and lease fencing', async () => {
@@ -31,6 +35,31 @@ it.skipIf(!process.env.TEST_SQL)('SQL records support immutable creates, conditi
     expect(await first.read(key)).toEqual({ value: 5 });
   } finally {
     await (await sqlPool()).request().input('key', key).query('DELETE dbo.Records WHERE record_key=@key');
+  }
+}, 60000);
+
+it.skipIf(!process.env.TEST_SQL)('SQL full-text joins retain late searchable evidence with database and record-key collations', async () => {
+  const store = new SqlStore('devstoreaccount1');
+  const generation = hash(randomUUID());
+  const saved = structuredClone(snapshot);
+  saved.items[0].key = generation.slice(0, 8).toUpperCase();
+  saved.items[1].data.parentItem = saved.items[0].key;
+  const source = normalize(saved)[0].source;
+  const note: Note = { schemaVersion: 1, generationId: generation, source,
+    extraction: { status: 'text', method: 'text', artifactHash: hash(generation + ':original'), artifactMime: 'text/plain', retrievedAt: new Date().toISOString(), reason: null, truncated: true },
+    analysis: null, processing: { version: '4', model: null, processedAt: new Date().toISOString() }, rightsEvidence: [] };
+  try {
+    await store.create(`source-text/${generation}.json`, sourceText(note, 'Bounded analysis preview.'));
+    await new DocumentTexts(store).retain(note, [{ hash: note.extraction.artifactHash!, mime: 'text/plain', complete: true,
+      sections: [{ locator: 'Saved text document', text: 'Early observations. '.repeat(12_000) + 'Late SQL full-text evidence.' }] }]);
+    await store.withLease('sql-fulltext-' + generation, () => store.publishNote(note));
+    expect((await store.sourceInputs()).get(source.id)?.fullText).toContain('Late SQL full-text evidence.');
+    expect((await readLibrary(store)).find(entry => entry.note.source.id === source.id)?.searchText).toContain('Late SQL full-text evidence.');
+  } finally {
+    const request = (await sqlPool()).request().input('source', source.id).input('generation', generation);
+    await request.query(`DELETE dbo.Sources WHERE source_id=@source;
+      DELETE dbo.Records WHERE record_key=CONCAT(N'source-text/',@generation,N'.json')
+        OR record_key LIKE CONCAT(N'document-text/',@generation,N'/%');`);
   }
 }, 60000);
 

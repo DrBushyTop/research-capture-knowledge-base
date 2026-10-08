@@ -29,7 +29,7 @@ try {
   }
   await mkdir('.local/search-source-text', { recursive: true });
   for (const { note } of await store.sources()) {
-    if (note.extraction.method !== 'pdf-text' || !note.extraction.artifactHash) continue;
+    if (note.extraction.method !== 'pdf-text' || !note.extraction.artifactHash || note.extraction.artifacts) continue;
     let bytes = localPdfs.get(note.extraction.artifactHash);
     if (!bytes) {
       try { bytes = await store.raw.getBlockBlobClient(note.extraction.artifactHash).downloadToBuffer(); }

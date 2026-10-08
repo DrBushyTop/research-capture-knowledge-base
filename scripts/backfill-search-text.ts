@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { readCorpus } from '../shared/reader.js';
-import { sourceText } from '../shared/source-text.js';
+import { matchedSourceText, sourceText } from '../shared/source-text.js';
 import type { SourceSnapshot } from '../shared/corpus.js';
 import { BlobStore } from '../apps/worker/src/storage.js';
 import { extractArtifact } from '../apps/worker/src/extraction.js';
@@ -13,6 +13,14 @@ let indexed = 0;
 for (const { note } of await readCorpus('content/research', 'private')) {
   if (!note.extraction.artifactHash) continue;
   await store.withLease(`search-text-${note.generationId}`, async () => {
+    const existing = await store.read(`source-text/${note.generationId}.json`);
+    if (existing !== undefined) {
+      const text = matchedSourceText(note, existing);
+      await writeFile(`.local/search-source-text/${note.generationId}.json`, JSON.stringify(existing));
+      if (text) indexed++;
+      return;
+    }
+    if (note.extraction.artifacts) throw new Error('Pinned attachment-set text is missing. Reprocess this source rather than backfill only its primary original.');
     const job = await store.read<Job>(`jobs/${note.generationId}.json`);
     const snapshot = job && await store.read<SourceSnapshot>(job.snapshotKey);
     const cached = await new SourceArtifacts(store).readForNote(note);

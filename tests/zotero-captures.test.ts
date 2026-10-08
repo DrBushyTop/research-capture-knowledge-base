@@ -118,7 +118,7 @@ it('passes an attachment note alongside retained image bytes', async () => {
   expect(result.evidence.method).toBe('image-vision');
 });
 
-it.each(['audio/mpeg', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/zip'])(
+it.each(['audio/mpeg', 'application/zip'])(
   'retains unsupported %s files for review',
   async (mime) => {
     const source = normalize(structuredClone(snapshot))[0];

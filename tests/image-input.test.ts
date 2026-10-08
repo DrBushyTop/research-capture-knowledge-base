@@ -19,5 +19,6 @@ it('rejects MIME spoofing, SVG, empty images and bounded oversized evidence', ()
   expect(() => sourceImage(Buffer.alloc(sourceImageLimits.bytes + 1), 'image/png')).toThrow('5 MB');
   const giant = Buffer.from(png); giant.writeUInt32BE(10000, 16);
   expect(() => sourceImage(giant, 'image/png')).toThrow('dimensions');
-  expect(() => inferenceContent({}, [sourceImage(png, 'image/png'), sourceImage(png, 'image/png')])).toThrow('one source image');
+  expect(inferenceContent({}, Array.from({ length: 4 }, () => sourceImage(png, 'image/png')))).toHaveLength(5);
+  expect(() => inferenceContent({}, Array.from({ length: 5 }, () => sourceImage(png, 'image/png')))).toThrow('at most 4');
 });

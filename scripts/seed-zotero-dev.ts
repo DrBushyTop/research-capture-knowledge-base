@@ -6,6 +6,8 @@ import { SecretClient } from '@azure/keyvault-secrets';
 import { Zotero } from '../apps/worker/src/zotero.js';
 import { downloadAttachment } from '../apps/worker/src/extraction.js';
 import { layoutPdf, pdfFixture } from '../tests/pdf-fixture.js';
+import { docxFixture } from '../tests/docx-fixture.js';
+import { chartPng } from '../tests/png-fixture.js';
 
 const apply = process.argv.includes('--apply');
 const marker = 'ingestion-matrix-dev-v1';
@@ -42,7 +44,7 @@ async function request(path: string, init: RequestInit) {
       ...init.headers,
     },
     redirect: 'manual',
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(60_000),
   });
   if (!response.ok) {
     await response.body?.cancel();
@@ -143,10 +145,11 @@ function file(
   files.set(itemKey, { bytes, filename, mime });
   return itemKey;
 }
-const imageItem = before.items.find(
+const imageItem = before.items.find((item) => item.key === keyFor('standalone-image') && item.data.md5) || before.items.find(
   (i) =>
     i.data.contentType === 'image/png' &&
     i.data.md5 &&
+    !(i.data.tags as { tag: string }[] | undefined)?.some((tag) => tag.tag === marker) &&
     ['imported_file', 'imported_url'].includes(String(i.data.linkMode)),
 );
 if (!imageItem) throw new Error('Expected existing dev PNG to reuse');
@@ -277,6 +280,48 @@ const scan = root('blank-pdf-with-image', 'report');
 file(scan, 'blank-pdf', pdfFixture(['']), 'application/pdf', 'blank.pdf');
 file(scan, 'scan-fallback', image, 'image/png', 'fallback.png');
 root('metadata-only', 'report');
+
+const docxMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+file(undefined, 'standalone-docx', docxFixture(), docxMime, 'observations.docx');
+const word = root('docx-with-note', 'report');
+file(word, 'word-document', docxFixture(), docxMime, 'field-notes.docx');
+note(word, 'word-commentary', 'These invented visits are a parser test. Check the Afternoon table row before comparing observations.');
+
+const secondPdf = pdfFixture([
+  'BT /F2 20 Tf 50 740 Td (Supplementary field observations) Tj ET\nBT /F1 12 Tf 50 690 Td (Afternoon observations recorded eighteen synthetic bee visits.) Tj ET\nBT /F1 12 Tf 50 672 Td (These invented observations test combining both document attachments.) Tj ET',
+]);
+const multiple = root('multiple-documents', 'report');
+file(multiple, 'multiple-main-pdf', layoutPdf(), 'application/pdf', 'main.pdf');
+file(multiple, 'multiple-supplement-pdf', secondPdf, 'application/pdf', 'supplement.pdf');
+
+const carousel = root('image-carousel', 'artwork');
+file(carousel, 'carousel-first', chartPng(), 'image/png', 'first-chart.png', {
+  note: '<p>This synthetic chart has a green bar for twelve visits and an orange bar for eighteen visits. These are invented counts.</p>',
+});
+file(carousel, 'carousel-second', chartPng(18, 12), 'image/png', 'second-chart.png', {
+  note: '<p>The second synthetic chart reverses the two invented counts. Compare both retained pictures.</p>',
+});
+
+const mixed = root('mixed-attachments', 'report');
+file(mixed, 'mixed-pdf', layoutPdf(), 'application/pdf', 'main.pdf');
+file(mixed, 'mixed-docx', docxFixture(), docxMime, 'observations.docx');
+file(mixed, 'mixed-chart', chartPng(), 'image/png', 'visits.png');
+note(mixed, 'mixed-commentary', 'The PDF, Word table and chart are separate synthetic evidence. No research finding should be inferred.');
+
+const partial = root('partially-synced-attachments', 'report');
+file(partial, 'partial-pdf', layoutPdf(), 'application/pdf', 'available.pdf');
+items.push({
+  key: keyFor('partial-image'), itemType: 'attachment', parentItem: partial,
+  linkMode: 'imported_file', title: 'Sibling picture not uploaded yet',
+  contentType: 'image/png', filename: 'pending-image.png', tags: [], relations: {},
+});
+file(undefined, 'long-docx', docxFixture({ title: 'Synthetic long Word document', paragraphs: [
+  'These invented field observations test preserving long document text for later retrieval. '.repeat(3000),
+  'Late Word evidence survives beyond the analysis preview. This statement is a synthetic retention check, not a research finding.',
+] }), docxMime, 'long-observations.docx');
+file(undefined, 'long-pdf', pdfFixture(Array.from({ length: 451 }, (_, index) =>
+  `BT /F1 12 Tf 50 700 Td (Page ${index + 1}: Synthetic observations distinguish retained text from the analysis preview.) Tj ET\nBT /F1 12 Tf 50 680 Td (${index === 450 ? 'Late PDF evidence survives on page 451.' : 'These invented measurements are only pipeline fixtures.'}) Tj ET`)),
+  'application/pdf', 'long-observations.pdf');
 const missing = items.filter((i) => !before.items.some((existing) => existing.key === i.key));
 for (const existing of before.items.filter((i) => items.some((d) => d.key === i.key))) {
   let ancestor = existing;
@@ -360,7 +405,7 @@ for (const [itemKey, f] of files) {
       method: 'POST',
       headers: { 'Content-Type': upload.contentType },
       body: Buffer.concat([Buffer.from(upload.prefix), f.bytes, Buffer.from(upload.suffix)]),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(60_000),
     });
     if (!response.ok) {
       await response.body?.cancel();

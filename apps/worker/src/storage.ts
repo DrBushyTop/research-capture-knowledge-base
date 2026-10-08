@@ -6,7 +6,7 @@ import type { PipelineStore } from './pipeline.js';
 import type { SourceArtifactStore } from './source-artifacts.js';
 
 const missing = (error: unknown) => (error as { statusCode?: number }).statusCode === 404;
-const maxArtifactBytes = 20 * 1024 * 1024;
+const maxArtifactBytes = 40 * 1024 * 1024;
 type LeaseFrame = { renew: () => Promise<void>; controller: AbortController; etags: Map<string, string | undefined>; parent?: LeaseFrame };
 export class BlobStore implements PipelineStore, SourceArtifactStore {
   readonly container: ContainerClient;

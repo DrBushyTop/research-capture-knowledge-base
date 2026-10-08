@@ -8,7 +8,7 @@ import type { SourceImage } from './image-input.js';
 
 export interface Processor {
   version: string; model: string;
-  extract(snapshot: SourceSnapshot): Promise<Extracted>;
+  extract(snapshot: SourceSnapshot, generationId?: string): Promise<Extracted>;
   enrich(text: string, signal?: AbortSignal, images?: SourceImage[]): Promise<Analysis>;
   classify?(source: SourceSnapshot['source'], text: string, registry: Registry, signal?: AbortSignal, images?: SourceImage[]): Promise<{ categoryId: string; reason: string }>;
   analyzeTemplate?(text: string, template: Template, signal?: AbortSignal, source?: Note['source'], images?: SourceImage[]): Promise<TemplateAnalysis>;
@@ -31,7 +31,7 @@ export async function processJob(store: PipelineStore, id: string, processor: Pr
     let note = await store.read<Note>(`analysis/${id}.json`);
     if (!note) {
       let extracted: Extracted;
-      try { extracted = await processor.extract(snapshot); }
+      try { extracted = await processor.extract(snapshot, id); }
       catch (error) {
         store.leaseSignal?.throwIfAborted();
         if (error instanceof MissingArtifact && job.attempts < 4) {

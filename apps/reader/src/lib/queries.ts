@@ -1,4 +1,4 @@
-import { queryOptions } from '@tanstack/react-query';
+import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import type { Note } from '../../../../shared/corpus';
 import type { ReaderNote } from '../../../../shared/reader-notes';
 import type { Registry, TemplateAnalysis } from '../../../../shared/categories';
@@ -14,6 +14,7 @@ export type CategorySource = { id: string; title: string; category: { id: string
 export type Batch = { id: string; createdAt: string; cancelled: boolean; entries: { sourceId: string; status: string; error?: string }[] };
 export type Overview = { registry: Registry; sources: CategorySource[]; batches: Batch[] };
 export type Preview = { status: 'pending' | 'complete' | 'failed'; result?: TemplateAnalysis; error?: string };
+export type OriginalTextPage = { text?: string; nextOffset?: number | null; complete?: boolean; reason?: string; artifact?: { mime: string; key?: string; title?: string }; sections?: { text: string; locator: string; page?: number; offset: number }[]; captureCommentary?: { text: string; truncated: boolean; description?: string; descriptionTruncated?: boolean } };
 
 const chat = '/api/chat';
 const id = encodeURIComponent;
@@ -39,6 +40,14 @@ export const libraryQuery = queryOptions({
 export const sourceTextQuery = (sourceId: string) => queryOptions({
   queryKey: keys.sourceText(sourceId),
   queryFn: ({ signal }) => getJson<{ text?: string }>(`${chat}?source=${id(sourceId)}`, signal, 'Original text could not be loaded.'),
+  staleTime: Infinity
+});
+
+export const sourceDocumentQuery = (sourceId: string, attachmentKey?: string) => infiniteQueryOptions({
+  queryKey: [...keys.sourceText(sourceId), attachmentKey || 'all', 'document'],
+  initialPageParam: 0,
+  queryFn: ({ signal, pageParam }) => getJson<OriginalTextPage>(`${chat}?source=${id(sourceId)}${attachmentKey ? '&attachment=' + id(attachmentKey) : ''}${pageParam ? '&offset=' + pageParam : ''}`, signal, 'Original text could not be loaded.'),
+  getNextPageParam: page => page.nextOffset ?? undefined,
   staleTime: Infinity
 });
 

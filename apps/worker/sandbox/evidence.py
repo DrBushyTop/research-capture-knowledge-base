@@ -23,18 +23,18 @@ class SourceHTML(HTMLParser):
         if any(tag in self.stack for tag in ['script', 'style', 'head', 'nav', 'header', 'footer', 'aside']):
             return
         data = data.strip()
-        if self.body_size < 60000:
+        if self.body_size < 180000:
             self.body.append(data); self.body_size += len(data)
-        if any(tag in self.stack for tag in ['main', 'article']) and self.main_size < 60000:
+        if any(tag in self.stack for tag in ['main', 'article']) and self.main_size < 180000:
             self.main.append(data); self.main_size += len(data)
 
 root = Path('/workspace/data').resolve()
 request = json.loads(Path('/workspace/request.json').read_text())
 results = []
-remaining = 240000
-for item in request['sources'][:4]:
+remaining = 720000
+for item in request['sources'][:32]:
     source = (root / item['path']).resolve()
-    if root not in source.parents or source.is_symlink() or source.stat().st_size > 20 * 1024 * 1024:
+    if root not in source.parents or source.is_symlink() or source.stat().st_size > 40 * 1024 * 1024:
         raise ValueError('Source path or size rejected')
     data = source.read_bytes()
     if hashlib.sha256(data).hexdigest() != item['hash']:
@@ -46,21 +46,29 @@ for item in request['sources'][:4]:
         with pymupdf.open(stream=data, filetype='pdf') as document:
             page_count = document.page_count
             text_page = item.get('textPage')
-            if text_page is not None and (type(text_page) is not int or not 1 <= text_page <= min(document.page_count, 200)):
+            if text_page is not None and (type(text_page) is not int or not 1 <= text_page <= min(document.page_count, 400)):
                 raise ValueError('PDF page unavailable')
-            indices = [text_page - 1] if text_page else range(min(document.page_count, 200))
+            text_pages = item.get('textPages')
+            if text_pages is not None:
+                start, end = text_pages.get('start'), text_pages.get('end')
+                if type(start) is not int or type(end) is not int or not 1 <= start <= end <= 400 or end - start >= 20 or start > document.page_count:
+                    raise ValueError('PDF page range unavailable')
+                indices = range(start - 1, min(end, document.page_count))
+            else:
+                indices = [text_page - 1] if text_page else range(min(document.page_count, 400))
             words = re.findall(r'\w{3,}', str(item.get('query', ''))[:500].lower())
             for number in indices:
-                if words and not text_page and not any(word in document[number].get_text('text').lower() for word in words):
+                if words and not text_page and not text_pages and not any(word in document[number].get_text('text').lower() for word in words):
                     continue
-                text = document[number].get_text('text')[:min(60000, remaining)]
-                pages.append({'locator': 'PDF page ' + str(number + 1), 'text': text})
+                original_text = document[number].get_text('text')
+                text = original_text[:min(180000, remaining)]
+                pages.append({'locator': 'PDF page ' + str(number + 1), 'page': number + 1, 'text': text, 'truncated': len(text) < len(original_text)})
                 remaining -= len(text)
-                if remaining <= 0 or len(pages) >= 8 or sum(len(p['text']) for p in pages) >= 60000:
+                if remaining <= 0 or (not text_pages and len(pages) >= 8) or sum(len(p['text']) for p in pages) >= 180000:
                     break
             if item.get('visualPage'):
                 number = item['visualPage']
-                if not isinstance(number, int) or not 1 <= number <= min(document.page_count, 200):
+                if not isinstance(number, int) or not 1 <= number <= min(document.page_count, 400):
                     raise ValueError('PDF page unavailable')
                 page = document[number - 1]
                 scale = min(1.5, 1800 / max(page.rect.width, page.rect.height))
@@ -81,9 +89,9 @@ for item in request['sources'][:4]:
         if 'html' in mime:
             parser = SourceHTML(); parser.feed(text)
             text = '\n'.join(parser.main or parser.body)
-        text = text[:min(60000, remaining)]
+        text = text[:min(180000, remaining)]
         pages.append({'locator': 'Stored HTML text' if 'html' in mime else 'Stored ' + mime, 'text': text})
         remaining -= len(text)
-    results.append({'sourceId': item['sourceId'], 'hash': item['hash'], 'pageCount': page_count, 'pages': pages})
+    results.append({'sourceId': item['sourceId'], 'hash': item['hash'], 'attachmentKey': item.get('attachmentKey'), 'pageCount': page_count, 'pages': pages})
 Path('/workspace/evidence.json').write_text(json.dumps(results))
 print(json.dumps({'processedSources': len(results)}))

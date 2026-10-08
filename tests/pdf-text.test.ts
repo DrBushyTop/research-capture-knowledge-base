@@ -7,14 +7,14 @@ it('reports incomplete coverage when a PDF exceeds the page limit', async () => 
     `BT /F1 12 Tf 50 400 Td (Page ${i + 1}: Synthetic evidence describes observations and methods in a native PDF text layer.) Tj ET`);
   const result = await pdfText(pdfFixture(pages));
   expect(result.truncated).toBe(true);
-  expect(result.text).toContain('<!-- PDF page 200 -->');
-  expect(result.text).not.toContain('<!-- PDF page 201 -->');
+  expect(result.text).toContain('<!-- PDF page 400 -->');
+  expect(result.text).not.toContain('<!-- PDF page 401 -->');
 });
 
 it('caps retained Markdown at the source text limit and marks it truncated', async () => {
   const dense = Array.from({ length: 45 }, (_, i) =>
     `BT /F1 10 Tf 50 ${750 - i * 15} Td (Line ${i}: ${'synthetic evidence '.repeat(6)}) Tj ET`).join('\n');
-  const result = await pdfText(pdfFixture(Array(15).fill(dense)));
+  const result = await pdfText(pdfFixture(Array(45).fill(dense)));
   expect(result.text.length).toBeLessThanOrEqual(sourceTextLimit);
   expect(result.text.length).toBeGreaterThan(sourceTextLimit - 10);
   expect(result.truncated).toBe(true);

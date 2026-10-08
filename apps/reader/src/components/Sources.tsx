@@ -251,7 +251,7 @@ function Reading({ entry: { note, humanHtml }, next }: { entry: Entry; next?: En
         {s.format === 'text' ? <p>{s.text}</p> : s.format === 'steps' ? <ol>{s.items.map((item, i) => <li key={i}>{item}</li>)}</ol> : <ul>{s.items.map((item, i) => <li key={i}>{item}</li>)}</ul>}</section>)}
       <section id="human" className="human-section"><h2>Notes <span className="origin-tag is-human">Human</span></h2>
         {humanHtml && <div className="human-prose" dangerouslySetInnerHTML={{ __html: humanHtml }} />}<ReaderNotes sourceId={source.id} /></section>
-      <section id="original" className="original-section"><h2>Original text <span className="origin-tag is-source">Source</span></h2><OriginalText sourceId={source.id} artifactMime={note.extraction.artifactMime} sourceUrl={source.url} /></section>
+      <section id="original" className="original-section"><h2>Original text <span className="origin-tag is-source">Source</span></h2><OriginalText key={note.generationId} sourceId={source.id} artifactMime={note.extraction.artifactMime} artifacts={note.extraction.artifacts} sourceUrl={source.url} /></section>
       <section id="source" className="details-section"><h2>Details</h2><dl className="facts">
         <div><dt>Captured</dt><dd>{longDate(source.capturedAt)}</dd></div><div><dt>Source type</dt><dd>{sourceTypeLabel(source.itemType)}</dd></div>
         <div><dt>Text</dt><dd>{note.extraction.method}</dd></div><div><dt>Analysis prepared</dt><dd>{longDate(note.processing.processedAt)}</dd></div>

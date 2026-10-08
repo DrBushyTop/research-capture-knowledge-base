@@ -62,19 +62,19 @@ describe('source artifact replay', () => {
     expect(offline.request).not.toHaveBeenCalled();
   });
 
-  it('prefers readable text over a screenshot and keeps that preference on replay', async () => {
+  it('combines readable text and a screenshot and keeps both on replay', async () => {
     const source = sourceWithFallback();
     source.children.reverse();
     source.children[1].data.contentType = 'text/plain';
     const store = new MemorySourceArtifactStore();
-    const request = vi.fn(async (path: string) => { expect(path).toBe('items/AAAAAA11/file'); return new Response(readableText); });
+    const request = vi.fn(async (path: string) => new Response(path === 'items/AAAAAA11/file' ? readableText : screenshot));
     const first = await new SourceArtifacts(store).extract(source, { request });
     const replay = await new SourceArtifacts(store).extract(source, offline);
-    expect(first.text).toBe(readableText);
-    expect(first.images).toBeUndefined();
+    expect(first.text).toContain(readableText);
+    expect(first.images).toEqual([{ bytes: screenshot, mime: 'image/png' }]);
     expect(replay).toEqual(first);
-    expect(request).toHaveBeenCalledTimes(1);
-    expect(store.files.has(hash(screenshot))).toBe(false);
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(store.files.has(hash(screenshot))).toBe(true);
   });
 
   it('reads existing single-artifact records without replacing them or their bytes', async () => {
@@ -277,9 +277,12 @@ describe('source artifact replay', () => {
     const waiting = new Promise<void>(resolve => { release = resolve; });
     let started!: () => void;
     const fetching = new Promise<void>(resolve => { started = resolve; });
-    const later = new SourceArtifacts(store).extract(source, { request: async () => { started(); await waiting; return new Response(readableText + ' Later response.'); } });
+    const later = new SourceArtifacts(store).extract(source, { request: async path => {
+      if (path.includes('BBBBBB11')) return new Response(screenshot);
+      started(); await waiting; return new Response(readableText + ' Later response.');
+    } });
     await fetching;
-    const winner = await new SourceArtifacts(store).extract(source, { request: async () => new Response(readableText) });
+    const winner = await new SourceArtifacts(store).extract(source, { request: async path => new Response(path.includes('BBBBBB11') ? screenshot : readableText) });
     release();
     expect(await later).toEqual(winner);
     expect(await new SourceArtifacts(store).extract(source, offline)).toEqual(winner);
@@ -302,7 +305,7 @@ it('bounds Blob reads before download and rejects an ETag change', async () => {
   const store = blobArtifactStore();
   const download = vi.fn(async () => Buffer.from(readableText));
   vi.spyOn(store.raw, 'getBlockBlobClient').mockReturnValue({
-    getProperties: async () => ({ contentLength: 21 * 1024 * 1024, contentType: 'text/plain', etag: 'original' }),
+    getProperties: async () => ({ contentLength: 41 * 1024 * 1024, contentType: 'text/plain', etag: 'original' }),
     downloadToBuffer: download
   } as never);
   await expect(store.readArtifact(hash(readableText))).rejects.toThrow('byte limit');

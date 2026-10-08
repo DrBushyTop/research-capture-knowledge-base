@@ -1,14 +1,14 @@
 import { expect, it } from 'vitest';
 import { MemoryStore, snapshot } from './fixtures.js';
-import { normalize, noteSchema } from '../shared/corpus.js';
-import { evidenceChunk, validateAnswer, type ChatJob } from '../shared/chat.js';
+import { hash, normalize, noteSchema } from '../shared/corpus.js';
+import { evidenceChunk, validateAnswer, type ChatAsset, type ChatJob } from '../shared/chat.js';
 import { readChatFile } from '../apps/worker/src/chat-files.js';
 import type { BlobStore } from '../apps/worker/src/storage.js';
 const id = '1'.repeat(32); const revision = '2'.repeat(64);
 it('serves the cited original generation and refuses another reader or uncited source', async () => {
   const state = new MemoryStore(); const keys: string[] = [];
   const raw = { getBlockBlobClient: (key: string) => { keys.push(key); return { getProperties: async () => ({ contentLength: 4, etag: 'version' }), downloadToBuffer: async () => Buffer.from('file') }; } };
-  const generationId = 'a'.repeat(64); const artifactHash = 'b'.repeat(64);
+  const generationId = 'a'.repeat(64); const artifactHash = hash('file');
   const source = normalize(snapshot)[0].source;
   const note = noteSchema.parse({ schemaVersion: 1, generationId, source, extraction: { status: 'text', method: 'pdf-text', reason: null, truncated: false, retrievedAt: new Date().toISOString(), artifactHash }, analysis: null, processing: { version: '2', model: null, processedAt: new Date().toISOString() }, rightsEvidence: [] });
   const cite = evidenceChunk({ sourceId: source.id, generationId, title: source.title, kind: 'source', locator: 'PDF page 2', text: 'Saved original text', sourceUrl: 'https://example.org/original', pdf: true });
@@ -34,4 +34,23 @@ it('serves cited image evidence even when it is not an answer attachment', async
   const store = Object.assign(state, { container: { getBlockBlobClient: () => ({ getProperties: async () => ({ contentLength: 3, etag: 'version' }), downloadToBuffer: async () => Buffer.from('png') }) } }) as unknown as BlobStore;
   expect((await readChatFile(store, 'owner', id, asset, null)).mime).toBe('image/png');
   await expect(readChatFile(store, 'other', id, asset, null)).rejects.toMatchObject({ status: 404 });
+});
+
+it('serves a selected original carousel image without requiring a citation', async () => {
+  const state = new MemoryStore();
+  const bytes = Buffer.from('second retained image');
+  const source = normalize(snapshot)[0].source;
+  const artifactHash = hash(bytes);
+  const note = noteSchema.parse({ schemaVersion: 1, generationId: 'a'.repeat(64), source,
+    extraction: { status: 'image', method: 'combined', reason: null, truncated: false, retrievedAt: new Date().toISOString(), artifactHash: hash('first image'), artifactMime: 'image/png',
+      artifacts: [hash('first image'), artifactHash].map((hash, index) => ({ hash, key: `IMAGE00${index + 1}`, mime: 'image/png', retrievedAt: new Date().toISOString(), status: 'image', method: 'image-vision', analyzed: true, reason: null, truncated: false })) },
+    analysis: null, processing: { version: '4', model: null, processedAt: new Date().toISOString() }, rightsEvidence: [] });
+  const asset: ChatAsset = { id: 'a_' + 'c'.repeat(16), sourceId: source.id, kind: 'image', mime: 'image/png', title: 'Second carousel image', page: null, artifactHash, attachmentKey: 'IMAGE002' };
+  const result = validateAnswer({ answer: 'Here is the second saved chart.', insufficientEvidence: false, citations: [], attachments: [asset.id] }, [], [asset]);
+  await state.create(`chat/jobs/${id}.json`, { id, owner: 'owner', createdAt: new Date().toISOString(), status: 'complete', corpusRevision: revision, result });
+  await state.create(`chat/corpora/${revision}.json`, { revision, sources: [{ note, humanMarkdown: '' }] });
+  await state.create(`chat/assets/${id}/${asset.id}.json`, asset);
+  const store = Object.assign(state, { raw: { getBlockBlobClient: () => ({ getProperties: async () => ({ contentLength: bytes.length, etag: 'version' }), downloadToBuffer: async () => bytes }) } }) as unknown as BlobStore;
+  expect(await readChatFile(store, 'owner', id, asset.id, null)).toMatchObject({ bytes, mime: 'image/png', filename: `${source.id}-IMAGE002.png` });
+  await expect(readChatFile(store, 'other', id, asset.id, null)).rejects.toMatchObject({ status: 404 });
 });

@@ -7,7 +7,7 @@ export const uploadId = z.string().regex(/^u_[a-f0-9]{32}$/);
 // Screenshots per message. Each upload is also capped by chatUploadLimits on the server.
 export const chatRequestSchema = z.strictObject({ question: z.string().trim().max(8000), conversationId: z.string().regex(/^[a-f0-9]{32}$/).optional(), sourceId: sourceId.optional(),
   history: z.array(z.strictObject({ role: z.enum(['user', 'assistant']), content: z.string().max(3000) })).max(6).default([]),
-  visual: z.strictObject({ sourceId, page: z.number().int().min(1).max(200).default(1) }).optional(),
+  visual: z.strictObject({ sourceId, page: z.number().int().min(1).max(400).default(1), attachmentKey: z.string().regex(/^[A-Z0-9]{8}$/).optional() }).optional(),
   images: z.array(uploadId).max(maxMessageImages).default([]) })
   .refine(request => request.question.length > 0 || request.images.length > 0, 'Write a message or attach an image')
   .refine(request => new Set(request.images).size === request.images.length, 'Duplicate image');
@@ -16,8 +16,8 @@ export type ChatRequest = Omit<z.infer<typeof chatRequestSchema>, 'images'> & { 
 export const chatCorpusSchema = z.strictObject({ revision: z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/), sources: z.array(z.strictObject({ note: noteSchema, humanMarkdown: z.string().max(100_000) })).max(10_000) });
 export type ChatCorpus = z.infer<typeof chatCorpusSchema>;
 export const chatSnapshotRevision = (gitRevision: string, sources: ChatCorpus['sources'], index: unknown) => hash(JSON.stringify({ gitRevision, sources, index }));
-export interface Evidence { id: string; sourceId: string; generationId: string; title: string; label?: string; kind: 'source' | 'machine' | 'human' | 'metadata' | 'visual'; locator: string; text: string; sourceUrl?: string | null; pdf?: boolean; assetId?: string; }
-export interface ChatAsset { id: string; sourceId: string; title: string; kind: 'image' | 'pdf' | 'site'; mime: string; page: number | null; blobKey?: string; artifactHash?: string; sourceUrl?: string; originJobId?: string; }
+export interface Evidence { id: string; sourceId: string; generationId: string; title: string; label?: string; kind: 'source' | 'machine' | 'human' | 'metadata' | 'visual'; locator: string; text: string; sourceUrl?: string | null; pdf?: boolean; assetId?: string; attachmentKey?: string; }
+export interface ChatAsset { id: string; sourceId: string; title: string; kind: 'image' | 'pdf' | 'site'; mime: string; page: number | null; blobKey?: string; artifactHash?: string; sourceUrl?: string; originJobId?: string; attachmentKey?: string; }
 /**
  * One real step of an answer. Tool steps are upserted by id when they start and again with their outcome.
  * `commentary` is a short update the model wrote for the reader before a tool call, never its hidden reasoning.
@@ -65,7 +65,7 @@ export function validateAnswer(input: unknown, evidence: Evidence[], assets: Cha
   const citations = answer.citations.map(cite => {
     const chunk = evidence.find(item => item.id === cite.evidenceId);
     if (!chunk || (cite.quote && !normalize(chunk.text).includes(normalize(cite.quote)))) throw new Error('Unsupported citation');
-    return { ...cite, sourceId: chunk.sourceId, generationId: chunk.generationId, title: chunk.title, label: chunk.label || citationLabel({ title: chunk.title, authors: [], url: chunk.sourceUrl || null }), kind: chunk.kind, locator: chunk.locator, excerpt: chunk.text.slice(0, 1400), sourceUrl: chunk.sourceUrl || null, pdf: chunk.pdf || false, assetId: chunk.assetId || null };
+    return { ...cite, sourceId: chunk.sourceId, generationId: chunk.generationId, title: chunk.title, label: chunk.label || citationLabel({ title: chunk.title, authors: [], url: chunk.sourceUrl || null }), kind: chunk.kind, locator: chunk.locator, excerpt: chunk.text.slice(0, 1400), sourceUrl: chunk.sourceUrl || null, pdf: chunk.pdf || false, assetId: chunk.assetId || null, ...(chunk.attachmentKey ? { attachmentKey: chunk.attachmentKey } : {}) };
   });
   for (const match of answer.answer.matchAll(/\[(e_[a-f0-9]{16})\]/g)) if (!citations.some(citation => citation.evidenceId === match[1])) throw new Error('Unsupported inline citation');
   const attachments = answer.attachments.map(id => {

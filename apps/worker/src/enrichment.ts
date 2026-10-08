@@ -24,7 +24,7 @@ export async function infer(input: unknown, instructions: string, schema: z.ZodT
   const credential = new DefaultAzureCredential();
   const token = await credential.getToken('https://cognitiveservices.azure.com/.default');
   const response = await fetch(`${endpoint.replace(/\/$/, '')}/openai/v1/chat/completions`, {
-    method: 'POST', headers: { Authorization: `Bearer ${token?.token}`, 'Content-Type': 'application/json' }, signal: AbortSignal.any([AbortSignal.timeout(180_000), ...(signal ? [signal] : [])]),
+    method: 'POST', headers: { Authorization: `Bearer ${token?.token}`, 'Content-Type': 'application/json' }, signal: AbortSignal.any([AbortSignal.timeout(360_000), ...(signal ? [signal] : [])]),
     body: JSON.stringify({ model: deployment, max_completion_tokens: 16000, reasoning_effort: 'medium',
       prompt_cache_key: promptCacheKey(session ? 'browser' : 'analysis', [instructions, format], session?.key),
       prompt_cache_options: cachePolicy, messages: history, response_format: format
@@ -53,7 +53,7 @@ export async function enrich(text: string, endpoint: string, deployment: string,
 }
 export async function classifySource(source: { title: string; url: string | null; itemType: string; tags: string[] }, text: string, registry: Registry, endpoint: string, deployment: string, signal?: AbortSignal, images?: SourceImage[]) {
   const categories = registry.categories.filter(category => !category.archived);
-  const result = classificationSchema.parse(await infer({ source, excerpt: text.slice(0, 8000) },
+  const result = classificationSchema.parse(await infer({ source, excerpt: text.slice(0, 16_000) },
     `${sourceInstructions} Choose one category from these definitions: ${JSON.stringify(categories.map(({ id, name, description }) => ({ id, name, description })))}. File format and Zotero item type are hints, not content categories. If the available facts are insufficient, choose other. Give a short reason.`, classificationSchema, endpoint, deployment, signal, images));
   if (!categories.some(category => category.id === result.categoryId)) throw new Error('Unknown category returned');
   return result;

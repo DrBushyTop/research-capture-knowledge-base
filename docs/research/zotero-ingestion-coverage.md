@@ -90,7 +90,7 @@ Use current object versions for each deletion, handle `412` by rereading and ree
 
 Do not promise selective cloud-byte removal while leaving the same stored attachment on every Zotero device. That operation was not established by the documented file API. The issue should resolve whether attachment-item deletion is acceptable before implementing cleanup.
 
-## Verified dev results
+## Initial dev verification, processing version 3
 
 The initial dev library contained 29 items at library version 37, representing 24 root sources, four PDF attachments and one PNG attachment. It had no notes, annotations, standalone files, saved HTML snapshots or child HTTP links. The cloud dev database, `research`, and local dev database, `research_dev`, both contained 24 source notes. Their historical extraction results differed.
 
@@ -134,3 +134,30 @@ The pipeline tries at most eight stored attachments in PDF, text, image and othe
 Processing version is now `3` in the shared default and infrastructure default so a deployment can rerun older captures with the new extraction rules. Existing cloud app settings can override that default.
 
 Reproduce with `npx tsx scripts/seed-zotero-dev.ts --apply`, then `npx tsx scripts/validate-zotero-dev.ts --process --restore-dev-artifacts`. The seed uses only the dev write secret. Processing refuses a non-dev SQL database. Results and verbose logs stay in ignored `.local/` files.
+
+## Multiple attachments, DOCX and full-document access
+
+Processing version `4` adds deterministic ingestion of up to eight stored attachments totaling 80 MiB, with a 40 MiB per-file limit. Readable PDFs, DOCX and supported text files share the analysis preview. Up to four checked images reach vision analysis in attachment order. Missing, unsupported, oversized or unreadable siblings receive explicit limitations. A valid sibling can still publish useful evidence. Each retained attachment keeps its key, hash, MIME, retrieval time and extraction result. Replay uses the same generation's attachment set rather than changing its evidence when another file later syncs.
+
+LiteParse supports DOCX by converting it with LibreOffice. We do not provision LibreOffice in the worker, so this change uses Mammoth for native DOCX structure after bounded ZIP validation. Headings, paragraphs, lists, tables, footnotes, readable headers and footers, and Word comments reach extracted text. Embedded images, charts and objects stay in the retained original and receive an omission reason. Old Word formats remain unsupported. [LiteParse Node documentation](https://github.com/run-llama/liteparse/blob/ab8879623ee45a0b7a775d12b42a9a7ae9dab16b/packages/node/README.md), [DOCX extractor](../../apps/worker/src/docx-text.ts).
+
+The goal is to extract and retain the full readable text for ordinary files. The initial model analysis has a separate 180,000-character preview, triple the original limit, and takes at most the first 400 PDF pages. That preview does not cap reader access, search or chat. The original file remains private and retained. Full text belongs to the exact generation and file hash, with chunk hashes and page or document locators. The reader loads successive windows. Chat can find text anywhere in the retained files, choose an attachment, read ordered PDF page ranges and continue with a returned offset.
+
+PDF full extraction attempts 2000 pages and 40 MiB of text, with OCR disabled and a hard 120-second process deadline. These are extraction safeguards, separate from the analysis preview. Any reached guard, missing text layer or partial parse remains visible through full-text completeness and its reason. DOCX ZIP validation allows 80 MiB total expanded content, 16 MiB per XML file and 2000 entries. Downloads have a 60-second deadline, inference requests have a six-minute deadline, and Functions has a 20-minute timeout. Image limits remain 5 MiB, 8192 pixels per side and 40 million pixels.
+
+The dev library now contains 77 items and 48 roots at library version 115. Eight new matrix roots add the cases below. The seed's repeat preview reports zero new items and never overwrites existing file bytes.
+
+| New case | Root key | Expected coverage |
+| --- | --- | --- |
+| Standalone DOCX | `HBREQGAC` | Heading, paragraphs and table text, retained DOCX |
+| DOCX with saved note | `PACKR38W` | Document text plus separately labeled human commentary |
+| Multiple documents | `K22QBI7U` | Both PDFs in analysis and independently readable full text |
+| Image carousel | `SNRRHHX3` | Both checked images in vision input |
+| Mixed attachments | `N74R2JFP` | PDF, DOCX and image evidence with file-specific links |
+| Partially synced attachments | `WX839Q4I` | Readable PDF with explicit unavailable-image limitation |
+| Long DOCX | `STFXS37B` | Final evidence retained beyond the 180,000-character preview |
+| Long PDF | `NB9Q7PSK` | Page 451 retained and readable beyond the 400-page preview |
+
+At 2026-10-08T05:16:36.373Z, all 28 cases passed extraction and real processing using dev Zotero, local Azurite, Azure SQL `research_dev` and the `research-sol` model. Twenty-seven sources published, twenty-four generated analysis, and the unsynced-only capture remained pending with a retry. Retained-file replay passed with Zotero unavailable. The published long DOCX and page 451 of the long PDF passed reader access, full-text indexing and chat retrieval checks. A repeat run reused all completed generation IDs and made zero model calls. The first indexing check exposed a SQL collation mismatch; the corrected join also passed a dedicated test against the actual dev SQL database.
+
+Remaining extraction work includes scanned-PDF and image OCR, compressed HTML snapshots, EPUB, spreadsheets, presentations, audio/video transcription, additional image formats and charset-aware text decoding. DOCX embedded visual content is not interpreted. Local linked files still require a synced copy because the cloud API cannot retrieve a desktop path. Old Word formats are deliberately excluded from the current work.

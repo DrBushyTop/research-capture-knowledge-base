@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { categoryId, templateAnalysisSchema } from './categories.js';
 
-export const processingVersion = '3';
+export const processingVersion = '4';
 export const httpUrl = z.url().refine(value => {
   try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password; }
   catch { return false; }
@@ -32,12 +32,21 @@ export const licenseEvidenceSchema = z.strictObject({
   origin: z.enum(['crossref', 'human']), licenseUrl: httpUrl, appliesTo: z.enum(['metadata', 'artifact']),
   artifactHash: z.string().regex(/^[a-f0-9]{64}$/).nullable(), checkedAt: z.string()
 });
+const extractionMethod = z.enum(['pdf-text', 'docx-text', 'html', 'browser', 'text', 'image-vision', 'combined', 'zotero-metadata', 'none']);
+export const extractionArtifactSchema = z.strictObject({
+  hash: z.string().regex(/^[a-f0-9]{64}$/), mime: z.string().min(1).max(100), retrievedAt: z.string(),
+  key: z.string().regex(/^[A-Z0-9]{8}$/).optional(), title: z.string().max(2000).optional(),
+  status: z.enum(['text', 'image', 'metadata-only', 'needs-review']), method: extractionMethod,
+  analyzed: z.boolean(), reason: z.string().max(1000).nullable(), truncated: z.boolean()
+});
+export type ExtractionArtifact = z.infer<typeof extractionArtifactSchema>;
 export const legacyNoteSchema = z.strictObject({
   schemaVersion: z.literal(1), generationId: z.string().regex(/^[a-f0-9]{64}$/), source: sourceSchema,
   extraction: z.strictObject({
-    status: z.enum(['text', 'image', 'metadata-only', 'needs-review']), method: z.enum(['pdf-text', 'html', 'browser', 'text', 'image-vision', 'zotero-metadata', 'none']),
+    status: z.enum(['text', 'image', 'metadata-only', 'needs-review']), method: extractionMethod,
     reason: z.string().max(1000).nullable(), truncated: z.boolean(), retrievedAt: z.string(),
-    artifactHash: z.string().regex(/^[a-f0-9]{64}$/).nullable(), artifactMime: z.string().max(100).optional()
+    artifactHash: z.string().regex(/^[a-f0-9]{64}$/).nullable(), artifactMime: z.string().max(100).optional(),
+    artifacts: z.array(extractionArtifactSchema).max(8).optional()
   }),
   analysis: analysisSchema.nullable(),
   processing: z.strictObject({ version: z.string(), model: z.string().nullable(), processedAt: z.string() }),
@@ -50,6 +59,13 @@ export const categoryNoteSchema = legacyNoteSchema.extend({
 });
 export const noteSchema = z.union([legacyNoteSchema, categoryNoteSchema]);
 export type Note = z.infer<typeof noteSchema>;
+/** Older notes name one original. New notes retain each attachment and whether analysis used it. */
+export function noteArtifacts(note: Pick<Note, 'extraction'>): ExtractionArtifact[] {
+  if (note.extraction.artifacts) return note.extraction.artifacts;
+  const { artifactHash, artifactMime, retrievedAt, status, method, reason, truncated } = note.extraction;
+  return artifactHash ? [{ hash: artifactHash, mime: artifactMime || (method === 'pdf-text' ? 'application/pdf' : ''),
+    retrievedAt, status, method, reason, truncated, analyzed: status === 'text' || status === 'image' }] : [];
+}
 export function analysisSections(note: Note) {
   const a = note.analysis;
   if (!a) return [];

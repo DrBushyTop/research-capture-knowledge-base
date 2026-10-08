@@ -7,7 +7,7 @@ export class Zotero {
   async request(path: string, headers: Record<string, string> = {}): Promise<Response> {
     for (let attempt = 0; attempt < 3; attempt++) {
       const response = await fetch(`https://api.zotero.org/${this.libraryType}/${this.accountId}/${path}`, {
-        headers: { 'Zotero-API-Key': this.apiKey, 'Zotero-API-Version': '3', ...headers }, redirect: 'manual', signal: AbortSignal.timeout(30_000)
+        headers: { 'Zotero-API-Key': this.apiKey, 'Zotero-API-Version': '3', ...headers }, redirect: 'manual', signal: AbortSignal.timeout(60_000)
       });
       if ([429, 503].includes(response.status)) {
         await response.body?.cancel();

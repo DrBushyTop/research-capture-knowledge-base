@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { canonical, hash } from '../../../shared/corpus.js';
+import { canonical, hash, noteArtifacts } from '../../../shared/corpus.js';
 import { chatCorpusSchema, chatRequestSchema, validateAnswer, type ChatJob, type ChatCorpus, type Evidence, type ChatConversation, type ChatActivity, type ChatAsset, type ChatSourceContext } from '../../../shared/chat.js';
 import { withReaderNotes } from './reader-notes.js';
 import type { PipelineStore } from './pipeline.js';
@@ -51,8 +51,9 @@ export async function submitChat(store: PipelineStore, owner: string, input: unk
     }
     if (parsed.data.visual) {
       const note = corpus.sources.find(source => source.note.source.id === parsed.data.visual!.sourceId)!.note;
-      if (!note.extraction.artifactHash || !(note.extraction.method === 'pdf-text' || note.extraction.artifactMime?.startsWith('image/'))) throw new ChatAccessError(400, 'Choose a retained PDF or image for visual evidence');
-      if (note.extraction.artifactMime?.startsWith('image/') && parsed.data.visual.page !== 1) throw new ChatAccessError(400, 'Images have only page 1');
+      const original = noteArtifacts(note).find(artifact => parsed.data.visual!.attachmentKey ? artifact.key === parsed.data.visual!.attachmentKey : artifact.hash === note.extraction.artifactHash);
+      if (!original || !(original.mime === 'application/pdf' || original.mime.startsWith('image/'))) throw new ChatAccessError(400, 'Choose a retained PDF or image for visual evidence');
+      if (original.mime.startsWith('image/') && parsed.data.visual.page !== 1) throw new ChatAccessError(400, 'Images have only page 1');
     }
     const conversationId = parsed.data.conversationId || randomBytes(16).toString('hex');
     if (parsed.data.conversationId) await getConversation(store, owner, conversationId);

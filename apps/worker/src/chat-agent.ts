@@ -6,10 +6,13 @@ import { answerSchema, validateAnswer, type ChatActivity, type ChatAsset, type C
 import { sourceId } from '../../../shared/corpus.js';
 import { streamedDraft } from '../../../shared/chat-stream.js';
 
+export const pdfPageRangeSchema = z.strictObject({ start: z.number().int().min(1).max(2000), end: z.number().int().min(1).max(2000) })
+  .refine(range => range.end >= range.start && range.end - range.start < 20, 'Read an ordered range of at most 20 pages');
 export const chatToolSchemas = {
   search_corpus: z.strictObject({ query: z.string().max(500), offset: z.number().int().min(0).max(10000), limit: z.number().int().min(1).max(20) }),
-  read_source: z.strictObject({ sourceId, section: z.enum(['source', 'analysis', 'notes', 'metadata']), query: z.string().max(500), page: z.number().int().min(1).max(200).nullable() }),
-  inspect_media: z.strictObject({ sourceId, page: z.number().int().min(1).max(200) })
+  read_source: z.strictObject({ sourceId, section: z.enum(['source', 'analysis', 'notes', 'metadata']), query: z.string().max(500), page: z.number().int().min(1).max(2000).nullable(), pages: pdfPageRangeSchema.nullable().optional(), attachmentKey: z.string().regex(/^[A-Z0-9]{8}$/).nullable().optional(), offset: z.number().int().min(0).max(40 * 1024 * 1024).nullable().optional() })
+    .refine(input => !input.pages || !input.page, 'Choose either a page or a page range'),
+  inspect_media: z.strictObject({ sourceId, page: z.number().int().min(1).max(400), attachmentKey: z.string().regex(/^[A-Z0-9]{8}$/).nullable().optional() })
 };
 export type ChatToolName = keyof typeof chatToolSchemas;
 export interface ChatTools {
@@ -32,10 +35,15 @@ export interface ModelRequestOptions { cacheScope?: string; toolsExhausted?: boo
 export type ModelRound = (messages: ModelMessage[], tools: unknown[], signal?: AbortSignal, onText?: (text: string) => Promise<void>, options?: ModelRequestOptions) => Promise<{ content?: string | null; tool_calls?: ToolCall[]; responseItems?: ResponseItem[] }>;
 const descriptions: Record<ChatToolName, string> = {
   search_corpus: 'Search all stored document text, metadata, generated analysis and human notes. Empty query lists sources. Use short keywords and paginate results.',
-  read_source: 'Read a saved original document, generated analysis, human notes or metadata. For original PDFs, query finds matching pages; page selects any specific page. Returned passages have evidence IDs. Returns available files and site links.',
-  inspect_media: 'View a saved PDF page or image, including charts and scanned text. Image files use page 1. Returns an image for you to inspect, a visual evidence ID and an attachment ID that can be included in the answer.'
+  read_source: 'Read a saved original document, generated analysis, human notes or metadata. For original PDFs, page selects one page; pages selects an ordered range of at most 20 pages. Retained text may include pages beyond the first analysis. Use attachmentKey from available documents or assets to choose one file in a capture. With no page range or offset, query finds a matching context window anywhere in the retained files. Use an empty query to read from the beginning. Results report actual returned pages and text coverage. Continue with the same attachment and page range using coverage.nextOffset as offset. Returned passages have evidence IDs. Returns available files and site links.',
+  inspect_media: 'View a saved PDF page or image, including charts and scanned text. Image files use page 1. Use attachmentKey from available assets to choose one file in a capture. Returns an image for you to inspect, a visual evidence ID and an attachment ID that can be included in the answer.'
 };
-const definitions = Object.entries(chatToolSchemas).map(([name, schema]) => ({ type: 'function', function: { name, description: descriptions[name as ChatToolName], strict: true, parameters: inferenceSchema(schema) } }));
+export const definitions = Object.entries(chatToolSchemas).map(([name, schema]) => {
+  const parameters = inferenceSchema(schema) as { properties: Record<string, unknown>; required: string[] };
+  // OpenAI strict tools require every property. New nullable fields stay optional for historical calls.
+  parameters.required = Object.keys(parameters.properties);
+  return { type: 'function', function: { name, description: descriptions[name as ChatToolName], strict: true, parameters } };
+});
 
 export function responseInput(messages: ModelMessage[]) {
   return messages.flatMap<unknown>(message => {
@@ -75,7 +83,7 @@ export const modelRound: ModelRound = async (messages, tools, signal, onText, op
   });
   const token = await new DefaultAzureCredential().getToken('https://cognitiveservices.azure.com/.default');
   const response = await fetch(`${endpoint.replace(/\/$/, '')}/openai/v1/responses`, {
-    method: 'POST', signal: AbortSignal.any([AbortSignal.timeout(180_000), ...(signal ? [signal] : [])]),
+    method: 'POST', signal: AbortSignal.any([AbortSignal.timeout(360_000), ...(signal ? [signal] : [])]),
     headers: { Authorization: `Bearer ${token?.token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ model, stream: true, reasoning: { effort: 'medium' }, max_output_tokens: 6000, input, prompt_cache_key: cacheKey, prompt_cache_options: cachePolicy, store: false, include: ['reasoning.encrypted_content'],
       ...(tools.length ? { tools: tools.map(tool => ({ type: 'function', ...(tool as { function: object }).function })), tool_choice: options?.toolsExhausted ? 'none' : 'auto', parallel_tool_calls: false } : {}),

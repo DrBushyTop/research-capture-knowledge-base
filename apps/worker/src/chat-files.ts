@@ -1,5 +1,5 @@
 import type { BlobStore } from './storage.js';
-import { noteSchema } from '../../../shared/corpus.js';
+import { hash, noteArtifacts, noteSchema } from '../../../shared/corpus.js';
 import { ChatAccessError, chatStatus } from './chat-service.js';
 import { chatCorpusSchema, type ChatAsset, type ChatJob } from '../../../shared/chat.js';
 
@@ -20,10 +20,10 @@ export async function readChatFile(store: BlobStore, owner: string, id: string, 
       if (!properties.contentLength || properties.contentLength > 5 * 1024 * 1024) throw new ChatAccessError(404, 'File unavailable');
       return { bytes: await blob.downloadToBuffer(0, undefined, { conditions: { ifMatch: properties.etag }, abortSignal: AbortSignal.timeout(20000) }), mime: 'image/png', filename: 'page.png' };
     }
-    if (asset.kind === 'pdf') { sourceId = asset.sourceId; artifactHash = asset.artifactHash; }
+    if (asset.kind === 'pdf' || asset.kind === 'image' && asset.artifactHash) { sourceId = asset.sourceId; artifactHash = asset.artifactHash; }
     else throw new ChatAccessError(404, 'File not found');
   }
-  if (!sourceId || (!result.citations.some(cite => cite.sourceId === sourceId) && !result.attachments.some(item => item.sourceId === sourceId && item.kind === 'pdf'))) throw new ChatAccessError(404, 'File not found');
+  if (!sourceId || (!result.citations.some(cite => cite.sourceId === sourceId) && !result.attachments.some(item => item.sourceId === sourceId && (item.kind === 'pdf' || item.kind === 'image' && item.id === assetId)))) throw new ChatAccessError(404, 'File not found');
   const job = (await store.read<ChatJob>(`chat/jobs/${id}.json`))!;
   const corpus = chatCorpusSchema.parse(await store.read(`chat/corpora/${job.corpusRevision}.json`));
   let note = corpus.sources.find(source => source.note.source.id === sourceId)?.note;
@@ -35,11 +35,15 @@ export async function readChatFile(store: BlobStore, owner: string, id: string, 
     if (!saved.success || saved.data.source.id !== sourceId || saved.data.generationId !== citation.generationId) throw new ChatAccessError(404, 'PDF not found');
     note = saved.data;
   }
-  artifactHash ||= note?.extraction.method === 'pdf-text' ? note.extraction.artifactHash || undefined : undefined;
+  const original = note ? noteArtifacts(note).find(artifact => artifactHash ? artifact.hash === artifactHash : citation?.attachmentKey ? artifact.key === citation.attachmentKey : artifact.hash === note.extraction.artifactHash && artifact.mime === 'application/pdf') : undefined;
+  artifactHash ||= original?.hash;
   if (!artifactHash || !/^[a-f0-9]{64}$/.test(artifactHash)) throw new ChatAccessError(404, 'PDF not found');
+  if (!original || original.hash !== artifactHash || !['application/pdf', 'image/png', 'image/jpeg', 'image/webp'].includes(original.mime)) throw new ChatAccessError(404, 'Saved file not found');
   const blob = store.raw.getBlockBlobClient(artifactHash);
   const properties = await blob.getProperties({ abortSignal: AbortSignal.timeout(20000) });
-  if (!properties.contentLength || properties.contentLength > 20 * 1024 * 1024) throw new ChatAccessError(404, 'PDF unavailable');
+  if (!properties.contentLength || properties.contentLength > (original.mime === 'application/pdf' ? 40 : 5) * 1024 * 1024) throw new ChatAccessError(404, 'Saved file unavailable');
   const bytes = await blob.downloadToBuffer(0, undefined, { conditions: { ifMatch: properties.etag }, abortSignal: AbortSignal.timeout(20000) });
-  return { bytes, mime: 'application/pdf', filename: `${sourceId}.pdf` };
+  if (hash(bytes) !== artifactHash) throw new ChatAccessError(404, 'Saved file unavailable');
+  const extension = ({ 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' } as Record<string, string>)[original.mime];
+  return { bytes, mime: original.mime, filename: `${sourceId}${original.key ? '-' + original.key : ''}.${extension}` };
 }

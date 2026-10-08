@@ -77,10 +77,16 @@ app.http('chatGateway', {
         return { status: 200, jsonBody: result, headers };
       }
       const fileHeaders = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox" };
-      if (request.method === 'GET' && request.query.has('source')) return { status: 200, jsonBody: await readSourceText(state, request.query.get('source') || ''), headers: { 'Cache-Control': 'private, no-store' } };
+      if (request.method === 'GET' && request.query.has('source')) {
+        const offset = request.query.get('offset');
+        if (offset !== null && !/^\d{1,10}$/.test(offset)) throw new ChatAccessError(400, 'Invalid original text position');
+        const attachmentKey = request.query.get('attachment');
+        if (attachmentKey !== null && !/^[A-Z0-9]{8}$/.test(attachmentKey)) throw new ChatAccessError(400, 'Invalid original attachment');
+        return { status: 200, jsonBody: await readSourceText(state, request.query.get('source') || '', { ...(offset !== null ? { offset: Number(offset) } : {}), ...(attachmentKey ? { attachmentKey } : {}) }), headers: { 'Cache-Control': 'private, no-store' } };
+      }
       if (request.method === 'GET' && request.query.has('document')) {
-        const file = await readSourceDocument(state, request.query.get('document') || '');
-        return { status: 200, body: file.bytes, headers: { ...fileHeaders, 'Content-Type': file.mime, 'Content-Disposition': `inline; filename="${file.filename}"` } };
+        const file = await readSourceDocument(state, request.query.get('document') || '', request.query.get('attachment'));
+        return { status: 200, body: file.bytes, headers: { ...fileHeaders, 'Content-Type': file.mime, 'Content-Disposition': `${file.disposition}; filename="${file.filename}"` } };
       }
       if (request.method === 'GET' && request.query.has('upload')) {
         const upload = await readUpload(state, owner, request.query.get('upload') || '');
@@ -143,7 +149,7 @@ app.storageQueue('processCapture', {
         import('./source-artifacts.js'), import('./browser-sandbox.js'), import('./processing.js')
       ]);
       await processJob(state, id, { version: process.env.PROCESSING_VERSION || processingVersion, model: required('FOUNDRY_DEPLOYMENT'),
-        extract: async snapshot => new SourceArtifacts(state).extract(snapshot, { request: async (...args) => (await zotero()).request(...args) }, process.env.BROWSER_SANDBOX_SNAPSHOT ? () => recoverWebpage(snapshot, state, state.leaseSignal || AbortSignal.timeout(180_000)) : undefined),
+        extract: async (snapshot, generationId) => new SourceArtifacts(state).extract(snapshot, { request: async (...args) => (await zotero()).request(...args) }, process.env.BROWSER_SANDBOX_SNAPSHOT ? () => recoverWebpage(snapshot, state, state.leaseSignal || AbortSignal.timeout(360_000)) : undefined, generationId),
         enrich: (text, signal, images) => enrich(text, required('FOUNDRY_ENDPOINT'), required('FOUNDRY_DEPLOYMENT'), signal, images),
         classify: (source, text, registry, signal, images) => classifySource(source, text, registry, required('FOUNDRY_ENDPOINT'), required('FOUNDRY_DEPLOYMENT'), signal, images),
         analyzeTemplate, rights: licenseEvidence });

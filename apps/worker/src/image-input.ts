@@ -4,7 +4,7 @@ export interface SourceImage {
   bytes: Uint8Array;
   mime: 'image/png' | 'image/jpeg' | 'image/webp';
 }
-export const sourceImageLimits = { bytes: 5 * 1024 * 1024, side: 8192, pixels: 40_000_000, count: 1 };
+export const sourceImageLimits = { bytes: 5 * 1024 * 1024, side: 8192, pixels: 40_000_000, count: 4 };
 
 /** Header checks bound inference input. They do not establish that the image decoder will accept the file. */
 export function sourceImage(bytes: Uint8Array, declaredMime: string): SourceImage {
@@ -18,7 +18,7 @@ export function sourceImage(bytes: Uint8Array, declaredMime: string): SourceImag
 
 export function inferenceContent(input: unknown, images: SourceImage[] = []) {
   if (!images.length) return JSON.stringify(input);
-  if (images.length > sourceImageLimits.count) throw new Error('Only one source image is supported per analysis.');
+  if (images.length > sourceImageLimits.count) throw new Error('Use at most 4 source images per analysis.');
   return [
     { type: 'text' as const, text: JSON.stringify(input) },
     ...images.map(image => {

@@ -129,7 +129,7 @@ function MoreMenu({ current, signOut }: { current?: 'Categories' | 'Trash'; sign
     <Popover.Portal><Popover.Content className="masthead-menu" align="end" sideOffset={6} collisionPadding={8}>
       <Link to="/categories/" aria-current={current === 'Categories' ? 'page' : undefined} onClick={() => setOpen(false)}><Tags size={18} aria-hidden="true" />Categories</Link>
       <Link to="/trash/" aria-current={current === 'Trash' ? 'page' : undefined} onClick={() => setOpen(false)}><Trash2 size={18} aria-hidden="true" />Trash</Link>
-      <a href="/logout.html" onClick={signOut}><LogOut size={18} aria-hidden="true" />Sign out</a>
+      {!import.meta.env.DEV && <a href="/logout.html" onClick={signOut}><LogOut size={18} aria-hidden="true" />Sign out</a>}
     </Popover.Content></Popover.Portal>
   </Popover.Root>;
 }

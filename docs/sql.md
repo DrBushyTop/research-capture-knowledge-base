@@ -30,7 +30,11 @@ SQL_SERVER=sql-research-dev-16681c6a.database.windows.net SQL_DATABASE=research_
 npm run dev
 ```
 
-The reader listens on port 4360 and a localhost-only development API on 7072. This API supplies a local development identity and must never be deployed as an authentication boundary. Local SQL access uses your Azure CLI credentials. Azurite stores development files separately from production.
+The reader listens on port 4360 and a localhost-only development API on 7072. Local development requires no GitHub sign-in. The reader skips production session renewal and hides Sign out. This API supplies a local development identity and must never be deployed as an authentication boundary. Local SQL access uses your Azure CLI credentials. Azurite stores development files separately from production.
+
+For Android browser checks, use T3's `device_list` and `device_open`, then the exact `agent-device` command and session flags returned by `device_open`. Open Chrome at `http://localhost:4360/`. The launcher forwards that port with `adb reverse`, so the emulator reaches the same development API without a GitHub session.
+
+T3's device hub expects Android command-line tools under `cmdline-tools/latest`. This machine's existing SDK uses `cmdline-tools/19.0`, with `latest` linked to that directory. The Homebrew JDK is registered through `~/Library/Java/JavaVirtualMachines/openjdk-17.jdk`, linked to `/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk`. Those links let T3 discover the existing Bun Do emulators without a shell's `JAVA_HOME`. A report that `latest` is missing does not establish that the SDK or emulators are absent.
 
 Configuration and generated credentials live in ignored `.local/dev.env` and `.local/dev-settings.json`. Setup refuses the production `research` database and does not erase either database or volumes. The initial seed imports source notes from the local historical corpus.
 

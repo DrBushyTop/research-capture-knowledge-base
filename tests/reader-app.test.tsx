@@ -72,6 +72,7 @@ const type = async (element: HTMLTextAreaElement | HTMLInputElement, value: stri
 const path = (router: ReturnType<typeof createAppRouter>) => router.state.location.href;
 
 it('opens the logout page from the menu and clears private data before navigating', async () => {
+  vi.stubEnv('DEV', false);
   const { client } = await mount('/sources/');
   const clear = vi.spyOn(client, 'clear');
   await click(host.querySelector('button[aria-label="More"]'));

@@ -61,14 +61,10 @@ it('requires a server session even on the approved custom domain', async () => {
 it('allows the worker to validate an app session after the Azure cookie has expired', async () => {
   const input = request(undefined, 'GET'); input.headers.delete('x-ms-client-principal');
   expect((await handler(false)(input)).status).toBe(202);
+  expect(backend).toHaveBeenCalledOnce();
   expect(backend.mock.calls[0][1].headers['x-reader-session']).toBe(session);
 });
-it('passes a fresh principal only through the separate session start endpoint', async () => {
-  const input = request(shelf);
-  await sessionHandler(false, true)(input);
-  expect(backend.mock.calls[0][0].searchParams.get('session')).toBe('start');
-  expect(backend.mock.calls[0][1].headers['x-ms-client-principal']).toBe(principal);
-});
+
 it('exchanges a standard GitHub sign-in for a private Shelf session without invitations', async () => {
   const config = JSON.parse(await readFile('apps/reader/staticwebapp.config.json', 'utf8'));
   const startRoute = config.routes.find((route: { route: string }) => route.route === '/api/session-start');
@@ -95,6 +91,9 @@ it('exchanges a standard GitHub sign-in for a private Shelf session without invi
   const input = request(shelf); input.headers.delete('cookie');
   const started = await sessionHandler(false, true)(input);
   expect(started.status).toBe(200);
+  expect(backend.mock.calls[0][0].searchParams.get('session')).toBe('start');
+  expect(backend.mock.calls[0][1].headers['x-ms-client-principal']).toBe(principal);
+  expect(started.headers['Set-Cookie']).toMatch(/^__Host-ShelfSession=[a-f0-9]{64}; Path=\/; Secure; HttpOnly; SameSite=Lax; Max-Age=2592000$/);
   expect(JSON.parse(started.body).clientPrincipal).toMatchObject({ userDetails: 'pinaatti', userRoles: ['authenticated', 'reader'] });
   input.headers.set('cookie', started.headers['Set-Cookie'].split(';')[0]);
   input.headers.delete('x-ms-client-principal');
@@ -109,12 +108,7 @@ it('does not pass a client-supplied principal into session renewal', async () =>
   expect(backend.mock.calls[0][0].searchParams.get('session')).toBe('resume');
   expect(backend.mock.calls[0][1].headers['x-ms-client-principal']).toBeUndefined();
 });
-it('passes the Secure HttpOnly session cookie from the worker to the browser', async () => {
-  const cookie = '__Host-ShelfSession=' + session + '; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=2592000';
-  backend.mockResolvedValueOnce(new Response('{}', { headers: { 'Content-Type': 'application/json', 'Set-Cookie': cookie } }));
-  const result = await sessionHandler(false)(request(shelf));
-  expect(result.headers['Set-Cookie']).toBe(cookie);
-});
+
 it('revokes the app session before redirecting through Azure logout', async () => {
   const input = request(shelf); input.query.set('returnTo', 'https://evil.example');
   const result = await sessionHandler(true)(input);
@@ -160,10 +154,7 @@ it('rejects ambiguous session cookies before contacting the worker', async () =>
   expect((await handler(false)(input)).status).toBe(403);
   expect(backend).not.toHaveBeenCalled();
 });
-it('keeps authenticated GET requests working without an Origin header', async () => {
-  expect((await handlers.get('chat')!(request(undefined, 'GET'))).status).toBe(202);
-  expect(backend).toHaveBeenCalledOnce();
-});
+
 it('supports existing development configuration with one READER_ORIGIN', async () => {
   vi.stubEnv('READER_ORIGINS', '');
   vi.stubEnv('READER_ORIGIN', 'https://dev.invalid');

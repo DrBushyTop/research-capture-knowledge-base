@@ -45,14 +45,10 @@ function finishReveal(block: Element) {
   block.dispatchEvent(event);
 }
 
-it('fades the first paragraph even when Markdown loads after the response mounts', async () => {
-  await render('The first paragraph.');
-  expect(host.querySelector('p')?.classList.contains('chat-text-reveal')).toBe(true);
-});
-
 it('reveals new blocks once and keeps earlier paragraphs visible through validation', async () => {
   await render('The first paragraph.');
   const first = host.querySelector('p')!;
+  expect(first.classList.contains('chat-text-reveal')).toBe(true);
   finishReveal(first);
   await render('The first paragraph.\n\nThe second paragraph.');
   expect(host.querySelector('p')).toBe(first);

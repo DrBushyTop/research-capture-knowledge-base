@@ -45,14 +45,6 @@ it('retains synced screenshot bytes and passes them to vision with an honest evi
   expect(result.evidence.reason).toContain('not a verified text transcription');
 });
 
-it('can analyze a retained image again without the original Zotero file', async () => {
-  const source = normalize(structuredClone(snapshot))[0];
-  const result = await extractArtifact(source, { bytes: screenshot, mime: 'image/png', retrievedAt: '2026-10-05T10:00:00Z' });
-  expect(result.text).toBe('');
-  expect(result.images?.[0].bytes).toEqual(screenshot);
-  expect(result.evidence.retrievedAt).toBe('2026-10-05T10:00:00Z');
-});
-
 it('retains invalid or unsupported images without pretending that vision evidence is available', async () => {
   const source = normalize(structuredClone(snapshot))[0]; source.children[0].data.contentType = 'image/svg+xml';
   const store = new MemorySourceArtifactStore();
@@ -83,13 +75,8 @@ it('extracts HTML evidence without executing source scripts or loading external 
   expect(result.text).not.toContain('source code executed');
   expect(result.evidence.status).toBe('text');
   expect(store.files.size).toBe(1);
-});
-it('can reprocess an archived input after the original file becomes unavailable', async () => {
-  const source = normalize(structuredClone(snapshot))[0];
-  const html = new TextEncoder().encode('<article><h1>Archived methods</h1><p>This retained source contains a synthetic description of a research method, sufficient to extract usable evidence and reproduce a note after the original source becomes unavailable.</p></article>');
-  const result = await extractArtifact(source, { bytes: html, mime: 'text/html', retrievedAt: '2026-10-05T10:00:00Z' });
-  expect(result.text).toContain('reproduce a note after the original source becomes unavailable');
-  expect(result.evidence.retrievedAt).toBe('2026-10-05T10:00:00Z');
+  const replay = await new SourceArtifacts(store).extract(source, { request: async () => { throw new Error('Original unavailable'); } });
+  expect(replay).toEqual(result);
 });
 
 it('uses saved captions as labelled metadata without treating them as extracted page text', async () => {

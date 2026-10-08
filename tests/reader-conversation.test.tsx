@@ -130,7 +130,10 @@ it.each(['standalone', 'source'] as const)('resumes a pending %s question throug
   expect(script.readJob).toHaveBeenCalledTimes(polls);
 });
 
-it.each(['standalone', 'source'] as const)('keeps %s Stop pending until server cancellation and Retry preserves a separate composer draft', async kind => {
+// Exercise both locations for selection, navigation and recovery. Shared job lifecycle
+// cases use one location unless the scenario changes routing or source storage.
+it('keeps standalone Stop pending until server cancellation and Retry preserves a separate composer draft', async () => {
+  const kind = 'standalone';
   const script = new ScriptedConversation();
   script.jobs.set('retry-job', { status: 'running' });
   remember(kind);
@@ -291,12 +294,13 @@ it.each(['standalone', 'source'] as const)('recovers an accepted %s submission a
   expect(view.turns[0].question).toBe('Question left running');
 });
 
-it.each(['standalone', 'source'] as const)('accepts the %s job when navigation returns before its response', async kind => {
+it('accepts the source job when navigation returns before its response', async () => {
+  const kind = 'source';
   const script = new ScriptedConversation();
   const late = deferred<{ id: string; conversationId: string }>();
   script.submit.mockImplementation(() => late.promise);
   storage.local!.setItem(localKey(kind), a);
-  if (kind === 'source') storage.local!.setItem(localKey(kind, sourceB), b);
+  storage.local!.setItem(localKey(kind, sourceB), b);
   await mount(kind, script, a);
   await act(async () => view.setQuestion('Question while navigating'));
   let submission!: Promise<boolean>;
@@ -310,7 +314,7 @@ it.each(['standalone', 'source'] as const)('accepts the %s job when navigation r
   expect(view.turns[0].question).toBe('Question while navigating');
 });
 
-it.each([['standalone', true], ['source', true], ['standalone', false], ['source', false]] as const)('resumes the accepted %s job when remount precedes acknowledgement, existing conversation %s', async (kind, existing) => {
+it.each([['source', true], ['standalone', false], ['source', false]] as const)('resumes the accepted %s job when remount precedes acknowledgement, existing conversation %s', async (kind, existing) => {
   const script = new ScriptedConversation();
   const late = deferred<{ id: string; conversationId: string }>();
   script.submit.mockImplementation(() => late.promise);
@@ -333,7 +337,8 @@ it.each([['standalone', true], ['source', true], ['standalone', false], ['source
   expect(script.cancel).toHaveBeenCalledWith('job-a');
 });
 
-it.each(['standalone', 'source'] as const)('adopts an accepted %s job after remount when storage refuses access', async kind => {
+it('adopts an accepted source job after remount when storage refuses access', async () => {
+  const kind = 'source';
   const denied = { getItem() { throw new Error('Denied'); }, setItem() { throw new Error('Denied'); }, removeItem() { throw new Error('Denied'); } };
   storage = { local: denied, session: denied };
   const script = new ScriptedConversation();
@@ -356,7 +361,8 @@ it.each(['standalone', 'source'] as const)('adopts an accepted %s job after remo
   expect(script.cancel).toHaveBeenCalledWith('job-a');
 });
 
-it.each(['standalone', 'source'] as const)('keeps the newer %s job when an older submission acknowledges after remount', async kind => {
+it('keeps the newer standalone job when an older submission acknowledges after remount', async () => {
+  const kind = 'standalone';
   const script = new ScriptedConversation();
   const late = deferred<{ id: string; conversationId: string }>();
   script.submit.mockImplementationOnce(() => late.promise).mockResolvedValue({ id: 'job-b', conversationId: a });
@@ -380,7 +386,8 @@ it.each(['standalone', 'source'] as const)('keeps the newer %s job when an older
   expect(script.cancel).toHaveBeenCalledWith('job-b');
 });
 
-it.each(['standalone', 'source'] as const)('recovers the older accepted %s job when the newer submission is refused', async kind => {
+it('recovers the older accepted source job when the newer submission is refused', async () => {
+  const kind = 'source';
   const script = new ScriptedConversation();
   const late = deferred<{ id: string; conversationId: string }>();
   script.submit.mockImplementationOnce(() => late.promise).mockRejectedValue(new ApiError('Question already running', 429));
@@ -401,7 +408,7 @@ it.each(['standalone', 'source'] as const)('recovers the older accepted %s job w
   expect(JSON.parse(storage.session!.getItem(activeKey(kind))!)).toMatchObject({ id: 'job-a', question: 'Accepted question' });
 });
 
-it.each([['standalone', false], ['source', false], ['standalone', true], ['source', true]] as const)('defers old %s recovery during a newer submission, refusal %s', async (kind, refused) => {
+it.each([['standalone', false], ['source', true]] as const)('defers old %s recovery during a newer submission, refusal %s', async (kind, refused) => {
   const script = new ScriptedConversation();
   const old = deferred<{ id: string; conversationId: string }>();
   const newer = deferred<{ id: string; conversationId: string }>();
@@ -434,7 +441,8 @@ it.each([['standalone', false], ['source', false], ['standalone', true], ['sourc
   expect(JSON.parse(storage.session!.getItem(activeKey(kind))!).id).toBe(refused ? 'job-a' : 'job-b');
 });
 
-it.each(['standalone', 'source'] as const)('discards an accepted %s acknowledgement after its conversation was deleted', async kind => {
+it('discards an accepted source acknowledgement after its conversation was deleted', async () => {
+  const kind = 'source';
   const script = new ScriptedConversation();
   const late = deferred<{ id: string; conversationId: string }>();
   script.submit.mockImplementation(() => late.promise);

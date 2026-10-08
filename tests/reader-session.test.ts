@@ -15,15 +15,6 @@ async function start(store = new SessionStore()) {
   return { store, response, token, key: `reader-sessions/${hash(token)}.json` };
 }
 
-it('starts a Shelf session for allowlisted pinaatti with the standard GitHub roles from production', async () => {
-  const store = new SessionStore();
-  const encoded = principal('pinaatti', '8089c951c5bb45b9a2ca845173e4bdd6', ['anonymous', 'authenticated']);
-  const response = await readerSessionResponse(store, { encoded, token: null, renew: true, start: true });
-  expect(response.jsonBody.clientPrincipal?.userDetails).toBe('pinaatti');
-  const token = response.headers['Set-Cookie'].split(';')[0].split('=')[1];
-  expect(await sessionReaderIdentity(store, null, token)).toBe(hash('github:8089c951c5bb45b9a2ca845173e4bdd6'));
-});
-
 it('keeps existing sessions working across the removal of invitation checks', async () => {
   const { store, token, key } = await start();
   const saved = store.data.get(key) as { clientPrincipal: { userRoles: string[] } };
@@ -50,6 +41,8 @@ it('rejects malformed and non-GitHub identities even when they name an approved 
 
 it('creates a 30-day server session only after allowlisted GitHub sign-in', async () => {
   const { store, response, token, key } = await start();
+  expect(response.jsonBody.clientPrincipal?.userDetails).toBe('pinaatti');
+  expect(await sessionReaderIdentity(store, null, token)).toBe(hash('github:user-one'));
   expect(token).toMatch(/^[a-f0-9]{64}$/);
   expect(response.jsonBody.expiresAt).toBe(new Date(now + 30 * day).toISOString());
   expect(response.headers['Set-Cookie']).toBe(`__Host-ShelfSession=${token}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=2592000`);

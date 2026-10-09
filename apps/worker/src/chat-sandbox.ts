@@ -2,7 +2,8 @@ import { requireSourceState } from './source-lifecycle.js';
 import { readFile } from 'node:fs/promises';
 import { DefaultAzureCredential } from '@azure/identity';
 import { SandboxGroupClient, endpointForRegion } from '@azure/containerapps-sandbox';
-import { hash, noteArtifacts } from '../../../shared/corpus.js';
+import { noteArtifacts } from '../../../shared/corpus.js';
+import { SourceArtifactReader } from './source-artifact-reader.js';
 import { chunkText, corpusEvidence, evidenceChunk, packEvidence, type ChatCorpus, type ChatJob, type Evidence } from '../../../shared/chat.js';
 import type { BlobStore } from './storage.js';
 import { createWorkspace, deleteWorkspace, denyWorkspaceEgress, readWorkspaceFile, writeWorkspaceFile } from './sandbox-lifecycle.js';
@@ -47,16 +48,12 @@ export async function gatherEvidence(store: BlobStore, corpus: ChatCorpus, job: 
       else if (options?.page || options?.pages || job.request.visual?.sourceId === note.source.id) originals = originals.filter(artifact => artifact.hash === note.extraction.artifactHash).slice(0, 1);
       if (selectedKey && !originals.length) throw new Error('Attachment is unavailable in this source generation');
       for (const original of originals) {
-      if (options?.pages && original.mime !== 'application/pdf') throw new Error('Page ranges require a retained PDF');
-      const raw = store.raw.getBlockBlobClient(original.hash);
-      const properties = await raw.getProperties({ abortSignal: signal });
-      if (!properties.contentLength || properties.contentLength > 40 * 1024 * 1024) throw new Error('Artifact exceeds chat size limit');
-      const bytes = await raw.downloadToBuffer(0, undefined, { abortSignal: signal });
-      if (hash(bytes) !== original.hash) throw new Error('Archived artifact hash mismatch');
-      if (original.mime && properties.contentType && original.mime !== properties.contentType) throw new Error('Archived artifact MIME mismatch');
+      const artifact = await new SourceArtifactReader(store).read(note, original.hash, { signal });
+      if (!artifact?.bytes.length) throw new Error('Retained source file is unavailable');
+      if (options?.pages && artifact.mime !== 'application/pdf') throw new Error('Page ranges require a retained PDF');
       const filename = `${note.source.key}${original.key ? '.' + original.key : ''}.source`;
-      await writeWorkspaceFile(sandbox.id, `/workspace/data/${filename}`, bytes, signal);
-      inputs.push({ sourceId: note.source.id, path: filename, hash: original.hash, mime: original.mime || properties.contentType || 'application/octet-stream',
+      await writeWorkspaceFile(sandbox.id, `/workspace/data/${filename}`, artifact.bytes, signal);
+      inputs.push({ sourceId: note.source.id, path: filename, hash: original.hash, mime: artifact.mime,
         ...(original.key ? { attachmentKey: original.key, title: original.title } : {}),
         ...(options?.page ? { textPage: options.page } : {}), ...(options?.query ? { query: options.query } : {}),
         ...(options?.pages ? { textPages: options.pages } : {}),
@@ -91,6 +88,7 @@ export async function gatherEvidence(store: BlobStore, corpus: ChatCorpus, job: 
       });
       const result = pageRangeEvidence({ sourceId: note.source.id, generationId: note.generationId, title: note.source.title, kind: 'source', pdf: true,
         ...(artifact.attachmentKey ? { attachmentKey: artifact.attachmentKey } : {}) }, options.pages, pages, artifact.pageCount);
+      for (const { note } of sources) await requireSourceState(store, note.source.id);
       return { evidence: result.passages, coverage: result.coverage, pageCount: artifact.pageCount, image: undefined };
     }
     const original = new Map<string, Evidence>();

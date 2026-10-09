@@ -13,9 +13,9 @@ import { docxCandidate, docxMime, docxText } from './docx-text.js';
 import type { DocumentTextInput } from '../../../shared/document-text.js';
 import { createHash } from 'node:crypto';
 import { savedCommentary, savedHtml } from './capture-commentary.js';
+import { maxArtifactBytes as maxBytes, MissingArtifact } from './source-artifact-reader.js';
 
-export const maxBytes = 40 * 1024 * 1024;
-export class MissingArtifact extends Error {}
+export { maxBytes, MissingArtifact };
 export interface Extracted { text: string; images?: SourceImage[]; documents?: DocumentTextInput[]; evidence: Note['extraction']; }
 export interface RetainedArtifact { bytes: Uint8Array; mime: string; retrievedAt: string; }
 export function withSavedCommentary(snapshot: SourceSnapshot, extracted: Extracted): Extracted {

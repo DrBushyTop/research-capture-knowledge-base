@@ -6,6 +6,8 @@ Azure SQL Database Standard S0, 10 DTUs, is the authoritative application store.
 
 Processing publishes directly to `Sources`. Reader and chat search batch-load full-text records for current source generations and validate their identity and hashes. Original-text endpoints read bounded windows or PDF page ranges with continuation, while chat text queries can find evidence beyond the analysis preview. The reader loads `/api/chat?library=1`; saving or reprocessing does not require a Git push or static deployment. Old `/research/{id}/` links load the same live reader. Chat freezes its retrieval snapshot at submission time and adds current reader notes when answering.
 
+`SourceArtifactReader` verifies retained original bytes for capture replay, Reader downloads, cited chat files and sandbox evidence. Callers select the source generation and check access. The reader checks generation membership, byte limits, hashes, MIME aliases and file signatures without loading document parsers. The Blob adapter checks size before downloading and uses the observed ETag to reject a changed blob. Reader and chat callers recheck source lifecycle state after reading bytes.
+
 The recovery timer removes expired temporary chat records from SQL in bounded batches. Conversations, source data, category revisions and reader notes do not share that expiry rule. Blob lifecycle still expires temporary binary chat files.
 
 ## Provisioning
@@ -31,6 +33,8 @@ npm run dev
 ```
 
 The reader listens on port 4360 and a localhost-only development API on 7072. Local development requires no GitHub sign-in. The reader skips production session renewal and hides Sign out. This API supplies a local development identity and must never be deployed as an authentication boundary. Local SQL access uses your Azure CLI credentials. Azurite stores development files separately from production.
+
+Production and local HTTP adapters use `handleReaderRequest` in `reader-actions.ts` for action validation, streamed body limits, status codes and file responses. Production owns GitHub authentication and Reader sessions. The local adapter supplies `local-developer`. Permanent deletion uses the production queue or local inline cleanup after saving the purging marker.
 
 For Android browser checks, use T3's `device_list` and `device_open`, then the exact `agent-device` command and session flags returned by `device_open`. Open Chrome at `http://localhost:4360/`. The launcher forwards that port with `adb reverse`, so the emulator reaches the same development API without a GitHub session.
 

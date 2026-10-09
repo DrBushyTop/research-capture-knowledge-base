@@ -1,9 +1,9 @@
-import { hash, noteArtifacts, sourceId, type Note } from '../../../shared/corpus.js';
+import { noteArtifacts, sourceId, type Note } from '../../../shared/corpus.js';
 import { chatCorpusSchema } from '../../../shared/chat.js';
 import { matchedSourceText } from '../../../shared/source-text.js';
 import { ChatAccessError } from './chat-service.js';
 import type { PipelineStore } from './pipeline.js';
-import type { BlobStore } from './storage.js';
+import { ArtifactTooLarge, InvalidArtifact, MissingArtifact, SourceArtifactReader, type ArtifactReaderStore } from './source-artifact-reader.js';
 import { DocumentTexts } from './document-text.js';
 import type { DocumentTextReadOptions } from '../../../shared/document-text.js';
 import { requireSourceState } from './source-lifecycle.js';
@@ -42,28 +42,24 @@ export async function readSourceText(store: SourceStore, id: string, options: Do
 }
 
 /** Original PDF/image access uses corpus membership; arbitrary raw blobs cannot be requested. */
-export async function readSourceDocument(store: SourceStore & Pick<BlobStore, 'raw'>, id: string, attachmentKey?: string | null) {
+export async function readSourceDocument(store: SourceStore & ArtifactReaderStore, id: string, attachmentKey?: string | null) {
   const note = await currentNote(store, id);
   if (attachmentKey && !/^[A-Z0-9]{8}$/.test(attachmentKey)) throw new ChatAccessError(404, 'Saved attachment not found');
   const reference = noteArtifacts(note).find(artifact => attachmentKey ? artifact.key === attachmentKey : artifact.hash === note.extraction.artifactHash);
   const artifact = reference?.hash;
-  const mime = reference?.mime || '';
+  const declaredMime = (reference?.mime || '').split(';')[0].trim().toLowerCase();
+  if (!artifact || !/^[a-f0-9]{64}$/.test(artifact) || declaredMime === 'text/html') throw new ChatAccessError(404, 'No supported saved document or image is available');
+  let file;
+  try { file = await new SourceArtifactReader(store).read(note, artifact); }
+  catch (error) {
+    if (error instanceof ArtifactTooLarge) throw new ChatAccessError(413, 'Saved file exceeds the 40 MB viewer limit');
+    if (error instanceof MissingArtifact || error instanceof InvalidArtifact) throw new ChatAccessError(404, 'Saved file is unavailable');
+    throw error;
+  }
+  if (!file?.bytes.length) throw new ChatAccessError(404, 'Saved file is unavailable');
   const extension = ({ 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx', 'text/plain': 'txt', 'text/markdown': 'md', 'text/csv': 'csv', 'application/json': 'json' } as Record<string, string>)[mime];
-  if (!artifact || !/^[a-f0-9]{64}$/.test(artifact) || !extension) throw new ChatAccessError(404, 'No supported saved document or image is available');
-  const blob = store.raw.getBlockBlobClient(artifact);
-  const signal = AbortSignal.timeout(20_000);
-  let properties;
-  try { properties = await blob.getProperties({ abortSignal: signal }); }
-  catch (error) { if ((error as { statusCode?: number }).statusCode === 404) throw new ChatAccessError(404, 'Saved file is unavailable'); throw error; }
-  if (!properties.contentLength || properties.contentLength > 40 * 1024 * 1024) throw new ChatAccessError(413, 'Saved file exceeds the 40 MB viewer limit');
-  const bytes = await blob.downloadToBuffer(0, undefined, { conditions: { ifMatch: properties.etag }, abortSignal: signal });
-  const signature = mime === 'application/pdf' ? bytes.subarray(0, 5).toString() === '%PDF-'
-    : mime === 'image/png' ? bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
-    : mime === 'image/jpeg' ? bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255
-    : mime === 'image/webp' ? bytes.subarray(0, 4).toString() === 'RIFF' && bytes.subarray(8, 12).toString() === 'WEBP'
-    : extension === 'docx' ? bytes[0] === 0x50 && bytes[1] === 0x4b : true;
-  if (!signature || hash(bytes) !== artifact) throw new ChatAccessError(404, 'Saved file is unavailable');
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx', 'text/plain': 'txt', 'text/markdown': 'md', 'text/csv': 'csv', 'application/json': 'json' } as Record<string, string>)[file.mime];
+  if (!extension) throw new ChatAccessError(404, 'No supported saved document or image is available');
   await requireSourceState(store, id, true);
-  return { bytes, mime, filename: `${id}${reference?.key ? '-' + reference.key : ''}.${extension}`, disposition: ['pdf', 'png', 'jpg', 'webp'].includes(extension) ? 'inline' : 'attachment' };
+  return { bytes: file.bytes, mime: file.mime, filename: `${id}${reference?.key ? '-' + reference.key : ''}.${extension}`, disposition: ['pdf', 'png', 'jpg', 'webp'].includes(extension) ? 'inline' : 'attachment' };
 }

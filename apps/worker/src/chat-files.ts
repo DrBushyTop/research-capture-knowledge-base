@@ -45,8 +45,10 @@ export async function readChatFile(store: PipelineStore & ArtifactReaderStore & 
   const original = note ? noteArtifacts(note).find(artifact => artifactHash ? artifact.hash === artifactHash : citation?.attachmentKey ? artifact.key === citation.attachmentKey : artifact.hash === note.extraction.artifactHash) : undefined;
   artifactHash ||= original?.hash;
   if (!artifactHash || !/^[a-f0-9]{64}$/.test(artifactHash)) throw new ChatAccessError(404, 'PDF not found');
-  if (!original || original.hash !== artifactHash || original.mime.split(';')[0].trim().toLowerCase() === 'text/html') throw new ChatAccessError(404, 'Saved file not found');
-  const image = original.mime.toLowerCase().startsWith('image/') || !original.mime && note?.extraction.status === 'image';
+  if (!original || original.hash !== artifactHash) throw new ChatAccessError(404, 'Saved file not found');
+  const declaredMime = original.mime.split(';')[0].trim().toLowerCase();
+  if (declaredMime === 'text/html') throw new ChatAccessError(404, 'Saved file not found');
+  const image = declaredMime.startsWith('image/') || !declaredMime && note?.extraction.status === 'image';
   let file;
   try { file = await new SourceArtifactReader(store).read(note!, artifactHash, { maxBytes: (image ? 5 : 40) * 1024 * 1024 }); }
   catch (error) {

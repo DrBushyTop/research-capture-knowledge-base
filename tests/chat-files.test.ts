@@ -1,10 +1,10 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { MemoryStore, snapshot } from './fixtures.js';
 import { hash, normalize, noteSchema } from '../shared/corpus.js';
 import { evidenceChunk, validateAnswer, type ChatAsset, type ChatJob } from '../shared/chat.js';
 import { readChatFile } from '../apps/worker/src/chat-files.js';
 import type { BlobStore } from '../apps/worker/src/storage.js';
-import { MemorySourceArtifactStore, screenshot } from './source-artifacts-fixture.js';
+import { blobArtifactStore, MemorySourceArtifactStore, screenshot } from './source-artifacts-fixture.js';
 const id = '1'.repeat(32); const revision = '2'.repeat(64);
 it.each([undefined, 'application/x-pdf', 'application/octet-stream'])('serves a cited original generation with MIME %s and refuses another reader or uncited source', async mime => {
   const state = new MemorySourceArtifactStore(); const keys: string[] = [];
@@ -45,6 +45,26 @@ it.each([false, true])('reads MIME-less cited images and enforces their 5 MB lim
   const read = readChatFile(state as unknown as BlobStore, 'owner', id, null, source.id);
   if (oversized) await expect(read).rejects.toMatchObject({ status: 404 });
   else expect(await read).toMatchObject({ bytes, mime: 'image/png', filename: `${source.id}.png` });
+});
+
+it('rejects oversized cited images with legacy MIME whitespace before downloading Blob bytes', async () => {
+  const state = new MemorySourceArtifactStore();
+  const blobs = blobArtifactStore();
+  const bytes = Buffer.concat([screenshot, Buffer.alloc(5 * 1024 * 1024)]);
+  const source = normalize(snapshot)[0].source;
+  const generationId = 'a'.repeat(64);
+  const note = noteSchema.parse({ schemaVersion: 1, generationId, source, extraction: { status: 'image', method: 'image-vision', reason: null, truncated: false, retrievedAt: new Date().toISOString(), artifactHash: hash(bytes), artifactMime: ' Image/PNG; charset=binary' }, analysis: null, processing: { version: '2', model: null, processedAt: new Date().toISOString() }, rightsEvidence: [] });
+  const citation = evidenceChunk({ sourceId: source.id, generationId, title: source.title, kind: 'source', locator: 'Stored image', text: 'Saved chart' });
+  const result = validateAnswer({ answer: `Chart [${citation.id}]`, insufficientEvidence: false, citations: [{ evidenceId: citation.id, quote: 'Saved chart' }] }, [citation]);
+  await state.create(`chat/jobs/${id}.json`, { id, owner: 'owner', createdAt: new Date().toISOString(), corpusRevision: revision, request: { question: 'Chart?', history: [] }, status: 'complete', attempts: 1, result } satisfies ChatJob);
+  await state.create(`chat/corpora/${revision}.json`, { revision, sources: [{ note, humanMarkdown: '' }] });
+  await blobs.retain(hash(bytes), bytes, 'image/png');
+  const client = blobs.raw.getBlockBlobClient(hash(bytes));
+  const download = vi.spyOn(client, 'downloadToBuffer');
+  vi.spyOn(blobs.raw, 'getBlockBlobClient').mockReturnValue(client);
+  const store = Object.assign(state, { readArtifact: blobs.readArtifact.bind(blobs) });
+  await expect(readChatFile(store as unknown as BlobStore, 'owner', id, null, source.id)).rejects.toMatchObject({ status: 404 });
+  expect(download).not.toHaveBeenCalled();
 });
 it('serves cited image evidence even when it is not an answer attachment', async () => {
   const state = new MemoryStore(); const asset = 'a_' + 'a'.repeat(16); const sourceId = 'zotero-users-12345-PBA4T3PN';

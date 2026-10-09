@@ -59,7 +59,7 @@ it('rejects oversized cited images with legacy MIME whitespace before downloadin
   await state.create(`chat/jobs/${id}.json`, { id, owner: 'owner', createdAt: new Date().toISOString(), corpusRevision: revision, request: { question: 'Chart?', history: [] }, status: 'complete', attempts: 1, result } satisfies ChatJob);
   await state.create(`chat/corpora/${revision}.json`, { revision, sources: [{ note, humanMarkdown: '' }] });
   await blobs.retain(hash(bytes), bytes, 'image/png');
-  const client = blobs.raw.getBlockBlobClient(hash(bytes));
+  const client = blobs.raw.getBlockBlobClient(hash(bytes)) as unknown as ReturnType<typeof blobs.raw.getBlockBlobClient>;
   const download = vi.spyOn(client, 'downloadToBuffer');
   vi.spyOn(blobs.raw, 'getBlockBlobClient').mockReturnValue(client);
   const store = Object.assign(state, { readArtifact: blobs.readArtifact.bind(blobs) });

@@ -88,3 +88,26 @@ it('honors cancellation before and during a retained read', async () => {
   await expect(new SourceArtifactReader(store).read(pinned(), undefined, { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' });
   expect(read).not.toHaveBeenCalled();
 });
+
+it('preserves an explicit caller deadline for a Blob read longer than the default 20 seconds', async () => {
+  vi.useFakeTimers();
+  const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(new Error('Deadline reached')), ms);
+    return controller.signal;
+  });
+  try {
+    const store = blobArtifactStore();
+    vi.spyOn(store.raw, 'getBlockBlobClient').mockReturnValue({
+      getProperties: async () => ({ contentLength: pdf.length, contentType: 'application/pdf', etag: 'original' }),
+      downloadToBuffer: async (_offset: number, _length: number, options: { abortSignal: AbortSignal }) => new Promise<Buffer>((resolve, reject) => {
+        options.abortSignal.addEventListener('abort', () => reject(options.abortSignal.reason), { once: true });
+        setTimeout(() => resolve(pdf), 30_000);
+      })
+    } as never);
+    const pending = new SourceArtifactReader(store).read(pinned(), undefined, { signal: AbortSignal.timeout(360_000) })
+      .then(value => ({ value }), error => ({ error }));
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(await pending).toMatchObject({ value: { bytes: pdf, mime: 'application/pdf' } });
+  } finally { timeout.mockRestore(); vi.useRealTimers(); }
+});

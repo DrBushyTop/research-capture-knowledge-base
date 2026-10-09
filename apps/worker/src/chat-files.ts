@@ -42,18 +42,20 @@ export async function readChatFile(store: PipelineStore & ArtifactReaderStore & 
     if (!saved.success || saved.data.source.id !== sourceId || saved.data.generationId !== citation.generationId) throw new ChatAccessError(404, 'PDF not found');
     note = saved.data;
   }
-  const original = note ? noteArtifacts(note).find(artifact => artifactHash ? artifact.hash === artifactHash : citation?.attachmentKey ? artifact.key === citation.attachmentKey : artifact.hash === note.extraction.artifactHash && artifact.mime === 'application/pdf') : undefined;
+  const original = note ? noteArtifacts(note).find(artifact => artifactHash ? artifact.hash === artifactHash : citation?.attachmentKey ? artifact.key === citation.attachmentKey : artifact.hash === note.extraction.artifactHash) : undefined;
   artifactHash ||= original?.hash;
   if (!artifactHash || !/^[a-f0-9]{64}$/.test(artifactHash)) throw new ChatAccessError(404, 'PDF not found');
-  if (!original || original.hash !== artifactHash || !['application/pdf', 'image/png', 'image/jpeg', 'image/webp'].includes(original.mime)) throw new ChatAccessError(404, 'Saved file not found');
+  if (!original || original.hash !== artifactHash || original.mime.split(';')[0].trim().toLowerCase() === 'text/html') throw new ChatAccessError(404, 'Saved file not found');
+  const image = original.mime.toLowerCase().startsWith('image/') || !original.mime && note?.extraction.status === 'image';
   let file;
-  try { file = await new SourceArtifactReader(store).read(note!, artifactHash, { maxBytes: (original.mime === 'application/pdf' ? 40 : 5) * 1024 * 1024 }); }
+  try { file = await new SourceArtifactReader(store).read(note!, artifactHash, { maxBytes: (image ? 5 : 40) * 1024 * 1024 }); }
   catch (error) {
     if (error instanceof ArtifactTooLarge || error instanceof InvalidArtifact || error instanceof MissingArtifact) throw new ChatAccessError(404, 'Saved file unavailable');
     throw error;
   }
   if (!file?.bytes.length) throw new ChatAccessError(404, 'Saved file unavailable');
-  const extension = ({ 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' } as Record<string, string>)[original.mime];
+  const extension = ({ 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' } as Record<string, string>)[file.mime];
+  if (!extension || file.mime.startsWith('image/') && file.bytes.length > 5 * 1024 * 1024) throw new ChatAccessError(404, 'Saved file unavailable');
   await requireSourceState(store, sourceId, true);
   return { bytes: file.bytes, mime: file.mime, filename: `${sourceId}${original.key ? '-' + original.key : ''}.${extension}` };
 }

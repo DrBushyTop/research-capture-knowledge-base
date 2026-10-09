@@ -30,7 +30,7 @@ export class BlobStore implements PipelineStore, SourceArtifactStore {
     for (let frame = this.leases.getStore(); frame; frame = frame.parent) signals.push(frame.controller.signal);
     return signals.length ? AbortSignal.any(signals) : undefined;
   }
-  private operationSignal() { return AbortSignal.any([AbortSignal.timeout(20_000), ...(this.leaseSignal ? [this.leaseSignal] : [])]); }
+  private operationSignal(signal = AbortSignal.timeout(20_000)) { return AbortSignal.any([signal, ...(this.leaseSignal ? [this.leaseSignal] : [])]); }
   async verifyLease() {
     for (let frame = this.leases.getStore(); frame; frame = frame.parent) {
       frame.controller.signal.throwIfAborted();
@@ -117,7 +117,7 @@ export class BlobStore implements PipelineStore, SourceArtifactStore {
   async readArtifact(hash: string, options: ArtifactReadOptions = {}) {
     if (!/^[a-f0-9]{64}$/.test(hash)) throw new Error('Invalid source artifact hash');
     const blob = this.raw.getBlockBlobClient(hash);
-    const signal = AbortSignal.any([this.operationSignal(), ...(options.signal ? [options.signal] : [])]);
+    const signal = this.operationSignal(options.signal);
     const limit = Math.min(maxArtifactBytes, options.maxBytes ?? maxArtifactBytes);
     try {
       const properties = await blob.getProperties({ abortSignal: signal });

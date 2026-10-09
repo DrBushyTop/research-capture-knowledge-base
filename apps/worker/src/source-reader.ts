@@ -47,10 +47,8 @@ export async function readSourceDocument(store: SourceStore & ArtifactReaderStor
   if (attachmentKey && !/^[A-Z0-9]{8}$/.test(attachmentKey)) throw new ChatAccessError(404, 'Saved attachment not found');
   const reference = noteArtifacts(note).find(artifact => attachmentKey ? artifact.key === attachmentKey : artifact.hash === note.extraction.artifactHash);
   const artifact = reference?.hash;
-  const mime = reference?.mime || '';
-  const extension = ({ 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx', 'text/plain': 'txt', 'text/markdown': 'md', 'text/csv': 'csv', 'application/json': 'json' } as Record<string, string>)[mime];
-  if (!artifact || !/^[a-f0-9]{64}$/.test(artifact) || !extension) throw new ChatAccessError(404, 'No supported saved document or image is available');
+  const declaredMime = (reference?.mime || '').split(';')[0].trim().toLowerCase();
+  if (!artifact || !/^[a-f0-9]{64}$/.test(artifact) || declaredMime === 'text/html') throw new ChatAccessError(404, 'No supported saved document or image is available');
   let file;
   try { file = await new SourceArtifactReader(store).read(note, artifact); }
   catch (error) {
@@ -59,6 +57,9 @@ export async function readSourceDocument(store: SourceStore & ArtifactReaderStor
     throw error;
   }
   if (!file?.bytes.length) throw new ChatAccessError(404, 'Saved file is unavailable');
+  const extension = ({ 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx', 'text/plain': 'txt', 'text/markdown': 'md', 'text/csv': 'csv', 'application/json': 'json' } as Record<string, string>)[file.mime];
+  if (!extension) throw new ChatAccessError(404, 'No supported saved document or image is available');
   await requireSourceState(store, id, true);
   return { bytes: file.bytes, mime: file.mime, filename: `${id}${reference?.key ? '-' + reference.key : ''}.${extension}`, disposition: ['pdf', 'png', 'jpg', 'webp'].includes(extension) ? 'inline' : 'attachment' };
 }

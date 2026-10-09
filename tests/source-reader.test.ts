@@ -4,7 +4,8 @@ import { hash, normalize, type Note } from '../shared/corpus.js';
 import { sourceText } from '../shared/source-text.js';
 import { readSourceDocument, readSourceText } from '../apps/worker/src/source-reader.js';
 import { ArtifactTooLarge } from '../apps/worker/src/source-artifact-reader.js';
-import { blobArtifactStore } from './source-artifacts-fixture.js';
+import { blobArtifactStore, screenshot } from './source-artifacts-fixture.js';
+import { docxFixture } from './docx-fixture.js';
 
 async function saved(mime = 'application/pdf', bytes = Buffer.from('%PDF-1.7\nfixture')) {
   const state = new MemoryStore();
@@ -44,6 +45,20 @@ it('reports the Reader size limit when the artifact module refuses a large file'
   const { files, note, readArtifact } = await saved();
   readArtifact.mockRejectedValueOnce(new ArtifactTooLarge());
   await expect(readSourceDocument(files, note.source.id)).rejects.toMatchObject({ status: 413 });
+});
+
+it.each(['application/x-pdf', 'application/octet-stream', 'Application/PDF; charset=binary'])('downloads verified PDFs from notes declaring %s', async mime => {
+  const { note, files } = await saved(mime);
+  expect(await readSourceDocument(files, note.source.id)).toMatchObject({ mime: 'application/pdf', filename: `${note.source.id}.pdf`, disposition: 'inline' });
+});
+
+it('downloads a verified DOCX labeled as ZIP and an older image without artifactMime', async () => {
+  const docx = await saved('application/zip', docxFixture());
+  expect(await readSourceDocument(docx.files, docx.note.source.id)).toMatchObject({ mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', filename: `${docx.note.source.id}.docx`, disposition: 'attachment' });
+  const image = await saved('image/png', screenshot);
+  const { artifactMime: _mime, ...extraction } = image.note.extraction;
+  await image.state.write('chat/corpora/' + 'a'.repeat(64) + '.json', { revision: 'a'.repeat(64), sources: [{ note: { ...image.note, extraction: { ...extraction, method: 'image-vision', status: 'image' } }, humanMarkdown: '' }] });
+  expect(await readSourceDocument(image.files, image.note.source.id)).toMatchObject({ bytes: screenshot, mime: 'image/png', filename: `${image.note.source.id}.png` });
 });
 
 it('revokes a retained read when permanent deletion starts during the download', async () => {

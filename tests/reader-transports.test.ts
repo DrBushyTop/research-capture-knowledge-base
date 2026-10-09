@@ -32,6 +32,7 @@ afterEach(async () => {
   server.closeAllConnections();
   await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   vi.unstubAllEnvs();
+  vi.restoreAllMocks();
 });
 
 async function production(query: string, body?: Uint8Array, headers: Record<string, string> = { 'x-ms-client-principal': principal }): Promise<HttpResponseInit> {
@@ -107,4 +108,14 @@ it('maps the local categories URL to the shared category handler', async () => {
   const response = await fetch(`${address}/api/categories`, { method: 'POST', body: JSON.stringify({ action: 'unknown' }) });
   expect(response.status).toBe(400);
   expect(await response.json()).toEqual({ error: 'Unknown category action' });
+});
+
+it('records unexpected local errors without exposing them in the HTTP response', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(fixture.store, 'sources').mockRejectedValueOnce(new Error('Unable to connect to development SQL'));
+  const response = await call('local', 'library=1');
+  expect(response.status).toBe(503);
+  expect(response.json).toEqual({ error: 'The service is temporarily unavailable. Try again.' });
+  expect(log).toHaveBeenCalledOnce();
+  expect(log.mock.calls.flat().join(' ')).toContain('Unable to connect to development SQL');
 });

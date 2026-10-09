@@ -4,9 +4,9 @@ import { DefaultAzureCredential } from '@azure/identity';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { PipelineStore } from './pipeline.js';
 import type { SourceArtifactStore } from './source-artifacts.js';
+import { ArtifactTooLarge, maxArtifactBytes, type ArtifactReadOptions } from './source-artifact-reader.js';
 
 const missing = (error: unknown) => (error as { statusCode?: number }).statusCode === 404;
-const maxArtifactBytes = 40 * 1024 * 1024;
 type LeaseFrame = { renew: () => Promise<void>; controller: AbortController; etags: Map<string, string | undefined>; parent?: LeaseFrame };
 export class BlobStore implements PipelineStore, SourceArtifactStore {
   readonly container: ContainerClient;
@@ -114,14 +114,16 @@ export class BlobStore implements PipelineStore, SourceArtifactStore {
     try { await this.raw.getBlockBlobClient(hash).upload(data, data.length, { conditions: { ifNoneMatch: '*' }, abortSignal: this.operationSignal(), blobHTTPHeaders: { blobContentType: mime } }); }
     catch (error) { if (![409, 412].includes((error as { statusCode: number }).statusCode)) throw error; }
   }
-  async readArtifact(hash: string) {
+  async readArtifact(hash: string, options: ArtifactReadOptions = {}) {
     if (!/^[a-f0-9]{64}$/.test(hash)) throw new Error('Invalid source artifact hash');
     const blob = this.raw.getBlockBlobClient(hash);
+    const signal = AbortSignal.any([this.operationSignal(), ...(options.signal ? [options.signal] : [])]);
+    const limit = Math.min(maxArtifactBytes, options.maxBytes ?? maxArtifactBytes);
     try {
-      const properties = await blob.getProperties({ abortSignal: this.operationSignal() });
-      if (properties.contentLength === undefined || properties.contentLength > maxArtifactBytes) throw new Error('Source exceeds byte limit');
-      const bytes = await blob.downloadToBuffer(0, properties.contentLength, { conditions: { ifMatch: properties.etag }, abortSignal: this.operationSignal() });
-      if (bytes.length > maxArtifactBytes) throw new Error('Source exceeds byte limit');
+      const properties = await blob.getProperties({ abortSignal: signal });
+      if (properties.contentLength === undefined || properties.contentLength > limit) throw new ArtifactTooLarge();
+      const bytes = await blob.downloadToBuffer(0, properties.contentLength, { conditions: { ifMatch: properties.etag }, abortSignal: signal });
+      if (bytes.length > limit) throw new ArtifactTooLarge();
       return { bytes, mime: properties.contentType || 'application/octet-stream' };
     } catch (error) { if (missing(error)) return undefined; throw error; }
   }

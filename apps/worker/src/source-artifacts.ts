@@ -6,12 +6,11 @@ import type { PipelineStore } from './pipeline.js';
 import type { Zotero } from './zotero.js';
 import { sourceImageLimits } from './image-input.js';
 import { sourceTextLimit } from '../../../shared/source-text.js';
-import { docxCandidate, docxMime } from './docx-text.js';
+import { SourceArtifactReader, type ArtifactReaderStore } from './source-artifact-reader.js';
 
 /** Records use the authoritative store. Only original bytes use the private Blob adapter. */
-export interface SourceArtifactStore extends Pick<PipelineStore, 'read' | 'create'> {
+export interface SourceArtifactStore extends Pick<PipelineStore, 'read' | 'create'>, ArtifactReaderStore {
   retain(hash: string, bytes: Uint8Array, mime: string): Promise<void>;
-  readArtifact(hash: string): Promise<{ bytes: Uint8Array; mime: string } | undefined>;
   source?(id: string): Promise<{ note: Pick<Note, 'source' | 'generationId' | 'extraction'> } | undefined>;
 }
 
@@ -29,15 +28,6 @@ const attachmentSetSchema = z.strictObject({ sourceId, fingerprint: artifactHash
   omissions: z.array(z.string().max(200)).max(100) });
 export const sourceArtifactLimits = { count: 8, bytes: 80 * 1024 * 1024 };
 class AttachmentBudget extends Error {}
-
-function mimeFor(bytes: Uint8Array, mime: string) {
-  const value = mime.split(';')[0].trim().toLowerCase();
-  if (!value || value.length > 100) throw new Error('Invalid retained source MIME');
-  // Historical PDF headers differ. Normalize the supported aliases only after checking the bytes.
-  if (['application/octet-stream', 'application/x-pdf'].includes(value) && Buffer.from(bytes.subarray(0, 5)).toString() === '%PDF-') return 'application/pdf';
-  if (docxCandidate(bytes, value)) return docxMime;
-  return value;
-}
 
 function attachments(snapshot: SourceSnapshot) {
   const items = snapshot.root.data.itemType === 'attachment' ? [snapshot.root, ...snapshot.children] : snapshot.children;
@@ -82,18 +72,10 @@ export class SourceArtifacts {
     return { receipt, artifact };
   }
 
-  private checked(artifact: { bytes: Uint8Array; mime: string }, receipt: Pick<Receipt, 'hash' | 'mime' | 'retrievedAt'>): RetainedArtifact {
-    if (artifact.bytes.length > maxBytes) throw new Error('Source exceeds byte limit');
-    if (hash(artifact.bytes) !== receipt.hash) throw new Error('Retained source hash does not match its record');
-    const mime = mimeFor(artifact.bytes, receipt.mime);
-    if (mimeFor(artifact.bytes, artifact.mime) !== mime) throw new Error('Retained source MIME does not match its record');
-    return { bytes: artifact.bytes, mime, retrievedAt: receipt.retrievedAt };
-  }
-
   private async restore(receipt: Pick<Receipt, 'hash' | 'mime' | 'retrievedAt'>): Promise<RetainedArtifact> {
     const artifact = await this.store.readArtifact(receipt.hash);
     if (!artifact) throw new MissingArtifact('Retained source file is unavailable.');
-    return this.checked(artifact, receipt);
+    return SourceArtifactReader.check(artifact, receipt);
   }
 
   private async acquire(snapshot: SourceSnapshot, attachment: ZoteroItem | undefined, zotero: Pick<Zotero, 'request'>, url = snapshot.source.url, remainingBytes = maxBytes) {
@@ -105,13 +87,14 @@ export class SourceArtifacts {
       const raw = await this.store.readArtifact(cached.hash);
       if (raw) {
         if (raw.bytes.length > remainingBytes) throw new AttachmentBudget('Combined attachment byte limit reached.');
-        return { receipt: cached, artifact: this.checked(raw, cached) };
+        return { receipt: cached, artifact: SourceArtifactReader.check(raw, cached) };
       }
     }
     const input = attachment ? await downloadAttachment(attachment, zotero) : await downloadPublic(url!);
     if (input.bytes.length > maxBytes) throw new Error('Source exceeds byte limit');
     if (input.bytes.length > remainingBytes) throw new AttachmentBudget('Combined attachment byte limit reached.');
-    const mime = Buffer.from(input.bytes.subarray(0, 5)).toString() === '%PDF-' ? 'application/pdf' : mimeFor(input.bytes, input.mime);
+    const mime = Buffer.from(input.bytes.subarray(0, 5)).toString() === '%PDF-' ? 'application/pdf'
+      : SourceArtifactReader.check(input, { hash: hash(input.bytes), mime: input.mime, retrievedAt: '' }).mime;
     const receipt = cached ?? receiptSchema.parse({ hash: hash(input.bytes), mime, retrievedAt: new Date().toISOString(),
       sourceId: snapshot.source.id, fingerprint: snapshot.source.fingerprint, origin: location });
     if (hash(input.bytes) !== receipt.hash) throw new MissingArtifact('Downloaded source does not match its receipt.');
@@ -303,17 +286,6 @@ export class SourceArtifacts {
    * For browser evidence the hash still names the original saved HTML, not the later rendered capture.
    */
   async readForNote(note: Pick<Note, 'source' | 'generationId' | 'extraction'>, selectedHash = note.extraction.artifactHash): Promise<RetainedArtifact | undefined> {
-    const id = selectedHash;
-    if (!id) return undefined;
-    artifactHash.parse(id);
-    artifactHash.parse(note.generationId);
-    const raw = await this.store.readArtifact(id);
-    if (!raw) throw new MissingArtifact('Pinned source artifact is unavailable.');
-    const reference = noteArtifacts(note).find(artifact => artifact.hash === id);
-    if (!reference) throw new Error('Artifact does not belong to the pinned source generation');
-    if (id === note.extraction.artifactHash && note.extraction.artifactMime && mimeFor(raw.bytes, note.extraction.artifactMime) !== mimeFor(raw.bytes, reference.mime || raw.mime)) throw new Error('Pinned source MIME does not match its attachment record');
-    const mime = reference.mime || raw.mime;
-    // Older notes may lack artifactMime. Verify the raw Blob header rather than guessing from source metadata.
-    return this.checked(raw, { hash: id, mime, retrievedAt: reference.retrievedAt });
+    return new SourceArtifactReader(this.store).read(note, selectedHash);
   }
 }

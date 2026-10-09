@@ -4,8 +4,9 @@ import mammoth from 'mammoth';
 import { fromBufferPromise } from 'yauzl';
 import { sourceTextLimit } from './pdf-text.js';
 import { documentTextLimits } from '../../../shared/document-text.js';
+import { docxMime } from './source-artifact-reader.js';
 
-export const docxMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+export { docxMime, docxCandidate } from './source-artifact-reader.js';
 export const docxByteLimit = 40 * 1024 * 1024;
 export const docxExpandedByteLimit = 80 * 1024 * 1024;
 export const docxXmlByteLimit = 16 * 1024 * 1024;
@@ -33,13 +34,6 @@ function additionalText(value: string, name: string) {
     }).filter(section => section.text);
     return [{ locator: `DOCX running ${name.includes('header') ? 'header' : 'footer'} ${name.split('/').pop()}`, text: wordParagraphs(dom.window.document.documentElement) }].filter(section => section.text);
   } finally { dom.window.close(); }
-}
-
-/** Generic downloads sometimes label DOCX as ZIP or octet-stream. Confirm the package before parsing. */
-export function docxCandidate(bytes: Uint8Array, mime: string) {
-  if (mime.toLowerCase().split(';')[0].trim() === docxMime) return true;
-  return ['', 'application/octet-stream', 'application/zip', 'application/x-zip-compressed'].includes(mime.toLowerCase().split(';')[0].trim())
-    && bytes[0] === 0x50 && bytes[1] === 0x4b && Buffer.from(bytes).includes(Buffer.from('word/document.xml'));
 }
 
 /** Validate actual expansion, not just ZIP metadata, before Mammoth reads the same archive. */

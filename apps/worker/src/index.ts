@@ -1,4 +1,7 @@
 import { app, type HttpResponseInit } from '@azure/functions';
+import { Readable } from 'node:stream';
+import type { ReadableStream } from 'node:stream/web';
+import { handleReaderRequest, readerErrorResponse } from './reader-actions.js';
 import { DefaultAzureCredential } from '@azure/identity';
 import { SecretClient } from '@azure/keyvault-secrets';
 import { processingVersion } from '../../../shared/corpus.js';
@@ -6,20 +9,14 @@ import { createStore } from './sql-store.js';
 import { Zotero } from './zotero.js';
 import { discover, reconcile } from './pipeline.js';
 import { enrich, classifySource, enrichTemplate, licenseEvidence } from './enrichment.js';
-import { categoryRegistry, CategoryError, saveCategory } from './category-registry.js';
-import { categoryOverview, startBatch, dispatchBatch, changeBatch, recoverCategoryWork, startPreview, getPreview, processPreview } from './category-work.js';
-import { ChatAccessError, cancelChat, chatStatus, deleteConversation, getConversation, listConversations, processChatJob, readerIdentity, reconcileChat, submitChat } from './chat-service.js';
+import { categoryRegistry } from './category-registry.js';
+import { dispatchBatch, recoverCategoryWork, processPreview } from './category-work.js';
+import { processChatJob, reconcileChat } from './chat-service.js';
 import { sandboxClient } from './chat-sandbox.js';
 import { deleteExpiredWorkspaces } from './sandbox-lifecycle.js';
 import { discuss } from './chat-agent.js';
 import { corpusTools } from './chat-tools.js';
-import { readChatFile } from './chat-files.js';
-import { readSourceDocument, readSourceText } from './source-reader.js';
-import { chatUploadLimits, readUpload, saveUpload } from './chat-uploads.js';
-import { readReaderNote, saveReaderNote } from './reader-notes.js';
-import { changeSourceLifecycleSchema } from '../../../shared/source-lifecycle.js';
-import { SourceAccessError, SourceLifecycleService, sourceLifecycle, sourceLifecycles } from './source-lifecycle.js';
-import { readLibrary, readTrash } from './library.js';
+import { SourceLifecycleService } from './source-lifecycle.js';
 import { readerSessionResponse, sessionReaderIdentity } from './reader-session.js';
 const required = (name: string) => { const value = process.env[name]; if (!value) throw new Error(`Missing configuration: ${name}`); return value; };
 const store = createStore;
@@ -54,82 +51,13 @@ app.http('chatGateway', {
       const token = request.headers.get('x-reader-session');
       if (request.query.has('session')) return await readerSessionResponse(state, { encoded, token, renew: request.method === 'POST', logout: request.method === 'POST' && request.query.has('logout'), start: request.query.get('session') === 'start' });
       const owner = await sessionReaderIdentity(state, encoded, token);
-      if (request.method === 'GET' && request.query.has('lifecycles')) return { status: 200, jsonBody: await sourceLifecycles(state), headers: { 'Cache-Control': 'private, no-store' } };
-      if (request.method === 'GET' && request.query.has('trash')) return { status: 200, jsonBody: await readTrash(state), headers: { 'Cache-Control': 'private, no-store' } };
-      if (request.query.has('lifecycle')) {
-        const id = request.query.get('lifecycle') || '';
-        const headers = { 'Cache-Control': 'private, no-store' };
-        if (request.method === 'GET') return { status: 200, jsonBody: await sourceLifecycle(state, id), headers };
-        const text = await request.text();
-        if (Buffer.byteLength(text) > 1000) throw new SourceAccessError(413, 'Action is too large');
-        let input: unknown; try { input = JSON.parse(text); } catch { throw new SourceAccessError(400, 'Invalid source action'); }
-        const parsed = changeSourceLifecycleSchema.safeParse(input);
-        if (!parsed.success) throw new SourceAccessError(400, 'Invalid source action');
-        const result = await new SourceLifecycleService(state).change(id, parsed.data.action, parsed.data.revision, owner);
-        if (result.state === 'purging') await state.send(`d_${id}`).catch(() => undefined);
-        return { status: 200, jsonBody: result, headers };
-      }
-      if (request.method === 'GET' && request.query.has('library')) return { status: 200, jsonBody: await readLibrary(state), headers: { 'Cache-Control': 'private, no-store' } };
-      if (request.query.has('notes')) {
-        const headers = { 'Cache-Control': 'private, no-store' };
-        if (request.method === 'GET') return { status: 200, jsonBody: await readReaderNote(state, request.query.get('notes') || ''), headers };
-        const text = await request.text();
-        if (Buffer.byteLength(text) > 100_000) throw new ChatAccessError(413, 'Notes are too large');
-        let input: unknown; try { input = JSON.parse(text); } catch { throw new ChatAccessError(400, 'Invalid notes'); }
-        if ((input as { sourceId?: unknown })?.sourceId !== request.query.get('notes')) throw new ChatAccessError(400, 'Source does not match the notes request');
-        return { status: 200, jsonBody: await saveReaderNote(state, owner, input), headers };
-      }
-      if (request.query.has('admin')) {
-        const headers = { 'Cache-Control': 'private, no-store' };
-        if (request.method === 'GET') return { status: 200, jsonBody: request.query.has('preview') ? await getPreview(state, owner, request.query.get('preview') || '') : await categoryOverview(state), headers };
-        const text = await request.text();
-        if (Buffer.byteLength(text) > 40_000) throw new CategoryError(413, 'Settings are too large');
-        let input: any; try { input = JSON.parse(text); } catch { throw new CategoryError(400, 'Invalid settings'); }
-        const send = (id: string) => state.send(id);
-        const result = input?.action === 'save' ? { registry: await saveCategory(state, input.registryRevision, input.template) }
-          : input?.action === 'update' ? await startBatch(state, input.batch, send)
-          : input?.action === 'preview' ? await startPreview(state, owner, input.sourceId, input.template, send)
-          : ['cancel', 'retry'].includes(input?.action) ? await changeBatch(state, input.id, input.action, send, input.sourceId)
-          : (() => { throw new CategoryError(400, 'Unknown category action'); })();
-        return { status: 200, jsonBody: result, headers };
-      }
-      const fileHeaders = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox" };
-      if (request.method === 'GET' && request.query.has('source')) {
-        const offset = request.query.get('offset');
-        if (offset !== null && !/^\d{1,10}$/.test(offset)) throw new ChatAccessError(400, 'Invalid original text position');
-        const attachmentKey = request.query.get('attachment');
-        if (attachmentKey !== null && !/^[A-Z0-9]{8}$/.test(attachmentKey)) throw new ChatAccessError(400, 'Invalid original attachment');
-        return { status: 200, jsonBody: await readSourceText(state, request.query.get('source') || '', { ...(offset !== null ? { offset: Number(offset) } : {}), ...(attachmentKey ? { attachmentKey } : {}) }), headers: { 'Cache-Control': 'private, no-store' } };
-      }
-      if (request.method === 'GET' && request.query.has('document')) {
-        const file = await readSourceDocument(state, request.query.get('document') || '', request.query.get('attachment'));
-        return { status: 200, body: file.bytes, headers: { ...fileHeaders, 'Content-Type': file.mime, 'Content-Disposition': `${file.disposition}; filename="${file.filename}"` } };
-      }
-      if (request.method === 'GET' && request.query.has('upload')) {
-        const upload = await readUpload(state, owner, request.query.get('upload') || '');
-        return { status: 200, body: upload.bytes, headers: { ...fileHeaders, 'Content-Type': upload.mime, 'Content-Disposition': 'inline; filename="screenshot"' } };
-      }
-      if (request.method === 'POST' && request.query.has('upload')) {
-        if (Number(request.headers.get('content-length')) > chatUploadLimits.bytes) throw new ChatAccessError(413, 'Images must be 5 MB or smaller');
-        const bytes = Buffer.from(await request.arrayBuffer());
-        return { status: 201, jsonBody: await saveUpload(state, owner, bytes, request.headers.get('content-type')), headers: { 'Cache-Control': 'private, no-store' } };
-      }
-      if (request.method === 'GET' && (request.query.has('asset') || request.query.has('file'))) {
-        const file = await readChatFile(state, owner, request.query.get('id') || '', request.query.get('asset'), request.query.get('file'), request.query.get('evidence'));
-        return { status: 200, body: file.bytes, headers: { 'Content-Type': file.mime, 'Content-Disposition': `inline; filename="${file.filename}"`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' } };
-      }
-      const result = request.method === 'GET' ? request.query.has('conversation') ? await getConversation(state, owner, request.query.get('conversation') || '') : request.query.has('conversations') ? await listConversations(state, owner) : await chatStatus(state, owner, request.query.get('id') || '') : await (async () => {
-        const text = await request.text();
-        if (Buffer.byteLength(text) > 40_000) throw new ChatAccessError(413, 'Message is too large');
-        let input: unknown; try { input = JSON.parse(text); } catch { throw new ChatAccessError(400, 'Invalid question'); }
-        if ((input as { action?: string })?.action === 'cancel') return cancelChat(state, owner, (input as { id: string }).id);
-        if ((input as { action?: string })?.action === 'delete') return deleteConversation(state, owner, String((input as { conversationId?: unknown }).conversationId));
-        return submitChat(state, owner, input, id => state.sendChat(id));
-      })();
-      return { status: request.method === 'POST' ? 202 : 200, jsonBody: result, headers: { 'Cache-Control': 'private, no-store' } };
+      return await handleReaderRequest(state, owner, {
+        method: request.method, query: request.query, headers: request.headers,
+        body: request.body ? Readable.fromWeb(request.body as ReadableStream<Uint8Array>) : undefined
+      });
     } catch (error) {
       context.error(JSON.stringify({ event: 'gateway-error', name: (error as Error).name, code: (error as { code?: string }).code, number: (error as { number?: number }).number }));
-      return { status: error instanceof ChatAccessError || error instanceof CategoryError || error instanceof SourceAccessError ? error.status : 503, jsonBody: { error: error instanceof ChatAccessError || error instanceof CategoryError || error instanceof SourceAccessError ? error.message : 'The service is temporarily unavailable. Try again.' }, headers: { 'Cache-Control': 'private, no-store' } };
+      return readerErrorResponse(error);
     }
   }
 });

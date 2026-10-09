@@ -9,7 +9,7 @@ const humanHtml = async (markdown: string) => sanitizeHtml(await marked.parse(ma
   allowedSchemes: ['http', 'https', 'mailto'], allowProtocolRelative: false
 });
 
-export async function readLibrary(store: SqlStore) {
+export async function readLibrary(store: Pick<SqlStore, 'sources' | 'sourceInputs' | 'read' | 'list'>) {
   const [sources, inputs] = await Promise.all([store.sources(), store.sourceInputs()]);
   const entries = await Promise.all(sources.map(async ({ note, humanMarkdown }) => {
     const { text, fullText, generationId, readerNote } = inputs.get(note.source.id) || {};
@@ -20,7 +20,7 @@ export async function readLibrary(store: SqlStore) {
   return entries.filter(entry => !lifecycles[entry.note.source.id] || lifecycles[entry.note.source.id].state === 'active');
 }
 
-export async function readTrash(store: SqlStore) {
+export async function readTrash(store: Pick<SqlStore, 'retainedSource' | 'read' | 'list'>) {
   const result = [];
   for (const lifecycle of Object.values(await sourceLifecycles(store))) {
     if (!['trashed', 'purging'].includes(lifecycle.state)) continue;

@@ -45,7 +45,8 @@ async function call(transport: 'local' | 'production', query: string, body?: Uin
     const response = await production(query, body, { 'x-ms-client-principal': principal, ...headers });
     return { status: response.status, headers: new Headers(response.headers), json: response.jsonBody, bytes: response.body ? Buffer.from(response.body as Uint8Array) : undefined };
   }
-  const response = await fetch(`${address}/api/chat?${query}`, { method: body === undefined ? 'GET' : 'POST', headers, body: body === undefined ? undefined : Buffer.from(body) });
+  const path = query === 'admin=1' ? '/api/categories' : `/api/chat?${query}`;
+  const response = await fetch(address + path, { method: body === undefined ? 'GET' : 'POST', headers, body: body === undefined ? undefined : Buffer.from(body) });
   const bytes = Buffer.from(await response.arrayBuffer());
   const json = response.headers.get('content-type')?.includes('application/json') ? JSON.parse(bytes.toString()) : undefined;
   return { status: response.status, headers: response.headers, json, bytes: json === undefined ? bytes : undefined };
@@ -56,16 +57,25 @@ it.each(['local', 'production'] as const)('%s enforces notes targets, category a
   const mismatch = await call(transport, 'notes=zotero-users-12345-OTHER123', jsonBytes({ sourceId: fixture.note.source.id, markdown: 'Wrong source', revision: 0 }));
   expect(mismatch.status).toBe(400);
   expect(await fixture.store.read(`reader-notes/${fixture.note.source.id}.json`)).toBeUndefined();
-  expect((await call(transport, 'admin=1', jsonBytes({ action: 'unknown' }))).status).toBe(400);
+  const saved = await call(transport, `notes=${fixture.note.source.id}`, jsonBytes({ sourceId: fixture.note.source.id, markdown: 'Observation', revision: 0 }));
+  const owner = transport === 'local' ? 'local-developer' : hash('github:reader-one');
+  expect(saved.status).toBe(200);
+  expect(saved.json).toMatchObject({ markdown: 'Observation', updatedBy: owner, revision: 1 });
+  const unknown = await call(transport, 'admin=1', jsonBytes({ action: 'unknown' }));
+  expect(unknown.status).toBe(400);
+  expect(unknown.json).toEqual({ error: 'Unknown category action' });
+  expect(fixture.store.send).not.toHaveBeenCalled();
   const submitted = await call(transport, '', jsonBytes({ question: 'Read this source' }));
   expect(submitted.status).toBe(202);
-  expect(await fixture.store.read(`chat/jobs/${submitted.json.id}.json`)).toMatchObject({ owner: transport === 'local' ? 'local-developer' : hash('github:reader-one') });
+  expect(fixture.store.sendChat).toHaveBeenCalledExactlyOnceWith(submitted.json.id);
+  expect(await fixture.store.read(`chat/jobs/${submitted.json.id}.json`)).toMatchObject({ owner, status: 'pending' });
 });
 
 it.each(['local', 'production'] as const)('%s serves verified documents and uploaded images with private headers', async transport => {
   const original = await call(transport, `document=${fixture.note.source.id}`);
   expect(original.status).toBe(200);
   expect(original.bytes).toEqual(fixture.bytes);
+  expect(original.headers.get('content-type')).toBe('application/pdf');
   expect(original.headers.get('cache-control')).toBe('private, no-store');
   expect(original.headers.get('x-content-type-options')).toBe('nosniff');
   expect(original.headers.get('content-security-policy')).toBe("default-src 'none'; sandbox");
@@ -104,17 +114,12 @@ it('returns 413 over a live local socket for a chunked body without Content-Leng
   expect(fixture.store.send).not.toHaveBeenCalled();
 });
 
-it('maps the local categories URL to the shared category handler', async () => {
-  const response = await fetch(`${address}/api/categories`, { method: 'POST', body: JSON.stringify({ action: 'unknown' }) });
-  expect(response.status).toBe(400);
-  expect(await response.json()).toEqual({ error: 'Unknown category action' });
-});
-
 it('records unexpected local errors without exposing them in the HTTP response', async () => {
   const log = vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(fixture.store, 'sources').mockRejectedValueOnce(new Error('Unable to connect to development SQL'));
   const response = await call('local', 'library=1');
   expect(response.status).toBe(503);
+  expect(response.headers.get('cache-control')).toBe('private, no-store');
   expect(response.json).toEqual({ error: 'The service is temporarily unavailable. Try again.' });
   expect(log).toHaveBeenCalledOnce();
   expect(log.mock.calls.flat().join(' ')).toContain('Unable to connect to development SQL');

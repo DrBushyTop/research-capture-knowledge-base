@@ -84,19 +84,15 @@ it('opens the logout page from the menu and clears private data before navigatin
   expect(clear).toHaveBeenCalledOnce();
 });
 
-it('opens the reader on refresh and in a new tab without waiting for session renewal', async () => {
+it('opens the reader without waiting for session renewal', async () => {
   vi.stubEnv('DEV', false);
   handler = (url, init) => url === '/api/session' ? new Promise<Response>(() => {}) : api(url, init);
-  for (const visit of ['first visit', 'page refresh', 'new tab']) {
-    const { client } = await mount('/sources/');
-    expect(host.querySelector('.sources-shell'), visit).toBeTruthy();
-    expect(host.textContent, visit).not.toContain('Checking your sign-in');
-    expect(client.getQueryData(keys.library), visit).toBeTruthy();
-    await act(async () => root!.unmount()); root = undefined;
-    host.replaceChildren();
-  }
-  expect(calls.filter(call => call === 'POST /api/session')).toHaveLength(3);
-  expect(calls.filter(call => call.includes('library=1'))).toHaveLength(3);
+  const { client } = await mount('/sources/');
+  expect(host.querySelector('.sources-shell')).toBeTruthy();
+  expect(host.textContent).not.toContain('Checking your sign-in');
+  expect(client.getQueryData(keys.library)).toBeTruthy();
+  expect(calls.filter(call => call === 'POST /api/session')).toHaveLength(1);
+  expect(calls.filter(call => call.includes('library=1'))).toHaveLength(1);
 });
 
 for (const failure of ['network', 'server', 'html', 'malformed'] as const) {

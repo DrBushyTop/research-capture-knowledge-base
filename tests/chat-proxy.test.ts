@@ -37,22 +37,29 @@ function request(origin?: string, method = 'POST'): ProxyRequest {
   if (origin !== undefined) headers.set('origin', origin);
   return { method, headers, query: new URLSearchParams(method === 'GET' ? 'library=1' : ''), text: async () => JSON.stringify({ question: 'Test', history: [] }) };
 }
-for (const name of ['chat', 'categories']) {
-  for (const origin of [shelf, azure]) {
-    it(`forwards ${name} writes from ${origin}`, async () => {
-      expect((await handlers.get(name)!(request(origin))).status).toBe(202);
-      expect(backend).toHaveBeenCalledOnce();
-      expect(backend.mock.calls[0][1].headers['x-reader-session']).toBe(session);
-      expect(backend.mock.calls[0][1].headers['x-ms-client-principal']).toBeUndefined();
-    });
-  }
-  for (const origin of [undefined, 'null', 'https://evil.example', 'https://shelf.huuhka.net.evil.example', 'http://shelf.huuhka.net', 'https://shelf.huuhka.net:444']) {
-    it(`rejects ${name} writes with origin ${origin}`, async () => {
-      expect((await handlers.get(name)!(request(origin))).status).toBe(403);
-      expect(backend).not.toHaveBeenCalled();
-    });
-  }
+for (const origin of [shelf, azure]) {
+  it(`forwards chat writes from ${origin}`, async () => {
+    expect((await handlers.get('chat')!(request(origin))).status).toBe(202);
+    expect(backend).toHaveBeenCalledOnce();
+    expect(backend.mock.calls[0][1].headers['x-reader-session']).toBe(session);
+    expect(backend.mock.calls[0][1].headers['x-ms-client-principal']).toBeUndefined();
+  });
 }
+for (const origin of [undefined, 'null', 'https://evil.example', 'https://shelf.huuhka.net.evil.example', 'http://shelf.huuhka.net', 'https://shelf.huuhka.net:444']) {
+  it(`rejects chat writes with origin ${origin}`, async () => {
+    expect((await handlers.get('chat')!(request(origin))).status).toBe(403);
+    expect(backend).not.toHaveBeenCalled();
+  });
+}
+it('forwards approved category writes as admin requests', async () => {
+  expect((await handlers.get('categories')!(request(shelf))).status).toBe(202);
+  expect(backend).toHaveBeenCalledOnce();
+  expect(new URL(backend.mock.calls[0][0]).searchParams.get('admin')).toBe('1');
+});
+it('rejects cross-origin category writes before contacting the worker', async () => {
+  expect((await handlers.get('categories')!(request('https://evil.example'))).status).toBe(403);
+  expect(backend).not.toHaveBeenCalled();
+});
 it('requires a server session even on the approved custom domain', async () => {
   const input = request(shelf); input.headers.delete('cookie');
   expect((await handlers.get('chat')!(input)).status).toBe(403);

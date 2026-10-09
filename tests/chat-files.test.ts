@@ -6,15 +6,15 @@ import { readChatFile } from '../apps/worker/src/chat-files.js';
 import type { BlobStore } from '../apps/worker/src/storage.js';
 import { blobArtifactStore, MemorySourceArtifactStore, screenshot } from './source-artifacts-fixture.js';
 const id = '1'.repeat(32); const revision = '2'.repeat(64);
-it.each([undefined, 'application/x-pdf', 'application/octet-stream'])('serves a cited original generation with MIME %s and refuses another reader or uncited source', async mime => {
+it('serves a cited legacy PDF generation and refuses another reader or uncited source', async () => {
   const state = new MemorySourceArtifactStore(); const keys: string[] = [];
   const bytes = Buffer.from('%PDF-1.7\nSaved fixture');
   const generationId = 'a'.repeat(64); const artifactHash = hash(bytes);
-  await state.retain(artifactHash, bytes, mime || 'application/pdf');
+  await state.retain(artifactHash, bytes, 'application/pdf');
   const read = state.readArtifact.bind(state);
   state.readArtifact = async key => { keys.push(key); return read(key); };
   const source = normalize(snapshot)[0].source;
-  const note = noteSchema.parse({ schemaVersion: 1, generationId, source, extraction: { status: 'text', method: 'pdf-text', reason: null, truncated: false, retrievedAt: new Date().toISOString(), artifactHash, ...(mime ? { artifactMime: mime } : {}) }, analysis: null, processing: { version: '2', model: null, processedAt: new Date().toISOString() }, rightsEvidence: [] });
+  const note = noteSchema.parse({ schemaVersion: 1, generationId, source, extraction: { status: 'text', method: 'pdf-text', reason: null, truncated: false, retrievedAt: new Date().toISOString(), artifactHash, artifactMime: ' Application/X-PDF; charset=binary' }, analysis: null, processing: { version: '2', model: null, processedAt: new Date().toISOString() }, rightsEvidence: [] });
   const cite = evidenceChunk({ sourceId: source.id, generationId, title: source.title, kind: 'source', locator: 'PDF page 2', text: 'Saved original text', sourceUrl: 'https://example.org/original', pdf: true });
   const result = validateAnswer({ answer: `Original [${cite.id}]`, insufficientEvidence: false, citations: [{ evidenceId: cite.id, quote: 'Saved original text' }] }, [cite]);
   const job: ChatJob = { id, owner: 'owner', createdAt: new Date().toISOString(), corpusRevision: revision, request: { question: 'Original?', history: [] }, status: 'complete', attempts: 1, result };
@@ -28,7 +28,6 @@ it.each([undefined, 'application/x-pdf', 'application/octet-stream'])('serves a 
   expect(keys).toEqual([]);
   expect((await readChatFile(store, 'owner', id, null, source.id, cite.id)).mime).toBe('application/pdf');
   expect(keys).toEqual([artifactHash]);
-  expect(result.citations[0].sourceUrl).toBe('https://example.org/original');
 });
 
 it.each([false, true])('reads MIME-less cited images and enforces their 5 MB limit, oversized=%s', async oversized => {

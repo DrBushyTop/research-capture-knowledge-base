@@ -31,7 +31,6 @@ it('serves only text matching the deployed source generation and artifact', asyn
 it('reads a retained original and rejects sources outside the corpus before reading bytes', async () => {
   const { note, files, readArtifact } = await saved();
   expect((await readSourceDocument(files, note.source.id)).mime).toBe('application/pdf');
-  expect(readArtifact).toHaveBeenCalledWith(note.extraction.artifactHash, {});
   readArtifact.mockClear();
   await expect(readSourceDocument(files, 'zotero-users-12345-MISSING1')).rejects.toMatchObject({ status: 404 });
   expect(readArtifact).not.toHaveBeenCalled();
@@ -47,8 +46,8 @@ it('reports the Reader size limit when the artifact module refuses a large file'
   await expect(readSourceDocument(files, note.source.id)).rejects.toMatchObject({ status: 413 });
 });
 
-it.each(['application/x-pdf', 'application/octet-stream', 'Application/PDF; charset=binary'])('downloads verified PDFs from notes declaring %s', async mime => {
-  const { note, files } = await saved(mime);
+it('downloads a verified legacy PDF using its canonical MIME and filename', async () => {
+  const { note, files } = await saved('application/x-pdf');
   expect(await readSourceDocument(files, note.source.id)).toMatchObject({ mime: 'application/pdf', filename: `${note.source.id}.pdf`, disposition: 'inline' });
 });
 

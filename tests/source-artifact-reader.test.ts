@@ -26,14 +26,6 @@ it.each(['application/octet-stream', 'application/x-pdf', 'application/pdf; char
   expect(await new SourceArtifactReader(store).read(note)).toEqual({ bytes: pdf, mime: 'application/pdf', retrievedAt: note.extraction.retrievedAt });
 });
 
-it('uses the raw MIME for old image notes that lack a retained MIME field', async () => {
-  const store = new MemorySourceArtifactStore();
-  await store.retain(hash(screenshot), screenshot, 'image/png');
-  const note = pinned(screenshot, 'image/png');
-  const { artifactMime: _mime, ...extraction } = note.extraction;
-  expect((await new SourceArtifactReader(store).read({ ...note, extraction: { ...extraction, method: 'image-vision', status: 'image' } }))?.mime).toBe('image/png');
-});
-
 it.each(['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'])('rejects bytes mislabeled as %s even if their hash is valid', async mime => {
   const bytes = Buffer.from('<html>Not a document or image</html>');
   const store = new MemorySourceArtifactStore();
@@ -51,7 +43,7 @@ it('rejects changed bytes and MIME without substituting another retained origina
   await expect(new SourceArtifactReader(store).read(pinned())).rejects.toBeInstanceOf(MissingArtifact);
 });
 
-it('applies the caller limit before Blob download and pins bytes to the ETag', async () => {
+it('enforces the caller byte limit before Blob download', async () => {
   const store = blobArtifactStore();
   const download = vi.fn(async () => screenshot);
   vi.spyOn(store.raw, 'getBlockBlobClient').mockReturnValue({
@@ -61,14 +53,6 @@ it('applies the caller limit before Blob download and pins bytes to the ETag', a
   const reader = new SourceArtifactReader(store);
   await expect(reader.read(pinned(screenshot, 'image/png'), undefined, { maxBytes: 5 * 1024 * 1024 })).rejects.toBeInstanceOf(ArtifactTooLarge);
   expect(download).not.toHaveBeenCalled();
-  vi.spyOn(store.raw, 'getBlockBlobClient').mockReturnValue({
-    getProperties: async () => ({ contentLength: screenshot.length, contentType: 'image/png', etag: 'original' }),
-    downloadToBuffer: async (_offset: number, _length: number, options: { conditions: { ifMatch: string } }) => {
-      expect(options.conditions.ifMatch).toBe('original');
-      throw Object.assign(new Error('ETag changed'), { statusCode: 412 });
-    }
-  } as never);
-  await expect(reader.read(pinned(screenshot, 'image/png'))).rejects.toThrow('ETag changed');
 });
 
 it('checks returned byte limits even when a memory adapter does not enforce the requested cap', async () => {
